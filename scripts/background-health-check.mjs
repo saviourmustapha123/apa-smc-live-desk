@@ -35,6 +35,9 @@ try {
     ['unsafe dynamic content escaping helper', /function escapeHTML\(/.test(source)],
     ['HTTPS-only API allowlist', /function safeApiBase\(/.test(source) && /https:\/\/biquote\.io\/api/.test(source)],
     ['content security policy present', /Content-Security-Policy/.test(source)],
+    ['forex tick-volume fallback is explicit', /useTicks\?ticks/.test(source) && /tick-volume proxy/.test(source)],
+    ['unknown quote freshness fails closed', /!Number\.isFinite\(age\)/.test(source) && /age>300/.test(source)],
+    ['volume profile warns it is approximate', /uniformly over the price bins/.test(source) && /volume-source unknown/.test(source)],
     ['no brokerage execution integration', !/apiKeySecret|brokerPassword|placeOrder\s*\(/i.test(source)]
   ];
   for (const [name, ok] of checks) ok ? pass(name) : fail(name);
