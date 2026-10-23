@@ -250,6 +250,9 @@ function analyse(){
 }
 function log(set){
  const key=[set.symbol,set.tf,set.side,set.time].join('|');
+ const existing=s.log.find(t=>[t.symbol,t.tf,t.side,t.time].join('|')===key);
+ // A candle's signal is immutable once recorded: refreshing or changing markets must not duplicate it or reset its lifecycle.
+ if(existing){s.lastKey=key;return}
  if(s.lastKey===key)return;
  s.lastKey=key;
  s.log.unshift({...set,status:set.status||'NOT RUNNING',loggedAt:Date.now()});
