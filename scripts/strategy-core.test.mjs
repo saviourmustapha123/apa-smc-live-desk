@@ -56,7 +56,10 @@ test('simulator records a target win when target is reached first', () => {
     bar(2, 100, 116, 99, 114),
   ];
   const result = simulate(bars, {index:0,side:'BUY',entry:100,sl:95,tp:115,rr:3});
-  assert.deepEqual(result, {result:'WIN',r:3});
+  assert.equal(result.result, 'WIN');
+  assert.equal(result.r, 3);
+  assert.equal(result.entry, 100);
+  assert.equal(result.rr, 3);
 });
 
 test('simulator records a stop loss when stop is reached', () => {
@@ -65,7 +68,9 @@ test('simulator records a stop loss when stop is reached', () => {
     bar(2, 100, 104, 94, 96),
   ];
   const result = simulate(bars, {index:0,side:'BUY',entry:100,sl:95,tp:115,rr:3});
-  assert.deepEqual(result, {result:'LOSS',r:-1});
+  assert.equal(result.result, 'LOSS');
+  assert.equal(result.r, -1);
+  assert.equal(result.entry, 100);
 });
 
 test('simulator conservatively assumes stop first when both levels are touched in one candle', () => {
@@ -74,7 +79,8 @@ test('simulator conservatively assumes stop first when both levels are touched i
     bar(2, 100, 116, 94, 105),
   ];
   const result = simulate(bars, {index:0,side:'BUY',entry:100,sl:95,tp:115,rr:3});
-  assert.deepEqual(result, {result:'LOSS (both levels touched; stop-first assumption)',r:-1});
+  assert.equal(result.result, 'LOSS (both levels touched; stop-first assumption)');
+  assert.equal(result.r, -1);
 });
 
 test('simulator leaves a trade unresolved when neither level is reached', () => {
@@ -83,5 +89,20 @@ test('simulator leaves a trade unresolved when neither level is reached', () => 
     bar(2, 100, 110, 96, 105),
   ];
   const result = simulate(bars, {index:0,side:'BUY',entry:100,sl:95,tp:115,rr:3});
-  assert.deepEqual(result, {result:'UNRESOLVED',r:null});
+  assert.equal(result.result, 'UNRESOLVED');
+  assert.equal(result.r, null);
+});
+
+test('simulator uses next candle open and skips a gap that breaks the 1:3 gate', () => {
+  const bars = [bar(1, 100, 101, 99, 100), bar(2, 103, 104, 102, 103)];
+  const result = simulate(bars, {index:0,side:'BUY',entry:100,sl:95,tp:115,rr:3});
+  assert.equal(result.result, 'SKIPPED (next-open entry fails 1:3 gate)');
+  assert.equal(result.entry, 103);
+  assert.ok(result.rr < 3);
+});
+
+test('simulator skips an entry if the next open is already beyond its stop', () => {
+  const bars = [bar(1, 100, 101, 99, 100), bar(2, 90, 96, 89, 92)];
+  const result = simulate(bars, {index:0,side:'BUY',entry:100,sl:95,tp:115,rr:3});
+  assert.equal(result.result, 'SKIPPED (next-open entry fails 1:3 gate)');
 });
