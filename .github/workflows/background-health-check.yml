@@ -43,6 +43,10 @@ jobs:
         if: github.event_name != 'schedule'
         run: node --test scripts/strategy-discovery.test.mjs
 
+      - name: Run research backtest unit tests
+        if: github.event_name != 'schedule'
+        run: node --test scripts/research-backtest.test.mjs
+
       - name: Run rolling historical proxy backtest
         if: github.event_name != 'schedule'
         run: node scripts/proxy-backtest.mjs
