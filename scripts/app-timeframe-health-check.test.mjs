@@ -10,6 +10,11 @@ test('chart exposes monthly and yearly timeframe controls', () => {
   assert.match(html, /'1Y':31536000/);
 });
 
+test('weekly candle refresh uses the same Monday UTC bucket as weekly aggregation', () => {
+  assert.match(html, /if\(tf==='1W'\)\{const day=\(d\.getUTCDay\(\)\+6\)%7;return Date\.UTC\(d\.getUTCFullYear\(\),d\.getUTCMonth\(\),d\.getUTCDate\(\)-day\)\/1000\}/);
+  assert.match(html, /calendarAggregate\(daily,'week'\)/);
+});
+
 test('yearly candles are bucketed by calendar year, not fixed 365-day offsets', () => {
   assert.match(html, /if\(tf==='1Y'\)return Date\.UTC\(d\.getUTCFullYear\(\),0,1\)\/1000/);
   assert.match(html, /calendarAggregate\(daily,'year'\)/);
