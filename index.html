@@ -17,8 +17,8 @@
 <div id="modal" class="hidden"><div class="panel modalbox"><div class="head"><b>Connection & privacy settings</b><button id="closeModal">Close</button></div><div class="body"><div class="note">Configured to request the documented Biquote REST API. The execution environment cannot reach the API directly, so use Test feed in your browser before trusting prices.</div><div class="field" style="margin-top:12px"><label>API base URL</label><input id="apiBase" value="https://biquote.io/api"></div><div class="field"><label>Initial candles to load</label><select id="initialBars"><option value="300">300 · faster</option><option value="600" selected>600 · balanced</option><option value="1000">1000 · max request</option></select></div><div class="controls"><button class="primary" id="saveSettings">Save & reconnect</button><button id="test">Test feed</button></div><p class="muted" id="testResult"></p><p class="fine">This is a single-file app, not a secure account system. Candles are cached in IndexedDB and settings/journal in local browser storage. Requests go to the market-data provider and chart CDN; they may receive ordinary connection metadata. Do not store brokerage passwords here. The strategy detectors are heuristic and no order is placed or executed.</p></div></div></div><div id="toast" class="toast hidden"></div>
 <script>
 (()=>{'use strict';
-const $=id=>document.getElementById(id), DB='apa-smc-live-db', STORE='bars';
-const s={symbol:'EURUSD',tf:'5m',api:'https://biquote.io/api',initial:600,refresh:5,rr:4,k:3,disp:1,db:null,chart:null,series:null,bars:[],data:[],minute:[],log:[],timer:null,stopLoad:false,busy:false,candleFeedOk:false,lines:[],trendSeries:[],markers:null,lastKey:'',didFit:false,overlay:null,zoneDefs:[],overlaySignal:null,topDownBusy:false,lastTopDownAt:0,topDownTimer:null};
+const $=id=>document.getElementById(id), DB='apa-smc-live-db', STORE='bars', SIGNALS='signals';
+const s={symbol:'EURUSD',tf:'5m',api:'https://biquote.io/api',initial:600,refresh:5,rr:4,k:3,disp:1,db:null,chart:null,series:null,bars:[],data:[],minute:[],log:[],timer:null,stopLoad:false,busy:false,candleFeedOk:false,lines:[],trendSeries:[],markers:null,lastKey:'',didFit:false,overlay:null,zoneDefs:[],overlaySignal:null,topDownBusy:false,lastTopDownAt:0,lastOtherPairScan:0,topDownTimer:null};
 const symbolConfig={EURUSD:{label:'EUR/USD',type:'forex',precision:5},BTCUSD:{label:'BTC/USD',type:'crypto',precision:2}};
 function escapeHTML(value){return String(value??'').replace(/[&<>\"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]))}
 function safeApiBase(value){try{const u=new URL(String(value||''));if(u.protocol!=='https:'||u.hostname!=='biquote.io'||u.username||u.password||u.search||u.hash||!['','/api','/api/'].includes(u.pathname))return 'https://biquote.io/api';return 'https://biquote.io/api'}catch{return 'https://biquote.io/api'}}
@@ -31,11 +31,28 @@ const priceFor=(n,sym)=>Number.isFinite(+n)?(+n).toFixed(symbolConfig[sym]?.prec
 const stamp=t=>new Date(t*1000).toISOString().replace('T',' ').slice(0,16);
 function toast(m){$('toast').textContent=m;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),2800)}
 function status(m,k=''){$('status').textContent=m;$('dot').className='dot '+(k==='ok'?'ok':k==='bad'?'bad':'')}
-function dbOpen(){return new Promise((res,rej)=>{let r=indexedDB.open(DB,2);r.onupgradeneeded=(event)=>{let d=r.result,tx=r.transaction,st;if(!d.objectStoreNames.contains(STORE)){st=d.createObjectStore(STORE,{keyPath:'key'})}else{st=tx.objectStore(STORE)}if(st.indexNames.contains('symtime'))st.deleteIndex('symtime');if(!st.indexNames.contains('symtf'))st.createIndex('symtf',['symbol','timeframe','time'],{unique:true});if(event.oldVersion<2){const get=st.getAll();get.onsuccess=()=>{const old=get.result||[];st.clear();for(const item of old){const sym=item.symbol||'EURUSD',tf=item.timeframe||'1m',bar={...item,timeframe:tf,key:sym+'_'+tf+'_'+item.time};st.put(bar)}}}};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+function dbOpen(){return new Promise((res,rej)=>{let r=indexedDB.open(DB,3);r.onupgradeneeded=(event)=>{let d=r.result,tx=r.transaction,st;if(!d.objectStoreNames.contains(STORE)){st=d.createObjectStore(STORE,{keyPath:'key'})}else{st=tx.objectStore(STORE)}if(st.indexNames.contains('symtime'))st.deleteIndex('symtime');if(!st.indexNames.contains('symtf'))st.createIndex('symtf',['symbol','timeframe','time'],{unique:true});if(event.oldVersion<2){const get=st.getAll();get.onsuccess=()=>{const old=get.result||[];st.clear();for(const item of old){const sym=item.symbol||'EURUSD',tf=item.timeframe||'1m',bar={...item,timeframe:tf,key:sym+'_'+tf+'_'+item.time};st.put(bar)}}}if(!d.objectStoreNames.contains(SIGNALS))d.createObjectStore(SIGNALS,{keyPath:'key'})};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 function dbPut(arr,sym=s.symbol,tf='1m'){if(!s.db)return Promise.resolve();return new Promise((res,rej)=>{let tx=s.db.transaction(STORE,'readwrite'),st=tx.objectStore(STORE);arr.forEach(b=>st.put({key:sym+'_'+tf+'_'+b.time,symbol:sym,timeframe:tf,...b}));tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}
 function dbGet(sym=s.symbol,tf='1m'){if(!s.db)return Promise.resolve([]);return new Promise((res,rej)=>{let r=s.db.transaction(STORE,'readonly').objectStore(STORE).index('symtf').getAll(IDBKeyRange.bound([sym,tf,0],[sym,tf,Number.MAX_SAFE_INTEGER]));r.onsuccess=()=>res(r.result.map(({key,symbol,timeframe,...b})=>b).sort((a,b)=>a.time-b.time));r.onerror=()=>rej(r.error)})}
 async function dbClear(sym){return new Promise((res,rej)=>{let tx=s.db.transaction(STORE,'readwrite'),cur=tx.objectStore(STORE).openCursor();cur.onsuccess=()=>{let c=cur.result;if(c){if(c.value.symbol===sym)c.delete();c.continue()}};tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}
-function save(){try{localStorage.setItem('apa-desk-settings',JSON.stringify({api:s.api,initial:s.initial,refresh:s.refresh,k:s.k,disp:s.disp,symbol:s.symbol,tf:s.tf}));localStorage.setItem('apa-desk-log',JSON.stringify(s.log))}catch(e){console.warn('Local settings could not be saved',e);if($('toast'))toast('Browser storage unavailable or full. Export your journal for backup.')}}
+function signalKey(t){return [t.symbol,t.tf,t.side,t.time].join('|')}
+function persistSignals(items){
+ if(!items?.length)return Promise.resolve();
+ if(!s.db){try{localStorage.setItem('apa-desk-log',JSON.stringify(s.log))}catch{}return Promise.resolve()}
+ return new Promise((res,rej)=>{const tx=s.db.transaction(SIGNALS,'readwrite'),st=tx.objectStore(SIGNALS);for(const t of items)st.put({...t,key:signalKey(t)});tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})
+}
+function clearSignalStore(){if(!s.db){try{localStorage.removeItem('apa-desk-log')}catch{}return Promise.resolve()}return new Promise((res,rej)=>{const tx=s.db.transaction(SIGNALS,'readwrite');tx.objectStore(SIGNALS).clear();tx.oncomplete=()=>{try{localStorage.removeItem('apa-desk-log')}catch{}res()};tx.onerror=()=>rej(tx.error)})}
+async function loadSignalStore(){
+ const legacy=Array.isArray(s.log)?s.log:[];if(!s.db)return;
+ const stored=await new Promise((res,rej)=>{const r=s.db.transaction(SIGNALS,'readonly').objectStore(SIGNALS).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)});
+ const map=new Map(stored.map(t=>[t.key||signalKey(t),t]));
+ const migrate=[];for(const t of legacy){const key=signalKey(t);if(!map.has(key)){map.set(key,{...t,key});migrate.push(t)}}
+ if(migrate.length)await persistSignals(migrate);
+ s.log=[...map.values()].sort((a,b)=>Number(b.time)-Number(a.time));
+ try{localStorage.removeItem('apa-desk-log')}catch{}
+}
+
+function save(){try{localStorage.setItem('apa-desk-settings',JSON.stringify({api:s.api,initial:s.initial,refresh:s.refresh,k:s.k,disp:s.disp,symbol:s.symbol,tf:s.tf}))}catch(e){console.warn('Local settings could not be saved',e);if($('toast'))toast('Browser storage unavailable or full. Export your journal for backup.')}}
 function renderPairSelector(){const host=$('pairSelector');if(!host)return;host.innerHTML=Object.entries(symbolConfig).map(([symbol,meta])=>'<button class="pair '+(s.symbol===symbol?'active':'')+'" data-s="'+symbol+'">'+meta.label+'</button>').join('');host.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>switchSymbol(b.dataset.s))}
 function loadPrefs(){try{const p=JSON.parse(localStorage.getItem('apa-desk-settings')||'{}');if(p&&typeof p==='object'&&!Array.isArray(p)){s.api=safeApiBase(p.api);if(Number.isFinite(+p.initial))s.initial=Math.min(1000,Math.max(100,+p.initial));if(Number.isFinite(+p.refresh))s.refresh=Math.min(60,Math.max(2,+p.refresh));if(Number.isFinite(+p.k))s.k=Math.min(10,Math.max(2,+p.k));if(Number.isFinite(+p.disp))s.disp=Math.min(5,Math.max(.1,+p.disp));if(symbolConfig[p.symbol])s.symbol=p.symbol;if(Object.hasOwn(secs,p.tf))s.tf=p.tf}const log=JSON.parse(localStorage.getItem('apa-desk-log')||'[]');s.log=Array.isArray(log)?log.filter(t=>t&&typeof t==='object'&&Number(t.rr)>=3&&Number.isFinite(Number(t.time))&&['BUY','SELL'].includes(t.side)&&symbolConfig[t.symbol]&&Object.hasOwn(secs,t.tf)):[]}catch{s.log=[]}s.api=safeApiBase(s.api);if(!symbolConfig[s.symbol])s.symbol='EURUSD';if(!Object.hasOwn(secs,s.tf))s.tf='5m';s.rr=Number(s.rr)||4;$('apiBase').value=s.api;$('initialBars').value=s.initial;$('refreshSec').value=s.refresh;$('swing').value=s.k;$('disp').value=s.disp;document.querySelectorAll('[data-s]').forEach(b=>b.classList.toggle('active',b.dataset.s===s.symbol));document.querySelectorAll('[data-t]').forEach(b=>b.classList.toggle('active',b.dataset.t===s.tf))}
 async function json(url){let r;try{r=await fetch(url,{cache:'no-store',mode:'cors'})}catch(e){throw Error('Network/CORS failure. Open this file in Chrome with internet access, then test the feed. '+e.message)}if(!r.ok){let detail='';try{let d=await r.json();detail=d.message||d.error||''}catch{}throw Error('HTTP '+r.status+(detail?' · '+detail:''))}return r.json()}
@@ -122,7 +139,7 @@ async function refreshTopDown(force=false){
   }
   if(additions.length){
    additions.sort((a,b)=>b.time-a.time);s.log.unshift(...additions);s.log.sort((a,b)=>Number(b.time)-Number(a.time));
-   save();renderLog();status('Opportunity scan updated · '+additions.length+' new provisional 1:3+ candidates across 7 timeframes','ok');
+   save();persistSignals(additions);renderLog();status('Opportunity scan updated · '+additions.length+' new provisional 1:3+ candidates across 7 timeframes','ok');
   }
   const votes=rows.slice(0,5).filter(x=>x.score!==0),net=votes.reduce((a,x)=>a+x.score,0);
   const agreement=net>0?'Higher-timeframe tilt bullish':net<0?'Higher-timeframe tilt bearish':'Higher-timeframe context mixed';
@@ -434,21 +451,21 @@ function log(set){
 }
 
 function monitorTrades(p){
- let changed=false;const now=Date.now();
+ let changed=false;const now=Date.now(),changedSignals=[];
  for(const t of s.log){
   if(t.symbol!==s.symbol||t.status==='HISTORICAL')continue;
   const terminal=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED'].includes(t.status);
   const dir=t.side==='BUY'?1:-1;
   const stopTouched=t.side==='BUY'?p<=t.sl:p>=t.sl,targetTouched=t.side==='BUY'?p>=t.tp:p<=t.tp;
   if(!terminal&&['RUNNING','TRIGGERED'].includes(t.status)){
-   if(stopTouched){t.status='STOP LOSS';t.exitPrice=p;t.closedAt=now;t.movePct=null;const risk=Math.abs(t.entry-t.sl);t.rNow=risk>0?(t.side==='BUY'?(p-t.entry):(t.entry-p))/risk:null;changed=true}
-   else if(targetTouched){t.status='TAKE PROFIT';t.exitPrice=t.tp;t.closedAt=now;t.movePct=null;t.rNow=t.rr;changed=true}
+   if(stopTouched){t.status='STOP LOSS';t.exitPrice=p;t.closedAt=now;t.movePct=null;const risk=Math.abs(t.entry-t.sl);t.rNow=risk>0?(t.side==='BUY'?(p-t.entry):(t.entry-p))/risk:null;changed=true;changedSignals.push(t)}
+   else if(targetTouched){t.status='TAKE PROFIT';t.exitPrice=t.tp;t.closedAt=now;t.movePct=null;t.rNow=t.rr;changed=true;changedSignals.push(t)}
   }else if(!terminal){
    const prior=Number.isFinite(t.lastObservedPrice)?t.lastObservedPrice:null;
    const crossed=prior!==null&&(t.side==='BUY'?(prior<t.entry&&p>=t.entry):(prior>t.entry&&p<=t.entry));
-   if(crossed&&!stopTouched&&!targetTouched){t.status='RUNNING';t.triggeredAt=t.triggeredAt||now;changed=true}
-   else if(stopTouched){t.status='INVALIDATED';t.closedAt=now;t.exitPrice=p;t.movePct=null;changed=true}
-   else if(targetTouched){t.status='MISSED ENTRY';t.closedAt=now;t.exitPrice=p;t.movePct=null;changed=true}
+   if(crossed&&!stopTouched&&!targetTouched){t.status='RUNNING';t.triggeredAt=t.triggeredAt||now;changed=true;changedSignals.push(t)}
+   else if(stopTouched){t.status='INVALIDATED';t.closedAt=now;t.exitPrice=p;t.movePct=null;changed=true;changedSignals.push(t)}
+   else if(targetTouched){t.status='MISSED ENTRY';t.closedAt=now;t.exitPrice=p;t.movePct=null;changed=true;changedSignals.push(t)}
   }
   if(t.status==='RUNNING'||t.status==='TRIGGERED'){
    const favourable=(p-t.entry)*dir,denominator=favourable>=0?Math.abs(t.tp-t.entry):Math.abs(t.entry-t.sl);
@@ -459,7 +476,7 @@ function monitorTrades(p){
   t.lastObservedPrice=p;
  }
  if(s.overlaySignal){const active=s.log.find(t=>t.symbol===s.overlaySignal.symbol&&t.tf===s.overlaySignal.tf&&t.time===s.overlaySignal.time);if(active)s.overlaySignal={...active}}
- if(changed)save();renderLog();renderSignalMonitor();renderOverlay()
+ if(changed){save();persistSignals(changedSignals)}renderLog();renderSignalMonitor();renderOverlay()
 }
 function renderLog(){
  $('journal').innerHTML=s.log.length?s.log.map(x=>{
@@ -475,8 +492,8 @@ async function history(){if(s.busy)return;s.busy=true;s.stopLoad=false;$('histor
 function dl(name,content,type){let a=document.createElement('a'),u=URL.createObjectURL(new Blob([content],{type}));a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),2000)}
 async function exportBars(){let arr=await dbGet(s.symbol,s.tf),csv='time,open,high,low,close,volume\n'+arr.map(b=>[new Date(b.time*1000).toISOString(),b.open,b.high,b.low,b.close,b.volume||0].join(',')).join('\n');dl(s.symbol+'_candles.csv',csv,'text/csv')}
 async function switchSymbol(sym){if(s.symbol===sym)return;s.symbol=sym;s.lastKey='';s.didFit=false;save();document.querySelectorAll('[data-s]').forEach(b=>b.classList.toggle('active',b.dataset.s===sym));try{s.data=await dbGet(sym,s.tf);s.minute=await dbGet(sym,'1m')}catch{s.data=[];s.minute=[]}draw();await start()}
-function events(){document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>switchSymbol(b.dataset.s));document.querySelectorAll('[data-t]').forEach(b=>b.onclick=async()=>{s.tf=b.dataset.t;s.lastKey='';s.didFit=false;document.querySelectorAll('[data-t]').forEach(x=>x.classList.toggle('active',x===b));save();try{s.data=await dbGet(s.symbol,s.tf)}catch{s.data=[]}draw();await start()});$('fit').onclick=()=>{s.chart.timeScale().fitContent();s.chart.timeScale().applyOptions({rightOffset:60});s.didFit=true;renderOverlay()};$('refresh').onclick=start;$('refreshTopDown').onclick=()=>refreshTopDown(true);$('history').onclick=history;$('stop').onclick=()=>s.stopLoad=true;$('clear').onclick=async()=>{if(confirm('Delete all cached candles for '+s.symbol+' across timeframes?')){await dbClear(s.symbol);s.minute=[];s.data=[];draw();toast('Local candles cleared')}};$('exportBtn').onclick=exportBars;$('exportSignals').onclick=()=>dl('apa_signal_log.json',JSON.stringify(s.log,null,2),'application/json');$('clearSignals').onclick=()=>{if(confirm('Clear signal journal?')){s.log=[];save();renderLog();draw()}};$('settingsBtn').onclick=()=>$('modal').classList.remove('hidden');$('closeModal').onclick=()=>$('modal').classList.add('hidden');$('test').onclick=async()=>{ $('testResult').textContent='Testing quote and OHLC endpoints…';try{let q=await json(endpoint('/'+s.symbol)),d=await json(endpoint('/'+s.symbol+'/ohlc?interval=1m&limit=3')),b=norm(d,s.symbol);$('testResult').textContent='Quote endpoint OK ('+(q.mid??q.bid??'no price')+'). OHLC endpoint returned '+b.length+' valid candles for '+s.symbol+'. '+(b.length?'Latest candle: '+stamp(b.at(-1).time)+' UTC.':'No usable candles returned.');}catch(e){$('testResult').textContent='Feed test failed: '+e.message}};$('saveSettings').onclick=()=>{s.api=safeApiBase($('apiBase').value.trim());$('apiBase').value=s.api;s.initial=+$('initialBars').value;save();$('modal').classList.add('hidden');start()};$('saveRules').onclick=()=>{s.k=+$('swing').value;s.disp=+$('disp').value;s.refresh=+$('refreshSec').value;save();start();toast('Rules saved. Targets are derived from confirmed opposing structure, not a fixed R:R input.')}}
-async function main(){loadPrefs();renderPairSelector();renderLog();events();try{initChart()}catch(e){console.error(e);return}try{s.db=await dbOpen();s.minute=await dbGet(s.symbol,'1m');s.data=await dbGet(s.symbol,s.tf)}catch(e){toast('Local database unavailable; data will be session-only')}await start();s.topDownTimer=setInterval(()=>refreshTopDown(),60000)}
+function events(){document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>switchSymbol(b.dataset.s));document.querySelectorAll('[data-t]').forEach(b=>b.onclick=async()=>{s.tf=b.dataset.t;s.lastKey='';s.didFit=false;document.querySelectorAll('[data-t]').forEach(x=>x.classList.toggle('active',x===b));save();try{s.data=await dbGet(s.symbol,s.tf)}catch{s.data=[]}draw();await start()});$('fit').onclick=()=>{s.chart.timeScale().fitContent();s.chart.timeScale().applyOptions({rightOffset:60});s.didFit=true;renderOverlay()};$('refresh').onclick=start;$('refreshTopDown').onclick=()=>refreshTopDown(true);$('history').onclick=history;$('stop').onclick=()=>s.stopLoad=true;$('clear').onclick=async()=>{if(confirm('Delete all cached candles for '+s.symbol+' across timeframes?')){await dbClear(s.symbol);s.minute=[];s.data=[];draw();toast('Local candles cleared')}};$('exportBtn').onclick=exportBars;$('exportSignals').onclick=()=>dl('apa_signal_log.json',JSON.stringify(s.log,null,2),'application/json');$('clearSignals').onclick=()=>{if(confirm('Clear signal journal?')){s.log=[];save();clearSignalStore();renderLog();draw()}};$('settingsBtn').onclick=()=>$('modal').classList.remove('hidden');$('closeModal').onclick=()=>$('modal').classList.add('hidden');$('test').onclick=async()=>{ $('testResult').textContent='Testing quote and OHLC endpoints…';try{let q=await json(endpoint('/'+s.symbol)),d=await json(endpoint('/'+s.symbol+'/ohlc?interval=1m&limit=3')),b=norm(d,s.symbol);$('testResult').textContent='Quote endpoint OK ('+(q.mid??q.bid??'no price')+'). OHLC endpoint returned '+b.length+' valid candles for '+s.symbol+'. '+(b.length?'Latest candle: '+stamp(b.at(-1).time)+' UTC.':'No usable candles returned.');}catch(e){$('testResult').textContent='Feed test failed: '+e.message}};$('saveSettings').onclick=()=>{s.api=safeApiBase($('apiBase').value.trim());$('apiBase').value=s.api;s.initial=+$('initialBars').value;save();$('modal').classList.add('hidden');start()};$('saveRules').onclick=()=>{s.k=+$('swing').value;s.disp=+$('disp').value;s.refresh=+$('refreshSec').value;save();start();toast('Rules saved. Targets are derived from confirmed opposing structure, not a fixed R:R input.')}}
+async function main(){loadPrefs();renderPairSelector();events();try{initChart()}catch(e){console.error(e);return}try{s.db=await dbOpen();await loadSignalStore();s.minute=await dbGet(s.symbol,'1m');s.data=await dbGet(s.symbol,s.tf)}catch(e){toast('Local database unavailable; data will be session-only')}renderLog();await start();s.topDownTimer=setInterval(()=>refreshTopDown(),60000)}
 main().catch(e=>{status('App startup failed: '+e.message,'bad');console.error(e)});
 })();
 </script></body></html>
