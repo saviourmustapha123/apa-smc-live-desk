@@ -144,3 +144,20 @@ The candidate generator and journal must enforce a hard minimum reward-to-risk o
 4. Separate APA and SMC rules into documented engines only where the APA source rules can be established. Do not invent proprietary rules.
 5. Extend chronological replay to sufficient history, add execution-cost assumptions and out-of-sample metrics, then begin forward paper tracking.
 6. Validate the deployed chart and all bounded annotations on Android Chrome before describing them as visually verified.
+
+## Engineering progress update (2026-10-23, data semantics and backtest safeguards)
+
+### Fixed in this pass
+- Forex candle normalization now prefers a positive tick-volume field over a zero-valued generic volume field. Volume source semantics are carried on normalized bars when available.
+- The approximate price-bin profile no longer assigns each candle's entire volume to a single typical-price bin. It spreads volume uniformly across bins crossed by the candle's high-low range, reports an approximate POC and 70% value area, and returns an unavailable message when no usable volume exists. This remains an OHLC-range approximation, not actual traded volume-at-price.
+- Quote freshness now fails closed if neither a usable age nor a parseable timestamp is available. Quotes older than five minutes, marked stale, or reported closed do not update the synthetic live candle. The header also shows spread when both bid and ask are available.
+- The proxy backtest now models entry at the next candle open rather than assuming entry at the signal candle close. It skips entries when the next open invalidates the stop or no longer permits at least 3R, conservatively treats same-candle stop/target ambiguity as a stop, and marks gap-through-stop losses at the next open.
+- Backtest output now includes history span, an explicit one-year coverage gate, skipped entries, expectancy, profit factor, event-sequence drawdown, losing streak and large timestamp gaps. These are gross proxy statistics; the script explicitly states that it does not model historical spread, commissions, slippage, latency, financing or a portfolio with overlapping positions.
+- The 15-minute scheduled workflow now runs lightweight health checks only. Unit tests and the proxy backtest still run on pushes and manual workflow dispatch, reducing unnecessary repeated historical API calls.
+
+### Validation still required
+- CI passing does not prove the chart has been visually verified on Android Chrome. This still needs a real-device check for 1M/monthly aggregation, chart alignment, overlay clipping, touch controls and provider/library failures.
+- The data provider's historical depth, symbol definitions, spread history, market sessions and volume source need independently verified records. The one-year gate must be passed by returned timestamps and coverage, not by request success.
+- The proxy engine remains a simplified heuristic and does not implement the complete APA/SMC detector catalogue. No strategy profitability or signal accuracy claim is established.
+- The app's browser journal and settings are local browser storage, not encrypted-at-rest storage. Do not save secrets or broker credentials in the public website or its local journal.
+- No automated order placement or signal publication has been enabled. Candidate signals remain provisional/manual-review only.
