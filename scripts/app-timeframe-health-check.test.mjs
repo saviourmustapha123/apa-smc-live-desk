@@ -40,3 +40,13 @@ test('higher-timeframe history backfill is bounded and persisted to the daily ca
   assert.match(html, /await dbPut\(daily,sym,'1d'\)/);
   assert.match(html, /fetchBarsRaw\(sym,'1d',1000,fromTime,toTime\)/);
 });
+
+test('analysis declares marker collection before adding OB markers, preventing startup temporal-dead-zone crash', () => {
+  const analysisStart = html.indexOf('function analyse(){');
+  const analysisEnd = html.indexOf('function structuralTarget(', analysisStart);
+  assert.ok(analysisStart >= 0 && analysisEnd > analysisStart, 'analyse function boundaries must exist');
+  const body = html.slice(analysisStart, analysisEnd);
+  const declaration = body.indexOf('let marks=[]');
+  const firstPush = body.indexOf('marks.push(');
+  assert.ok(declaration >= 0 && firstPush > declaration, 'marks must be declared before the first marks.push');
+});
