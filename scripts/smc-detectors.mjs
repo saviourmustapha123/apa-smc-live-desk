@@ -19,13 +19,18 @@ export function confirmedPivots(bars, strength = 2) {
   const highs = [], lows = [];
   for (let i = strength; i < bars.length - strength; i++) {
     let isHigh = true, isLow = true;
-    for (let j = i - strength; j <= i + strength; j++) {
-      if (j === i) continue;
+    // Deterministic tie policy from the audit: left side strict, right side
+    // inclusive. The earliest of equal highs/lows wins; later ties do not.
+    for (let j = i - strength; j < i; j++) {
       if (bars[j].high >= bars[i].high) isHigh = false;
       if (bars[j].low <= bars[i].low) isLow = false;
     }
-    if (isHigh) highs.push({ index: i, price: bars[i].high, confirmedAt: i + strength });
-    if (isLow) lows.push({ index: i, price: bars[i].low, confirmedAt: i + strength });
+    for (let j = i + 1; j <= i + strength; j++) {
+      if (bars[j].high > bars[i].high) isHigh = false;
+      if (bars[j].low < bars[i].low) isLow = false;
+    }
+    if (isHigh) highs.push({ index: i, price: bars[i].high, confirmedAt: i + strength, known_at: bars[i + strength].time ?? i + strength });
+    if (isLow) lows.push({ index: i, price: bars[i].low, confirmedAt: i + strength, known_at: bars[i + strength].time ?? i + strength });
   }
   return { highs, lows };
 }
