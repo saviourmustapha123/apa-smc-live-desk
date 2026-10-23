@@ -12,7 +12,7 @@ test('FVG detector identifies a bullish three-candle non-overlap', () => {
 });
 
 test('FVG detector identifies bearish gap and marks later touch as mitigated', () => {
-  const bars = [bar(1, 15, 16, 14, 15), bar(2, 14, 15, 10, 11), bar(3, 10, 13, 8, 9), bar(4, 10, 12, 9, 11)];
+  const bars = [bar(1, 15, 16, 14, 15), bar(2, 14, 15, 10, 11), bar(3, 10, 13, 8, 9), bar(4, 10, 13.5, 9, 11)];
   const gaps = detectFairValueGaps(bars);
   assert.ok(gaps.some(g => g.side === 'BEARISH' && g.status === 'MITIGATED'));
 });
