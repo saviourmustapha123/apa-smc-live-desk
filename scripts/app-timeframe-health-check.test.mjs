@@ -43,7 +43,7 @@ test('higher-timeframe history backfill is bounded and persisted to the daily ca
 
 test('analysis declares marker collection before adding OB markers, preventing startup temporal-dead-zone crash', () => {
   const analysisStart = html.indexOf('function analyse(){');
-  const analysisEnd = html.indexOf('function structuralTarget(', analysisStart);
+  const analysisEnd = html.indexOf('function log(', analysisStart);
   assert.ok(analysisStart >= 0 && analysisEnd > analysisStart, 'analyse function boundaries must exist');
   const body = html.slice(analysisStart, analysisEnd);
   const declaration = body.indexOf('let marks=[]');
