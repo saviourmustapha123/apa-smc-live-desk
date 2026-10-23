@@ -99,8 +99,8 @@ test('equal swing highs use deterministic earliest-pivot tie handling', () => {
   const bars = [
     bar(1, 5, 6, 4, 5),
     bar(2, 6, 10, 5, 8),
-    bar(3, 7, 9, 6, 8),
-    bar(4, 8, 10, 7, 9),
+    bar(3, 7, 10, 6, 8),
+    bar(4, 8, 9, 7, 8),
     bar(5, 8, 8, 7.5, 8),
     bar(6, 8, 8, 7.5, 8)
   ];
