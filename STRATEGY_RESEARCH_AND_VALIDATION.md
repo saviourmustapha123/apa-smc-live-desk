@@ -167,7 +167,7 @@ The candidate generator and journal must enforce a hard minimum reward-to-risk o
 
 ## Continuous opportunity scanning update (2026-10-23)
 
-- The browser now scans the seven chart intervals supported by the UI: 1m, 5m, 15m, 1h, 4h, 1d and monthly (aggregated from daily candles). It checks the selected pair every 60 seconds and checks the other supported pair at least every five minutes while the tab remains open.
+- The browser now scans eight intervals: 1m, 5m, 15m, 1h, 4h, 1d, 1W and 1M. Weekly and monthly candles are calendar-aggregated from daily candles. It checks the selected pair every 60 seconds and checks the other supported pair at least every five minutes while the tab remains open.
 - The journal no longer applies an application-defined 500-candidate cap. Signal records are stored in IndexedDB instead of putting the entire journal in localStorage; the legacy localStorage journal is migrated when the database opens. The monitor and journal display the complete stored set, and export includes the stored candidates.
 - There is no maximum R:R filter. The current rule is a minimum structural target of 1:3; higher ratios are retained if the proxy target calculation supports them. The scanner deduplicates by pair, timeframe, direction and signal-candle timestamp.
 - This scan is still a **provisional APA-style/SMC heuristic**, not a fully verified proprietary APA engine. It scans the latest 1,000 closed bars per interval per scan pass, and the browser must remain open for continuous polling. Historical labels are kept separate from current opportunities. This does not establish that every rule from LOWKEY FX's full method is represented or that any candidate is profitable.
