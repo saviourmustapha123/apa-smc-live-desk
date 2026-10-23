@@ -502,11 +502,11 @@ function tradeStateLabel(t){
 }
 function renderDailyTarget(){
  const now=new Date(),todayKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
- const today=s.log.filter(t=>{if(!Number.isFinite(Number(t.time))||Number(t.rr)<3||String(t.status||'').toUpperCase()==='HISTORICAL')return false;const d=new Date(Number(t.time)*1000);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')===todayKey});
+ const today=s.log.filter(t=>{if(!Number.isFinite(Number(t.time))||Number(t.rr)<3)return false;const d=new Date(Number(t.time)*1000);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')===todayKey});
  const count=today.length,target=Math.max(1,+s.dailyTarget||6),pct=Math.min(100,count/target*100);
  if($('dailyTargetCount'))$('dailyTargetCount').textContent=count+' / '+target;
  if($('dailyTargetBar'))$('dailyTargetBar').style.width=pct+'%';
- if($('dailyTargetText'))$('dailyTargetText').textContent=count>=target?'Daily target reached · '+count+' qualifying 1:3+ candidates logged.':'Target: '+target+' qualifying 1:3+ candidates per day · '+(target-count)+' more needed. Only detected setups count; the scanner will not fabricate trades.';
+ if($('dailyTargetText'))$('dailyTargetText').textContent=count>=target?'Daily target reached · '+count+' qualifying 1:3+ candidates logged.':'Target: '+target+' qualifying 1:3+ setups in today’s candles · '+(target-count)+' more needed. Only detected setups count; the scanner will not fabricate trades.';
 }
 function renderSignalMonitor(){
  const rows=s.log;
