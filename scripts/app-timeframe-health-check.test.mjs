@@ -50,3 +50,8 @@ test('analysis declares marker collection before adding OB markers, preventing s
   const firstPush = body.indexOf('marks.push(');
   assert.ok(declaration >= 0 && firstPush > declaration, 'marks must be declared before the first marks.push');
 });
+
+test('chart drawing isolates analysis exceptions instead of aborting candle display', () => {
+  assert.match(html, /try\{analyse\(\)\}catch\(e\)\{console\.error\('Strategy analysis failed without stopping the chart'/);
+  assert.match(html, /Candles remain visible/);
+});
