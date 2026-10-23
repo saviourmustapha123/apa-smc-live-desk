@@ -32,7 +32,9 @@ jobs:
         run: node scripts/background-health-check.mjs
 
       - name: Run strategy core unit tests
+        if: github.event_name != 'schedule'
         run: node --test scripts/strategy-core.test.mjs
 
       - name: Run rolling historical proxy backtest
+        if: github.event_name != 'schedule'
         run: node scripts/proxy-backtest.mjs
