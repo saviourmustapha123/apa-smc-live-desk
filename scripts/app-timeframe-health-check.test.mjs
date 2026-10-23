@@ -26,7 +26,7 @@ test('monthly and yearly contexts are included in the top-down and background sc
   assert.match(html, /summarizeTf\('Yearly',yearly\)/);
   assert.match(html, /\['1M',monthly\],\['1Y',yearly\]/);
   assert.match(html, /\['1M',monthly\],\['1Y',yearly\]/);
-  assert.match(html, /across 9 timeframes/);
+  assert.match(html, /across 11 timeframes/);
 });
 
 test('selected chart candles are refreshed from the OHLC endpoint separately from quote polling', () => {
@@ -80,4 +80,10 @@ test('8H and 12H are included in top-down context and opportunity scanning', () 
   assert.match(html, /summarizeTf\('12H',h12\),summarizeTf\('8H',h8\)/);
   assert.match(html, /\['8h',h8\],\['12h',h12\]/);
   assert.match(html, /across 11 timeframes/);
+});
+
+test('concurrent 8H/12H requests share a short-lived hourly cache and pending fetch', () => {
+  assert.match(html, /const hourlyHistoryCache=new Map\(\),hourlyHistoryPending=new Map\(\)/);
+  assert.match(html, /if\(hourlyHistoryPending\.has\(sym\)\)return hourlyHistoryPending\.get\(sym\)/);
+  assert.match(html, /Date\.now\(\)-cached\.at<30000/);
 });
