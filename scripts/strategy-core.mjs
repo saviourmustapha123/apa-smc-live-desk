@@ -1,13 +1,19 @@
 export function pivots(bars, k=3) {
   const highs = [], lows = [];
+  if (!Array.isArray(bars) || !Number.isInteger(k) || k < 1) return {highs,lows};
   for (let i=k; i<bars.length-k; i++) {
     let high=true, low=true;
-    for (let j=i-k; j<=i+k; j++) if (j!==i) {
+    // Deterministic ties: earliest equal pivot wins (strict left, inclusive right).
+    for (let j=i-k; j<i; j++) {
       if (bars[j].high >= bars[i].high) high=false;
       if (bars[j].low <= bars[i].low) low=false;
     }
-    if (high) highs.push({i,p:bars[i].high});
-    if (low) lows.push({i,p:bars[i].low});
+    for (let j=i+1; j<=i+k; j++) {
+      if (bars[j].high > bars[i].high) high=false;
+      if (bars[j].low < bars[i].low) low=false;
+    }
+    if (high) highs.push({i,p:bars[i].high,known_at:bars[i+k].time ?? i+k});
+    if (low) lows.push({i,p:bars[i].low,known_at:bars[i+k].time ?? i+k});
   }
   return {highs,lows};
 }
@@ -57,9 +63,16 @@ export function assessAt(bars, {k=3, atrPeriod=14, displacementAtr=1, minRR=3}={
 }
 
 export function simulate(bars, signal, maxForwardBars=100, minRR=3) {
+  if (!Array.isArray(bars) || !signal || !Number.isInteger(signal.index) ||
+      signal.index < 0 || !['BUY','SELL'].includes(signal.side) ||
+      !Number.isFinite(signal.sl) || !Number.isFinite(signal.tp) ||
+      !Number.isInteger(maxForwardBars) || maxForwardBars < 1 ||
+      !Number.isFinite(minRR) || minRR < 3) {
+    return {result:'INVALID INPUT',r:null,entry:null,rr:null};
+  }
   const first=bars[signal.index+1];
   if (!first) return {result:'UNRESOLVED',r:null,entry:null,rr:null};
-  // The setup is known only after its signal candle closes. Simulate execution at the next candle open.
+  // Setup is known after signal candle close; execution is next candle open.
   const entry=first.open;
   const risk=signal.side==='BUY'?entry-signal.sl:signal.sl-entry;
   const reward=signal.side==='BUY'?signal.tp-entry:entry-signal.tp;
@@ -70,6 +83,7 @@ export function simulate(bars, signal, maxForwardBars=100, minRR=3) {
     const b=bars[i];
     const gapStop=signal.side==='BUY'?b.open<=signal.sl:b.open>=signal.sl;
     const gapTarget=signal.side==='BUY'?b.open>=signal.tp:b.open<=signal.tp;
+    // Gaps are handled at the open before inspecting the later candle range.
     if (gapStop) return {result:'LOSS (gap through stop)',r:-(Math.abs(entry-b.open)/risk),entry,rr};
     if (gapTarget) return {result:'WIN (target crossed at open)',r:rr,entry,rr};
     const stop=signal.side==='BUY'?b.low<=signal.sl:b.high>=signal.sl;
