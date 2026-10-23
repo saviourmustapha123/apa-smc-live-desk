@@ -88,3 +88,33 @@ Build a local-first, phone-friendly analysis desk that computes context across t
 5. Add test fixtures and expected outputs for annotated chart examples.
 6. Replace approximate volume-profile mapping with lower-timeframe price-bin allocation, and show a clear warning when only tick volume or insufficient bars are available.
 7. Do not enable any automated order execution; this project remains analysis and manual review only.
+
+
+## Additional public research leads reviewed (2026-10-23)
+
+8. **Quasimodo (QML) pattern description on TradingView** — https://www.tradingview.com/script/HuBqQBr5-QM-Signal-TradingFinder-Quasimodo-Pattern-Head-and-Shoulders/  
+   Describes the sequence of a head extending beyond a prior swing, a break of the intervening structure, and a return toward the left-shoulder area. Entry and stop conventions vary by author. Implement the chosen sequence explicitly and compare against annotated examples rather than treating all five-pivot shapes as equivalent.
+
+9. **Open-source Quasimodo indicator** — https://www.tradingview.com/script/SQRSlcup/  
+   Public source reference for pattern geometry. Review TradingView House Rules and license conditions before reusing any code; public visibility alone does not grant unrestricted redistribution.
+
+10. **Alchemist SNR / role-reversal research lead** — https://in.tradingview.com/script/ANCSINu0-Wonra-Alchemist-SNR-Engine/  
+    Public indicator description discusses support/resistance role reversal, QML and higher-timeframe storyline. Treat it as one author's implementation, not a universal definition of APA or SMC.
+
+11. **Alchemist strategy overview / lesson summary** — https://glasp.co/youtube/uV5EaTertic  
+    A public summary of a video describes session ranges, liquidity runs and higher-timeframe points of interest. Verify the original video and exact timestamps before adopting a rule.
+
+12. **Inducement concept and failure cases** — https://therighttrader.com/learn/smart-money-concepts/inducement  
+    Provides a useful distinction between a minor swing before a larger liquidity pool and an actual confirmed sweep/reclaim. It also discusses the failure case where price continues through the minor swing. These remain interpretations of price, not evidence of a specific institution's intent.
+
+## Current chart colour contract
+
+- BUY setup and its entry visual: green (#35d39a).
+- SELL setup and its entry visual: red/pink (#ff657a).
+- Take-profit zone remains green; stop/risk zone remains red/pink.
+- Other annotations use distinct semantic colours: head-and-shoulders magenta, QML cyan, SBR orange, RBS yellow, inducement lime, FVG teal, iFVG purple, breaker blocks indigo, BOS blue, CHoCH pink, rejection orange, engulfing pink, and separate trendline colours.
+- A colour identifies a visual category only. It does not indicate a setup's quality or validation status.
+
+## Risk/reward eligibility rule
+
+The candidate generator and journal must enforce a hard minimum reward-to-risk of 1:3. A setup with a structurally calculated target below 3R is rejected rather than displayed as an eligible signal. This is a selection filter, not evidence that a 3R target will be reached. Backtests must report the resulting trade frequency, win rate, expectancy and drawdown, including the effects of costs and missed entries.
