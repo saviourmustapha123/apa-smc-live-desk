@@ -98,8 +98,8 @@ test('weekly/monthly/yearly views reuse sufficiently deep daily history during r
 test('QQQUSDT is wired to the Binance USDⓈ-M perpetual feed, including candles and quote timestamps', () => {
   assert.match(html, /QQQUSDT:\{label:'QQQUSDT · Binance perpetual'/);
   assert.match(html, /https:\/\/fapi\.binance\.com/);
-  assert.match(html, /fapi\.binance\.com\/fapi\/v1\/klines/);
-  assert.match(html, /fapi\.binance\.com\/fapi\/v1\/ticker\/price/);
+  assert.match(html, /BINANCE_FUTURES_API\+'\/fapi\/v1\/klines/);
+  assert.match(html, /BINANCE_FUTURES_API\+'\/fapi\/v1\/ticker\/price/);
   assert.match(html, /connect-src 'self' https:\/\/biquote\.io https:\/\/fapi\.binance\.com/);
   assert.match(html, /if\(sym==='QQQUSDT'\)/);
   assert.match(html, /if\(sym==='QQQUSDT'\)return fetchBarsRaw\(sym,tf/);
@@ -127,7 +127,7 @@ test('live chart distinguishes breaker blocks from order blocks and requires a r
 test('live inducement proxy is tied to a post-BOS pullback and exposes status', () => {
   assert.match(html, /function latestInducementProxy\(/);
   assert.match(html, /Possible bullish IDM/);
-  assert.match(html, /IDM \+im\.status/);
+  assert.match(html, /IDM '\+im\.status/);
 });
 
 test('QQQUSDT long history target is clamped to its documented listing date', () => {
