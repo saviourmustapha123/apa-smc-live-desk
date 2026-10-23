@@ -1,0 +1,30 @@
+name: APA SMC background health check
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apa-smc-background-health-check
+  cancel-in-progress: true
+
+jobs:
+  health-check:
+    name: Check website, market feeds, and safety guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run background health checks
+        run: node scripts/background-health-check.mjs
