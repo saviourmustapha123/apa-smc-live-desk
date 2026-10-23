@@ -16,13 +16,13 @@
 <div class="footer">Local-first build v0.3 · no orders sent · verify the live feed in your browser · signals are heuristic and must be independently validated.</div></main>
 
 <div id="researchModal" class="hidden"><section class="panel researchbox"><div class="head"><div><b>Strategy Research Lab</b><div class="sub">Strategy discovery, transparent rules, and validation status</div></div><button id="closeResearch">Close</button></div><div class="body">
-<div class="note">Research dashboard foundation. It does not yet autonomously invent, backtest, or promote strategies. No candidate is marked successful without recorded, reproducible evidence. Historical performance cannot prove future profitability.</div>
+<div class="note">The hypothesis generator now proposes deterministic combinations from the documented feature library. These are research proposals only, not validated strategies. Backtesting and promotion remain blocked until reproducible evidence exists. Historical performance cannot prove future profitability.</div>
 <div class="lab-grid" style="margin-top:12px">
-<div class="lab-card"><div class="label">DISCOVERY ENGINE</div><h3>Rule-combination search</h3><div class="lab-status bad">NOT IMPLEMENTED</div><p class="fine">The system needs a bounded feature library, hypothesis generator, experiment runner, and a complete record of every trial.</p></div>
+<div class="lab-card"><div class="label">DISCOVERY ENGINE</div><h3>Rule-combination search</h3><div class="lab-status good">PROPOSAL GENERATOR IMPLEMENTED</div><p class="fine">A bounded, deterministic generator proposes combinations of documented SMC-style features. It does not claim strategies are globally novel or profitable.</p></div>
 <div class="lab-card"><div class="label">VALIDATION ENGINE</div><h3>Walk-forward + holdout</h3><div class="lab-status bad">NOT IMPLEMENTED</div><p class="fine">Current checks are not a full cost-aware, out-of-sample validation pipeline.</p></div>
 <div class="lab-card"><div class="label">LIVE PROMOTION</div><h3>Human approval required</h3><div class="lab-status good">LOCKED BY DESIGN</div><p class="fine">No experimental strategy should replace live signals automatically or send brokerage orders.</p></div>
 </div>
-<section class="panel" style="margin-top:12px"><div class="head"><div><b>Strategy registry</b><div class="sub">Candidates must have a version, exact rules, and evidence record</div></div><span class="pill">0 validated research candidates recorded here</span></div><div class="body lab-table"><table><thead><tr><th>Name / version</th><th>Hypothesis</th><th>Variables</th><th>Test status</th><th>Promotion gate</th></tr></thead><tbody><tr><td>APA · SMC live scanner</td><td>Existing provisional rule scanner</td><td>Current heuristic settings</td><td><span class="lab-status">PROVISIONAL</span></td><td>Not validated for automated promotion</td></tr><tr><td>New combinations</td><td>Not generated yet</td><td>Feature library not connected</td><td><span class="lab-status bad">NOT TESTED</span></td><td>Blocked until discovery and validation engines exist</td></tr></tbody></table></div></section>
+<section class="panel" style="margin-top:12px"><div class="head"><div><b>Strategy registry</b><div class="sub">Candidates must have a version, exact rules, and evidence record</div></div><span class="pill" id="candidateCount">Generator ready · no results yet</span></div><div class="body lab-table"><div class="controls" style="margin-bottom:10px"><button id="generateHypotheses" class="primary">Generate hypotheses</button><button id="exportHypotheses">Export research proposals</button></div><p class="fine" id="generatorStatus">No proposals generated in this session.</p><table><thead><tr><th>Name / ID</th><th>Hypothesis / feature combination</th><th>Variables / rules</th><th>Test status</th><th>Promotion gate</th></tr></thead><tbody id="hypothesisRows"><tr><td>APA · SMC live scanner</td><td>Existing provisional rule scanner</td><td>Current heuristic settings</td><td><span class="lab-status">PROVISIONAL</span></td><td>Not validated for automated promotion</td></tr></tbody></table></div></section>
 <div class="lab-grid" style="margin-top:12px">
 <div class="lab-card"><h3>Variable registry</h3><p class="fine">Every variable must define its name, formula, unit, lookback, allowable range, default, data source, and the earliest candle/time when it becomes knowable.</p><p class="fine"><b>Examples to formalise:</b> swing strength, sweep depth, FVG size, displacement threshold, volatility regime, session, spread, higher-timeframe bias.</p></div>
 <div class="lab-card"><h3>Evidence dashboard</h3><p class="fine">Required outputs: trade count, coverage dates, net expectancy in R, win rate, profit factor, drawdown, costs, losing streaks, walk-forward folds, untouched holdout, and performance by market regime.</p></div>
@@ -535,4 +535,36 @@ function events(){document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=
 async function main(){loadPrefs();renderPairSelector();events();try{initChart()}catch(e){console.error(e);return}try{s.db=await dbOpen();await loadSignalStore();s.minute=await dbGet(s.symbol,'1m');s.data=await dbGet(s.symbol,s.tf)}catch(e){toast('Local database unavailable; data will be session-only')}renderLog();await start();s.topDownTimer=setInterval(()=>refreshTopDown(),60000)}
 main().catch(e=>{status('App startup failed: '+e.message,'bad');console.error(e)});
 })();
+</script>
+<script type="module">
+import { generateHypotheses } from './scripts/strategy-discovery.mjs';
+const labEsc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+let labCandidates = [];
+const genButton = document.getElementById('generateHypotheses');
+if (genButton) {
+  genButton.addEventListener('click', () => {
+    try {
+      labCandidates = generateHypotheses({ maxCandidates: 100 });
+      const rows = labCandidates.map(item => {
+        const spec = item.specification;
+        return '<tr><td><b>' + labEsc(item.name) + '</b><div class="fine">' + labEsc(item.id) + '</div></td>' +
+          '<td>' + labEsc(spec.entryConvention) + '<div class="fine">Target: ' + labEsc(spec.targetConvention) + '</div></td>' +
+          '<td><div>' + labEsc(spec.features.join(', ')) + '</div><div class="fine">Minimum R:R ' + labEsc(spec.minimumRiskReward) + ' · ' + labEsc(spec.stopConvention) + '</div></td>' +
+          '<td><span class="lab-status">PROPOSED · NOT TESTED</span></td><td>Blocked pending backtest, holdout and paper test</td></tr>';
+      }).join('');
+      document.getElementById('hypothesisRows').innerHTML = rows || '<tr><td colspan="5">No combinations meet the current search bounds.</td></tr>';
+      document.getElementById('candidateCount').textContent = labCandidates.length + ' proposals · 0 validated';
+      document.getElementById('generatorStatus').textContent = 'Generated deterministically from ' + labCandidates.length + ' feature combinations. IDs are reproducible fingerprints, not cryptographic hashes. Proposals have no performance results.';
+    } catch (error) {
+      document.getElementById('generatorStatus').textContent = 'Generator error: ' + error.message;
+    }
+  });
+  document.getElementById('exportHypotheses')?.addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify({schemaVersion:1, generatedAt:new Date().toISOString(), status:'PROPOSALS_NOT_TESTED', candidates:labCandidates}, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = 'apa-smc-research-proposals.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  });
+}
 </script></body></html>
