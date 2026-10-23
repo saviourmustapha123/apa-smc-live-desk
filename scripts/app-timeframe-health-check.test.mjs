@@ -108,3 +108,28 @@ test('QQQUSDT is wired to the Binance USDⓈ-M perpetual feed, including candles
 test('QQQUSDT risk sizing uses linear contract units instead of labelling the quantity as BTC', () => {
   assert.match(html, /QQQUSDT contract units \(linear USDT-margined estimate\)/);
 });
+
+test('live chart only labels order blocks after displacement, FVG and close-confirmed structure break', () => {
+  assert.match(html, /function recentQualifiedZones\(/);
+  assert.match(html, /impulse\.low>b\[i-2\]\.high/);
+  assert.match(html, /impulse\.high<b\[i-2\]\.low/);
+  assert.match(html, /close-confirmed structure break/);
+  assert.match(html, /qualifiedZones=recentQualifiedZones/);
+});
+
+test('live chart distinguishes breaker blocks from order blocks and requires a retest', () => {
+  assert.match(html, /oppositeBreak<0\)continue/);
+  assert.match(html, /retestIndex:j,retestTime:bar\.time/);
+  assert.match(html, /Breaker block/);
+  assert.match(html, /BREAK ER/);
+});
+
+test('live inducement proxy is tied to a post-BOS pullback and exposes status', () => {
+  assert.match(html, /function latestInducementProxy\(/);
+  assert.match(html, /Possible bullish IDM/);
+  assert.match(html, /IDM \+im\.status/);
+});
+
+test('QQQUSDT long history target is clamped to its documented listing date', () => {
+  assert.match(html, /Date\.UTC\(2026,3,6\)/);
+});
