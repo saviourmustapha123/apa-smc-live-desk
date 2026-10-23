@@ -38,6 +38,11 @@ try {
     ['forex tick-volume fallback is explicit', /useTicks\?ticks/.test(source) && /tick-volume proxy/.test(source)],
     ['unknown quote freshness fails closed', /!Number\.isFinite\(age\)/.test(source) && /age>300/.test(source)],
     ['volume profile warns it is approximate', /uniformly over the price bins/.test(source) && /volume-source unknown/.test(source)],
+    ['seven-timeframe opportunity scanner', /function scanOpportunityHistory/.test(source) && /scanSets=\[\['1m'/.test(source)],
+    ['both supported pairs scanned', /async function scanBackgroundPair/.test(source) && /scanBackgroundPair\(other\)/.test(source)],
+    ['signal journal uses IndexedDB', /createObjectStore\(SIGNALS/.test(source) && /function persistSignals/.test(source)],
+    ['continuous opportunity polling', /setInterval\(\(\)=>refreshTopDown\(\),60000\)/.test(source)],
+    ['no artificial 500-signal cap', !/s\.log\s*=\s*s\.log\.slice\(0,\s*500\)/.test(source)],
     ['no brokerage execution integration', !/apiKeySecret|brokerPassword|placeOrder\s*\(/i.test(source)]
   ];
   for (const [name, ok] of checks) ok ? pass(name) : fail(name);
