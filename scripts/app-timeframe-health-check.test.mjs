@@ -162,9 +162,9 @@ test('all-timeframe SMC zones are rebuilt into one symbol-wide overlay and mappe
   assert.match(html, /const allZones=\[\.\.\.\(s\.globalZones\|\|\[\]\)\.filter\(z=>z\.sourceTf!==s\.tf\),\.\.\.\(s\.zoneDefs\|\|\[\]\)\.map\(z=>\(\{\.\.\.z,sourceTf:s\.tf\}\)\)\]/);
   assert.match(html, /const x1=chartXForTime\(z\.start\),mappedX2=chartXForTime\(z\.end\)/);
   assert.match(html, /s\.globalMarks=allMarks\.sort/);
-  assert.match(html, /for\(const mark of \(s\.globalMarks\|\|\[\]\)\)/);
+  assert.match(html, /const marksToDraw=\(s\.globalMarks\|\|\[\]\)\.filter\(mark=>mode!==\x27clean\x27\|\|mark\.sourceTf===s\.tf\|\|htf\.has\(mark\.sourceTf\)\)/);
   assert.ok(html.includes("tag.textContent='['+mark.sourceTf.toUpperCase()+'] '+mark.text"));
-  assert.match(html, /t\.symbol===s\.symbol&&Number\.isFinite\(t\.time\).*sort\(\(a,b\)=>Number\(b\.time\)-Number\(a\.time\)\)/);
+  assert.match(html, /t\.symbol===s\.symbol&&String\(t\.status\|\|\x27\x27\)\.toUpperCase\(\)!==\x27HISTORICAL\x27/);
 });
 
 test('QQQUSDT supports a configurable Cloudflare Workers proxy for region-restricted Binance data', () => {
