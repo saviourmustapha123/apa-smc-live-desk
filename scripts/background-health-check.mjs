@@ -29,9 +29,21 @@ try {
     catch (e) { fail('Inline JavaScript syntax', e.message); }
   }
 
+
+try {
+  const quote = await (await get('https://fapi.binance.com/fapi/v1/ticker/price?symbol=QQQUSDT')).json();
+  if (quote.symbol === 'QQQUSDT' && Number(quote.price) > 0) pass('Binance QQQUSDT perpetual live quote', String(quote.price));
+  else fail('Binance QQQUSDT perpetual live quote', 'Missing symbol or positive price');
+  for (const interval of ['1h', '8h', '12h']) {
+    const rows = await (await get('https://fapi.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + interval + '&limit=3')).json();
+    if (Array.isArray(rows) && rows.length > 0 && rows.every(r => Array.isArray(r) && [0,1,2,3,4,5,6].every(i => Number.isFinite(Number(r[i]))))) pass('Binance QQQUSDT ' + interval + ' candles', rows.length + ' valid OHLCV rows');
+    else fail('Binance QQQUSDT ' + interval + ' candles', 'No valid OHLCV rows');
+  }
+} catch (e) { fail('Binance QQQUSDT market feed', e.message); }
+
   const checks = [
     ['minimum 1:3 reward/risk gate', /rr\s*<\s*3/.test(source)],
-    ['supported EURUSD, BTCUSD and QQQUSDT instruments', /EURUSD/.test(source) && /BTCUSD/.test(source) && /QQQUSDT/.test(source) && /fapi\.binance\.com/.test(source)],
+    ['EURUSD, BTCUSD and QQQUSDT supported', /EURUSD/.test(source) && /BTCUSD/.test(source) && /QQQUSDT/.test(source) && /fapi\.binance\.com/.test(source)],
     ['unsafe dynamic content escaping helper', /function escapeHTML\(/.test(source)],
     ['HTTPS-only Biquote allowlist plus fixed Binance Futures adapter', /function safeApiBase\(/.test(source) && /https:\/\/biquote\.io\/api/.test(source) && /https:\/\/fapi\.binance\.com/.test(source) && /sym==='QQQUSDT'/.test(source)],
     ['content security policy present', /Content-Security-Policy/.test(source)],
@@ -41,7 +53,7 @@ try {
     ['eleven-timeframe opportunity scanner including 8H, 12H, weekly, monthly and yearly', /function scanOpportunityHistory/.test(source) && /scanSets=\[\['1m'/.test(source) && /\['8h',h8\]/.test(source) && /\['12h',h12\]/.test(source) && /\['1W',weekly\]/.test(source) && /\['1M',monthly\]/.test(source) && /\['1Y',yearly\]/.test(source)],
     ['8H/12H and weekly/monthly/yearly chart aggregation', /data-t="8h">8H/.test(source) && /data-t="12h">12H/.test(source) && /data-t="1W">1W/.test(source) && /data-t="1M">1M/.test(source) && /data-t="1Y">1Y/.test(source) && /aggregateHours\(hourly,tf==='8h'\?8:12\)/.test(source) && /calendarAggregate\(daily,'week'\)/.test(source) && /calendarAggregate\(daily,'year'\)/.test(source)],
     ['selected candle feed refreshes separately from live quote polling', /async function refreshSelectedCandles\(force=false\)/.test(source) && /await tick\(\);await refreshSelectedCandles\(false\)/.test(source)],
-    ['both supported pairs scanned', /async function scanBackgroundPair/.test(source) && /scanBackgroundPair\(other\)/.test(source)],
+    ['all configured markets included in background scan', /async function scanBackgroundPair/.test(source) && /Object\.keys\(symbolConfig\)\.filter\(market=>market!==sym\)/.test(source) && /otherPairNew\+=await scanBackgroundPair\(other\)/.test(source)],
     ['signal journal uses IndexedDB', /createObjectStore\(SIGNALS/.test(source) && /function persistSignals/.test(source)],
     ['continuous opportunity polling', /setInterval\(\(\)=>refreshTopDown\(\),60000\)/.test(source)],
     ['no artificial 500-signal cap', !/s\.log\s*=\s*s\.log\.slice\(0,\s*500\)/.test(source)],
