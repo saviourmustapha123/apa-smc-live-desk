@@ -175,7 +175,7 @@ function paint(set, levels=[], marks=[], trendDefs=[]){
   for(const line of s.lines){try{s.series.removePriceLine(line)}catch{}}s.lines=[];
   for(const ts of s.trendSeries){try{s.chart.removeSeries(ts)}catch{}}s.trendSeries=[];
   // Add a marker for each logged signal at its original candle when that candle is on this chart.
-  for(const t of s.log.filter(t=>t.symbol===s.symbol)){
+  for(const t of s.log.filter(t=>t.symbol===s.symbol&&t.tf===s.tf)){
    if(s.bars.some(bar=>bar.time===t.time)){
     const win=t.status==='TAKE PROFIT',loss=t.status==='STOP LOSS';
     marks.push({time:t.time,position:t.side==='BUY'?'belowBar':'aboveBar',color:win?'#35d39a':loss?'#ff657a':t.side==='BUY'?'#35d39a':'#ff657a',shape:t.side==='BUY'?'arrowUp':'arrowDown',text:t.side+' · '+(t.status||'NOT RUNNING')});
@@ -227,7 +227,7 @@ function renderOverlay(){
   const label=document.createElement('span');label.className='chart-zone-label';label.style.color=z.color;label.textContent=z.label;box.appendChild(label);s.overlay.appendChild(box);
  }
  // Draw historical signal risk/reward rectangles for the active pair and timeframe.
- const visibleTrades=s.log.filter(t=>t.symbol===s.symbol&&Number.isFinite(t.time)&&Number.isFinite(t.entry)&&Number.isFinite(t.sl)&&Number.isFinite(t.tp));
+ const visibleTrades=s.log.filter(t=>t.symbol===s.symbol&&t.tf===s.tf&&Number.isFinite(t.time)&&Number.isFinite(t.entry)&&Number.isFinite(t.sl)&&Number.isFinite(t.tp)).slice(0,80);
  for(const t of visibleTrades){
   const x1=chartXForTime(t.time),terminal=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED','HISTORICAL'].includes(t.status),endTime=terminal&&Number.isFinite(t.closedAt)?Math.floor(t.closedAt/1000):null,x2=terminal?chartXForTime(endTime):plotRight;
   if(x1==null||x2==null)continue;
