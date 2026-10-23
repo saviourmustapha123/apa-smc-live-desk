@@ -87,3 +87,10 @@ test('concurrent 8H/12H requests share a short-lived hourly cache and pending fe
   assert.match(html, /if\(hourlyHistoryPending\.has\(sym\)\)return hourlyHistoryPending\.get\(sym\)/);
   assert.match(html, /Date\.now\(\)-cached\.at<30000/);
 });
+
+test('weekly/monthly/yearly views reuse sufficiently deep daily history during refresh bursts', () => {
+  assert.match(html, /const dailyHistoryCache=new Map\(\)/);
+  assert.match(html, /cachedDaily&&Date\.now\(\)-cachedDaily\.at<30000&&cachedDaily\.bars\.length&&cachedDaily\.bars\[0\]\.time<=target/);
+  assert.match(html, /reused in-memory daily history cache/);
+  assert.match(html, /dailyHistoryCache\.set\(sym,\{at:Date\.now\(\),bars:daily\}\)/);
+});
