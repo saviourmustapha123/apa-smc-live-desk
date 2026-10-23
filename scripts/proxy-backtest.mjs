@@ -40,14 +40,22 @@ for (const symbol of SYMBOLS) for (const timeframe of TIMEFRAMES) {
     let lastTime=0;
     for (const c of candidates) if (c.time!==lastTime) { unique.push(c); lastTime=c.time; }
     const tested=unique.map(s=>({...s,...simulate(bars,s,MAX_FORWARD_BARS)}));
-    const wins=tested.filter(s=>s.result==='WIN').length;
+    const wins=tested.filter(s=>s.result.startsWith('WIN')).length;
     const losses=tested.filter(s=>s.result.startsWith('LOSS')).length;
+    const skipped=tested.filter(s=>s.result.startsWith('SKIPPED')).length;
     const unresolved=tested.filter(s=>s.result==='UNRESOLVED').length;
     const resolved=wins+losses;
     const netR=tested.reduce((sum,s)=>sum+(s.r??0),0);
-    const report={symbol,timeframe,bars:bars.length,candidates:tested.length,wins,losses,unresolved,winRate:resolved?Math.round(wins/resolved*1000)/10:null,netR:Math.round(netR*100)/100,latestBar:new Date(bars.at(-1).time*1000).toISOString()};
+    const grossWinsR=tested.reduce((sum,s)=>sum+(s.r>0?s.r:0),0);
+    const grossLossR=Math.abs(tested.reduce((sum,s)=>sum+(s.r<0?s.r:0),0));
+    let equity=0,peak=0,maxDrawdown=0,lossStreak=0,maxLossStreak=0;
+    for(const trade of tested){if(trade.result.startsWith('SKIPPED')||trade.result==='UNRESOLVED')continue;equity+=trade.r??0;peak=Math.max(peak,equity);maxDrawdown=Math.max(maxDrawdown,peak-equity);if((trade.r??0)<0){lossStreak++;maxLossStreak=Math.max(maxLossStreak,lossStreak)}else lossStreak=0}
+    const spanDays=Math.max(0,(bars.at(-1).time-bars[0].time)/86400);
+    const expectedSeconds=timeframe==='5m'?300:900;
+    const largeGaps=bars.slice(1).filter((b,i)=>b.time-bars[i].time>expectedSeconds*2).length;
+    const report={symbol,timeframe,bars:bars.length,candidates:tested.length,wins,losses,skipped,unresolved,winRate:resolved?Math.round(wins/resolved*1000)/10:null,netR:Math.round(netR*100)/100,expectancyR:resolved?Math.round(netR/resolved*1000)/1000:null,profitFactor:grossLossR?Math.round(grossWinsR/grossLossR*100)/100:grossWinsR?'infinite':'n/a',maxDrawdownR:Math.round(maxDrawdown*100)/100,maxLosingStreak:maxLossStreak,historyDays:Math.round(spanDays),oneYearCoverage:spanDays>=365,largeGaps,firstBar:new Date(bars[0].time*1000).toISOString(),latestBar:new Date(bars.at(-1).time*1000).toISOString()};
     reports.push(report);
-    console.log(`PASS ${symbol} ${timeframe}: ${bars.length} closed bars; ${tested.length} qualifying proxy candidates; ${wins} TP, ${losses} SL, ${unresolved} unresolved; net ${report.netR}R`);
+    console.log(`PASS ${symbol} ${timeframe}: ${bars.length} closed bars over ${report.historyDays} days; ${tested.length} candidate events (${skipped} skipped at next open); ${wins} TP, ${losses} SL, ${unresolved} unresolved; win rate ${report.winRate??'n/a'}%; gross net ${report.netR}R; coverage ${report.oneYearCoverage?'at least 1 year':'LESS THAN 1 YEAR'}`);
   } catch (error) {
     failures.push(`${symbol} ${timeframe}: ${error.message}`);
     console.error(`FAIL ${symbol} ${timeframe}: ${error.message}`);
@@ -63,11 +71,11 @@ const summaryLines=[
   '- Simulation: next bars only; if stop and target are touched in the same candle, count stop first; unresolved trades remain unresolved.',
   '- This is a heuristic proxy backtest, **not** validation of the complete proprietary LOWKEY FX APA strategy. It omits spread, commissions, slippage, session filters, and broker execution.',
   '',
-  '| Pair | TF | Closed bars | Candidates | TP | SL | Unresolved | Resolved win rate | Net R* |',
+  '| Pair | TF | Closed bars | History days | 1-year coverage | Candidates | Skipped | TP | SL | Unresolved | Win rate* | Expectancy R* | Profit factor* | Max DD R* | Max losing streak | Large gaps | Net R* |',
   '|---|---:|---:|---:|---:|---:|---:|---:|---:|',
-  ...reports.map(r=>`| ${r.symbol} | ${r.timeframe} | ${r.bars} | ${r.candidates} | ${r.wins} | ${r.losses} | ${r.unresolved} | ${r.winRate===null?'n/a':r.winRate+'%'} | ${r.netR} | `),
+  ...reports.map(r=>`| ${r.symbol} | ${r.timeframe} | ${r.bars} | ${r.historyDays} | ${r.oneYearCoverage?'yes':'NO'} | ${r.candidates} | ${r.skipped} | ${r.wins} | ${r.losses} | ${r.unresolved} | ${r.winRate===null?'n/a':r.winRate+'%'} | ${r.expectancyR===null?'n/a':r.expectancyR} | ${r.profitFactor} | ${r.maxDrawdownR} | ${r.maxLosingStreak} | ${r.largeGaps} | ${r.netR} | `),
   '',
-  '*Net R is the sum of resolved outcomes plus zero for unresolved candidates. These results are descriptive, not a forecast or proof of profitability.*',
+  '*Metrics are gross and descriptive only. Win rate and expectancy use resolved outcomes; skipped and unresolved events are not treated as wins or losses. Max drawdown is computed over this event sequence, not a tradable portfolio. A full-year coverage gate is explicitly reported and is not passed merely because the request succeeded.*',
   failures.length ? '\n## Data/test failures\n'+failures.map(x=>'- '+x).join('\n') : '\n## Data/test failures\n- None'
 ].join('\n');
 console.log('\n'+summaryLines);
