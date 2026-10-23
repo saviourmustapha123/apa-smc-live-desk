@@ -116,6 +116,19 @@ function scanOpportunityHistory(symbol,tf,bars){
  return found;
 }
 
+async function scanBackgroundPair(symbol){
+ const load=async(tf,limit)=>{let cached=[];try{cached=await dbGet(symbol,tf)}catch{}try{const fresh=await getBars(symbol,tf,limit);if(fresh.length)await dbPut(fresh,symbol,tf);const map=new Map(cached.map(b=>[b.time,b]));fresh.forEach(b=>map.set(b.time,b));return [...map.values()].sort((a,b)=>a.time-b.time).slice(-2000)}catch{return cached.slice(-2000)}};
+ const [m1,m5,m15,h1,h4,d1]=await Promise.all([load('1m',1000),load('5m',1000),load('15m',1000),load('1h',1000),load('4h',1000),load('1d',1000)]);
+ const sets=[['1m',m1],['5m',m5],['15m',m15],['1h',h1],['4h',h4],['1d',d1],['1M',aggregateMonthly(d1)]];
+ const seen=new Set(s.log.map(t=>[t.symbol,t.tf,t.side,t.time].join('|'))),additions=[];
+ for(const [tf,bars] of sets)for(const candidate of scanOpportunityHistory(symbol,tf,bars)){
+  const key=[candidate.symbol,candidate.tf,candidate.side,candidate.time].join('|');
+  if(!seen.has(key)){seen.add(key);additions.push(candidate)}
+ }
+ if(additions.length){additions.sort((a,b)=>b.time-a.time);s.log.unshift(...additions);s.log.sort((a,b)=>Number(b.time)-Number(a.time));save();await persistSignals(additions);renderLog()}
+ return additions.length;
+}
+
 async function refreshTopDown(force=false){
  if(!force&&s.lastTopDownAt&&Date.now()-s.lastTopDownAt<60000)return;
  if(s.topDownBusy)return;s.topDownBusy=true;
@@ -144,7 +157,8 @@ async function refreshTopDown(force=false){
   const votes=rows.slice(0,5).filter(x=>x.score!==0),net=votes.reduce((a,x)=>a+x.score,0);
   const agreement=net>0?'Higher-timeframe tilt bullish':net<0?'Higher-timeframe tilt bearish':'Higher-timeframe context mixed';
   host.innerHTML=rows.map(x=>'<div style="padding:8px 0;border-bottom:1px solid #1e2b38"><div class="row"><span><b>'+x.tf+'</b></span><b style="color:'+(x.score>0?'var(--g)':x.score<0?'var(--r)':'var(--m)')+'">'+x.bias+'</b></div><div class="fine">'+x.detail+'</div><div class="fine">'+x.volume+'</div></div>').join('')+'<div class="note" style="margin-top:9px"><b>'+agreement+'</b><br>Directional votes: '+net+' across '+votes.length+' timeframes with readable structure. This is context, not an entry signal.</div>';
-  statusEl.textContent='Updated '+new Date().toLocaleTimeString()+' · '+(d1.length?d1.length+' daily candles loaded':'daily history unavailable')+' · independent feed/cache results';
+  let otherPairNew=0;if(Date.now()-s.lastOtherPairScan>=300000){s.lastOtherPairScan=Date.now();const other=sym==='EURUSD'?'BTCUSD':'EURUSD';try{otherPairNew=await scanBackgroundPair(other)}catch(e){console.warn('Background pair scan unavailable',e)}}
+  statusEl.textContent='Updated '+new Date().toLocaleTimeString()+' · '+(d1.length?d1.length+' daily candles loaded':'daily history unavailable')+' · scanning 7 timeframes; '+otherPairNew+' new candidates on other pair';
   s.lastTopDownAt=Date.now();
  }catch(e){statusEl.textContent='Context unavailable: '+e.message}
  finally{s.topDownBusy=false}
