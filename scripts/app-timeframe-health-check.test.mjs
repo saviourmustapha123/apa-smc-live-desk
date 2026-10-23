@@ -159,7 +159,7 @@ test('all-timeframe SMC zones are rebuilt into one symbol-wide overlay and mappe
   assert.match(html, /rebuildUnifiedAnnotations\(scanSets\)/);
   assert.match(html, /function rebuildUnifiedAnnotations\(scanSets\)/);
   assert.ok(html.includes("label:'['+tf.toUpperCase()+'] '+z.label"));
-  assert.match(html, /const unifiedZones=\(s\.globalZones\|\|\[\]\)/);
+  assert.match(html, /const unifiedZones=\[\.\.\.\(s\.globalZones\|\|\[\]\)\.filter\(z=>z\.sourceTf!==s\.tf\),\.\.\.\(s\.zoneDefs\|\|\[\]\)\]/);
   assert.match(html, /const x1=chartXForTime\(z\.start\),mappedX2=chartXForTime\(z\.end\)/);
   assert.match(html, /s\.globalMarks=allMarks\.sort/);
   assert.match(html, /for\(const mark of \(s\.globalMarks\|\|\[\]\)\)/);
