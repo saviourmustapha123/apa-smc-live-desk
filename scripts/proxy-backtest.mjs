@@ -77,7 +77,7 @@ const summaryLines=[
   ...reports.map(r=>`| ${r.symbol} | ${r.timeframe} | ${r.bars} | ${r.historyDays} | ${r.oneYearCoverage?'yes':'NO'} | ${r.candidates} | ${r.skipped} | ${r.wins} | ${r.losses} | ${r.unresolved} | ${r.winRate===null?'n/a':r.winRate+'%'} | ${r.expectancyR===null?'n/a':r.expectancyR} | ${r.profitFactor} | ${r.maxDrawdownR} | ${r.maxLosingStreak} | ${r.largeGaps} | ${r.netR} | `),
   '',
   '*Metrics are gross and descriptive only. Win rate and expectancy use resolved outcomes; skipped and unresolved events are not treated as wins or losses. Max drawdown is computed over this event sequence, not a tradable portfolio. Zero candidates means no qualifying events were found in this limited sample; it does not establish that the strategy never signals.*',
-  reports.some(r=>!r.oneYearCoverage||r.candidates===0) ? '\\n## Validation warnings\\n'+reports.filter(r=>!r.oneYearCoverage||r.candidates===0).map(r=>'- '+r.symbol+' '+r.timeframe+': '+(!r.oneYearCoverage?'history coverage below 365 days':'no candidate events in the available sample')).join('\\n') : '\\n## Validation warnings\\n- None',
+  reports.some(r=>!r.oneYearCoverage||r.candidates===0) ? '\n## Validation warnings\n'+reports.filter(r=>!r.oneYearCoverage||r.candidates===0).map(r=>'- '+r.symbol+' '+r.timeframe+': '+(!r.oneYearCoverage?'history coverage below 365 days':'no candidate events in the available sample')).join('\\n') : '\n## Validation warnings\n- None',
   failures.length ? '\n## Data/test failures\n'+failures.map(x=>'- '+x).join('\n') : '\n## Data/test failures\n- None'
 ].join('\n');
 console.log('\n'+summaryLines);
