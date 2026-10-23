@@ -56,15 +56,27 @@ export function assessAt(bars, {k=3, atrPeriod=14, displacementAtr=1, minRR=3}={
   return {index:bars.length-1,time:x.time,side,entry,sl:stop,tp:target,rr};
 }
 
-export function simulate(bars, signal, maxForwardBars=100) {
+export function simulate(bars, signal, maxForwardBars=100, minRR=3) {
+  const first=bars[signal.index+1];
+  if (!first) return {result:'UNRESOLVED',r:null,entry:null,rr:null};
+  // The setup is known only after its signal candle closes. Simulate execution at the next candle open.
+  const entry=first.open;
+  const risk=signal.side==='BUY'?entry-signal.sl:signal.sl-entry;
+  const reward=signal.side==='BUY'?signal.tp-entry:entry-signal.tp;
+  const rr=risk>0&&reward>0?reward/risk:null;
+  if (!(Number.isFinite(rr)&&rr>=minRR)) return {result:'SKIPPED (next-open entry fails 1:3 gate)',r:0,entry,rr};
   const end=Math.min(bars.length,signal.index+1+maxForwardBars);
   for (let i=signal.index+1;i<end;i++) {
     const b=bars[i];
+    const gapStop=signal.side==='BUY'?b.open<=signal.sl:b.open>=signal.sl;
+    const gapTarget=signal.side==='BUY'?b.open>=signal.tp:b.open<=signal.tp;
+    if (gapStop) return {result:'LOSS (gap through stop)',r:-(Math.abs(entry-b.open)/risk),entry,rr};
+    if (gapTarget) return {result:'WIN (target crossed at open)',r:rr,entry,rr};
     const stop=signal.side==='BUY'?b.low<=signal.sl:b.high>=signal.sl;
     const target=signal.side==='BUY'?b.high>=signal.tp:b.low<=signal.tp;
-    if (stop&&target) return {result:'LOSS (both levels touched; stop-first assumption)',r:-1};
-    if (stop) return {result:'LOSS',r:-1};
-    if (target) return {result:'WIN',r:signal.rr};
+    if (stop&&target) return {result:'LOSS (both levels touched; stop-first assumption)',r:-1,entry,rr};
+    if (stop) return {result:'LOSS',r:-1,entry,rr};
+    if (target) return {result:'WIN',r:rr,entry,rr};
   }
-  return {result:'UNRESOLVED',r:null};
+  return {result:'UNRESOLVED',r:null,entry,rr};
 }
