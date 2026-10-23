@@ -28,3 +28,6 @@ jobs:
 
       - name: Run background health checks
         run: node scripts/background-health-check.mjs
+
+      - name: Run rolling historical proxy backtest
+        run: node scripts/proxy-backtest.mjs
