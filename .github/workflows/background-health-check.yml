@@ -35,6 +35,10 @@ jobs:
         if: github.event_name != 'schedule'
         run: node --test scripts/strategy-core.test.mjs
 
+      - name: Run SMC detector unit tests
+        if: github.event_name != 'schedule'
+        run: node --test scripts/smc-detectors.test.mjs
+
       - name: Run rolling historical proxy backtest
         if: github.event_name != 'schedule'
         run: node scripts/proxy-backtest.mjs
