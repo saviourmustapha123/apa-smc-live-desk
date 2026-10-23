@@ -46,8 +46,8 @@ const s={symbol:'EURUSD',tf:'5m',api:'https://biquote.io/api',qqqProxy:'',initia
 const symbolConfig={EURUSD:{label:'EUR/USD',type:'forex',precision:5},BTCUSD:{label:'BTC/USD',type:'crypto',precision:2},QQQUSDT:{label:'QQQUSDT · Binance perpetual',type:'equity-perp',precision:2}};
 const BINANCE_FUTURES_API='https://fapi.binance.com';
 function escapeHTML(value){return String(value??'').replace(/[&<>\"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]))}
-function safeQqqProxy(value){try{const u=new URL(String(value||''));if(u.protocol!=='https:'||!u.hostname.endsWith('.workers.dev')||u.username||u.password||u.search||u.hash)return '';return u.origin+u.pathname.replace(/\\/$/,'')}catch{return ''}}
-function qqqUrl(path){return s.qqqProxy?s.qqqProxy.replace(/\\/$/,'')+path:BINANCE_FUTURES_API+path}
+function safeQqqProxy(value){try{const u=new URL(String(value||''));if(u.protocol!=='https:'||!u.hostname.endsWith('.workers.dev')||u.username||u.password||u.search||u.hash)return '';return u.origin+u.pathname.replace(/\/$/,'')}catch{return ''}}
+function qqqUrl(path){return s.qqqProxy?s.qqqProxy.replace(/\/$/,'')+path:BINANCE_FUTURES_API+path}
 function safeApiBase(value){try{const u=new URL(String(value||''));if(u.protocol!=='https:'||u.hostname!=='biquote.io'||u.username||u.password||u.search||u.hash||!['','/api','/api/'].includes(u.pathname))return 'https://biquote.io/api';return 'https://biquote.io/api'}catch{return 'https://biquote.io/api'}}
 const historyDiagnostics={};
 const secs={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'8h':28800,'12h':43200,'1d':86400,'1W':604800,'1M':2592000,'1Y':31536000};
