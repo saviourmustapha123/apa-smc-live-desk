@@ -121,7 +121,7 @@ test('live chart distinguishes breaker blocks from order blocks and requires a r
   assert.match(html, /oppositeBreak<0\)continue/);
   assert.match(html, /retestIndex:j,retestTime:bar\.time/);
   assert.match(html, /Breaker block/);
-  assert.match(html, /BREAK ER/);
+  assert.match(html, /text:breaker\.side\+' BREAKER'/);
 });
 
 test('live inducement proxy is tied to a post-BOS pullback and exposes status', () => {
@@ -132,4 +132,10 @@ test('live inducement proxy is tied to a post-BOS pullback and exposes status', 
 
 test('QQQUSDT long history target is clamped to its documented listing date', () => {
   assert.match(html, /Date\.UTC\(2026,3,6\)/);
+});
+
+test('background scan iterates over every configured market except the active one', () => {
+  assert.match(html, /Object\.keys\(symbolConfig\)\.filter\(market=>market!==sym\)/);
+  assert.match(html, /otherPairNew\+=await scanBackgroundPair\(other\)/);
+  assert.match(html, /QQQUSDT:\{label:'QQQUSDT · Binance perpetual'/);
 });
