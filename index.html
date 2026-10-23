@@ -84,11 +84,16 @@ async function json(url){let r;try{r=await fetch(url,{cache:'no-store',mode:'cor
 function endpoint(p){s.api=safeApiBase(s.api);return s.api.replace(/\/$/,'')+p}
 function norm(d,sym=s.symbol){let rows=Array.isArray(d)?d:(d?.bars||d?.data||d?.candles||d?.ohlc||[]);let m=new Map();for(const b of rows){let raw=b.openTime??b.time??b.timestamp??b.date;let n=typeof raw==='number'?raw:(/^\d+(\.\d+)?$/.test(String(raw))?Number(raw):Date.parse(raw));let time=Math.floor(n>1e12?n/1000:n),reported=Number(b.volume),ticks=Number(b.tickVolume),useTicks=symbolConfig[sym]?.type==='forex'&&Number.isFinite(ticks)&&ticks>0,volume=useTicks?ticks:(Number.isFinite(reported)&&reported>0?reported:(Number.isFinite(ticks)&&ticks>0?ticks:0));let bar={time,open:Number(b.open),high:Number(b.high),low:Number(b.low),close:Number(b.close),volume,volumeKind:useTicks?'tick volume':Number.isFinite(reported)&&reported>0?'reported volume':Number.isFinite(ticks)&&ticks>0?'tick volume':'unavailable',isOpen:!!b.isOpen};if(Number.isFinite(time)&&time>0&&[bar.open,bar.high,bar.low,bar.close].every(Number.isFinite)&&bar.high>=Math.max(bar.open,bar.close,bar.low)&&bar.low<=Math.min(bar.open,bar.close,bar.high))m.set(time,bar)}return [...m.values()].sort((a,b)=>a.time-b.time)}
 async function fetchBarsRaw(sym,tf,lim,from,to){const q=new URLSearchParams({interval:tf,limit:String(Math.min(1000,lim))});if(from)q.set('from',new Date(from*1000).toISOString());if(to)q.set('to',new Date(to*1000).toISOString());return norm(await json(endpoint('/'+sym+'/ohlc?'+q)),sym)}
+const hourlyHistoryCache=new Map(),hourlyHistoryPending=new Map();
+async function getHourlyHistory(sym){
+ const cached=hourlyHistoryCache.get(sym);if(cached&&Date.now()-cached.at<30000)return cached.bars;
+ if(hourlyHistoryPending.has(sym))return hourlyHistoryPending.get(sym);
+ const task=(async()=>{let local=[];try{local=await dbGet(sym,'1h')}catch{}const fresh=await fetchBarsRaw(sym,'1h',1000);const merged=new Map(local.map(b=>[b.time,b]));for(const bar of fresh)merged.set(bar.time,bar);const bars=[...merged.values()].sort((a,b)=>a.time-b.time);if(bars.length)await dbPut(bars,sym,'1h');hourlyHistoryCache.set(sym,{at:Date.now(),bars});return bars})();
+ hourlyHistoryPending.set(sym,task);try{return await task}finally{hourlyHistoryPending.delete(sym)}
+}
 async function getBars(sym,tf,lim,from,to){
  if(tf==='8h'||tf==='12h'){
-  let cached=[];try{cached=await dbGet(sym,'1h')}catch{}
-  const fresh=await fetchBarsRaw(sym,'1h',1000);const merged=new Map(cached.map(b=>[b.time,b]));for(const bar of fresh)merged.set(bar.time,bar);
-  const hourly=[...merged.values()].sort((a,b)=>a.time-b.time);if(hourly.length)await dbPut(hourly,sym,'1h');
+  const hourly=await getHourlyHistory(sym);
   return aggregateHours(hourly,tf==='8h'?8:12).slice(-Math.max(lim,300));
  }
  if(tf==='1M'||tf==='1W'||tf==='1Y'){
