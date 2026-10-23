@@ -87,7 +87,9 @@ async function getBars(sym,tf,lim,from,to){
  if(tf==='1M'||tf==='1W'||tf==='1Y'){
   let daily=[];try{daily=await dbGet(sym,'1d')}catch{}
   const latest=await fetchBarsRaw(sym,'1d',1000);
-  const merged=new Map(daily.map(b=>[b.time,b]));latest.forEach(b=>merged.set(b.time,b));daily=[...merged.values()].sort((a,b)=>a.time-b.time);
+  const merged=new Map(daily.map(b=>[b.time,b]));let dailyChanged=false;
+  for(const bar of latest){const previous=merged.get(bar.time);if(!previous||previous.open!==bar.open||previous.high!==bar.high||previous.low!==bar.low||previous.close!==bar.close||previous.volume!==bar.volume)dailyChanged=true;merged.set(bar.time,bar)}
+  daily=[...merged.values()].sort((a,b)=>a.time-b.time);
   const years=tf==='1W'?5:25,target=Math.floor(Date.now()/1000)-years*365*86400;
   let cursor=daily.length?daily[0].time:Math.floor(Date.now()/1000),rounds=0;
   while(cursor>target&&rounds<16){
@@ -95,11 +97,12 @@ async function getBars(sym,tf,lim,from,to){
    let older=[];try{older=await fetchBarsRaw(sym,'1d',1000,fromTime,toTime)}catch(e){console.warn('Higher-timeframe history backfill stopped',e);break}
    const earlier=older.filter(b=>b.time<cursor);
    if(!earlier.length)break;
-   earlier.forEach(b=>merged.set(b.time,b));daily=[...merged.values()].sort((a,b)=>a.time-b.time);
+   for(const bar of earlier){if(!merged.has(bar.time))dailyChanged=true;merged.set(bar.time,bar)}
+   daily=[...merged.values()].sort((a,b)=>a.time-b.time);
    const nextCursor=daily[0]?.time;if(!Number.isFinite(nextCursor)||nextCursor>=cursor)break;cursor=nextCursor;rounds++;
    if(cursor<=target)break;
   }
-  if(daily.length)await dbPut(daily,sym,'1d');
+  if(daily.length&&dailyChanged)await dbPut(daily,sym,'1d');
   if(tf==='1M')return aggregateMonthly(daily).slice(-Math.max(lim,300));
   if(tf==='1W')return calendarAggregate(daily,'week').slice(-Math.max(lim,260));
   return calendarAggregate(daily,'year').slice(-Math.max(lim,25));
