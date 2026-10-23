@@ -243,10 +243,10 @@ async function refreshTopDown(force=false){
   const votes=rows.slice(0,5).filter(x=>x.score!==0),net=votes.reduce((a,x)=>a+x.score,0);
   const agreement=net>0?'Higher-timeframe tilt bullish':net<0?'Higher-timeframe tilt bearish':'Higher-timeframe context mixed';
   host.innerHTML=rows.map(x=>'<div style="padding:8px 0;border-bottom:1px solid #1e2b38"><div class="row"><span><b>'+x.tf+'</b></span><b style="color:'+(x.score>0?'var(--g)':x.score<0?'var(--r)':'var(--m)')+'">'+x.bias+'</b></div><div class="fine">'+x.detail+'</div><div class="fine">'+x.volume+'</div></div>').join('')+'<div class="note" style="margin-top:9px"><b>'+agreement+'</b><br>Directional votes: '+net+' across '+votes.length+' timeframes with readable structure. This is context, not an entry signal.</div>';
-  let otherPairNew=0;if(Date.now()-s.lastOtherPairScan>=300000){s.lastOtherPairScan=Date.now();const other=sym==='EURUSD'?'BTCUSD':'EURUSD';try{otherPairNew=await scanBackgroundPair(other)}catch(e){console.warn('Background pair scan unavailable',e)}}
+  let otherPairNew=0;if(Date.now()-s.lastOtherPairScan>=300000){s.lastOtherPairScan=Date.now();const others=Object.keys(symbolConfig).filter(market=>market!==sym);for(const other of others){try{otherPairNew+=await scanBackgroundPair(other)}catch(e){console.warn('Background market scan unavailable for '+other,e)}}}
   const hd=historyDiagnostics[sym]||{},coverage=hd.oldest?'oldest daily '+new Date(hd.oldest*1000).toISOString().slice(0,10):'oldest daily date unavailable';
   const backfill=hd.reason||'history backfill status unavailable';
-  statusEl.textContent='Updated '+new Date().toLocaleTimeString()+' · '+(d1.length?d1.length+' daily candles loaded':'daily history unavailable')+' · '+coverage+' · '+monthly.filter(x=>!x.isOpen).length+' monthly / '+yearly.filter(x=>!x.isOpen).length+' yearly candles · backfill: '+backfill+' · scanning 11 timeframes; '+otherPairNew+' new candidates on other pair';
+  statusEl.textContent='Updated '+new Date().toLocaleTimeString()+' · '+(d1.length?d1.length+' daily candles loaded':'daily history unavailable')+' · '+coverage+' · '+monthly.filter(x=>!x.isOpen).length+' monthly / '+yearly.filter(x=>!x.isOpen).length+' yearly candles · backfill: '+backfill+' · scanning 11 timeframes; '+otherPairNew+' new candidates on other markets';
   s.lastTopDownAt=Date.now();
  }catch(e){statusEl.textContent='Context unavailable: '+e.message}
  finally{s.topDownBusy=false}
