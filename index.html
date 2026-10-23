@@ -46,8 +46,7 @@ function paint(set, levels=[], marks=[], trendDefs=[]){
   marks.sort((a,b)=>a.time-b.time);
   for(const line of s.lines){try{s.series.removePriceLine(line)}catch{}}s.lines=[];
   for(const ts of s.trendSeries){try{s.chart.removeSeries(ts)}catch{}}s.trendSeries=[];
-  // Price levels are local segments/boxes, not full-width price lines.
-  for(const item of (levels||[])){if(!Array.isArray(item)||!Number.isFinite(item[1]))continue;const [label,p,color]=item;const last=s.bars.at(-1),first=s.bars[Math.max(0,s.bars.length-30)];if(last&&first){const half=Math.max(Math.abs(last.close)*0.000015,Math.abs(last.high-last.low)*0.025,1e-8);s.zoneDefs.push({start:first.time,end:last.time,high:p+half,low:p-half,label,color,fill:color+'18',extendRight:false,kind:'level'})}}
+  // Explicit zone geometry is supplied by the structure/FVG/OB detectors below; no full-width price lines.
   if(set){
    const entryTime=set.time||s.bars.at(-1)?.time;
    s.zoneDefs.push({start:entryTime,end:s.bars.at(-1)?.time||entryTime,high:Math.max(set.entry,set.tp),low:Math.min(set.entry,set.tp),label:'TAKE PROFIT · 1:'+set.rr,color:'#35d39a',fill:'#35d39a38',extendRight:true,kind:'reward'});
@@ -80,10 +79,54 @@ function renderOverlay(){
    const y=s.series.priceToCoordinate(value);if(y==null||y<0||y>h)continue;
    const tag=document.createElement('div');tag.className='chart-level-label';tag.style.top=y+'px';tag.style.color=color;tag.textContent=name+' '+priceFor(value,sig.symbol);s.overlay.appendChild(tag);
   }
-  const head=document.createElement('div');head.className='chart-signal-head';head.style.color=sig.side==='BUY'?'#35d39a':'#ff657a';head.textContent=sig.side+' SETUP · 1:'+sig.rr;s.overlay.appendChild(head);
+  const head=document.createElement('div');head.className='chart-signal-head';head.style.color=sig.side==='BUY'?'#35d39a':'#ff657a';head.textContent=sig.side+' SETUP · 1:'+sig.rr+(sig.ageBars>0?' · HISTORICAL':'');s.overlay.appendChild(head);
  }
 }
 function row(label,value){return `<div class="row"><span class="muted">${label}</span><b>${value}</b></div>`}
+function addAdvancedAnnotations(b,marks){
+ if(b.length<10)return;
+ const k=Math.max(2,+s.k||3),last=b.length-1,from=Math.max(2,last-100);
+ const all=pivots(b,k),confirmedH=all.h.filter(p=>p.i<=last-k),confirmedL=all.l.filter(p=>p.i<=last-k);
+ const zone=(start,end,high,low,label,color,fill,kind='zone',extendRight=true)=>{if(!Number.isFinite(high)||!Number.isFinite(low)||high<=low)return;s.zoneDefs.push({start,end,high,low,label,color,fill,kind,extendRight})};
+ // Three-candle fair value gaps and inversions. Zones remain local to their origin and are labelled independently.
+ let gaps=[];
+ for(let i=Math.max(2,last-100);i<=last;i++){
+  const left=b[i-2],mid=b[i-1],cur=b[i];
+  if(cur.low>left.high){const lo=left.high,hi=cur.low;let invertedAt=-1,mitigated=false;for(let j=i+1;j<=last;j++){if(b[j].close<lo){invertedAt=j;break}if(b[j].low<=hi)mitigated=true}
+   if(invertedAt>=0)gaps.push({i,lo,hi,dir:'bull',invertedAt,invDir:'bear'});
+   else if(!mitigated)gaps.push({i,lo,hi,dir:'bull'});
+  }
+  if(cur.high<left.low){const lo=cur.high,hi=left.low;let invertedAt=-1,mitigated=false;for(let j=i+1;j<=last;j++){if(b[j].close>hi){invertedAt=j;break}if(b[j].high>=lo)mitigated=true}
+   if(invertedAt>=0)gaps.push({i,lo,hi,dir:'bear',invertedAt,invDir:'bull'});
+   else if(!mitigated)gaps.push({i,lo,hi,dir:'bear'});
+  }
+ }
+ let unfilled=gaps.filter(g=>g.invertedAt===undefined).slice(-4);
+ for(const g of unfilled){const bull=g.dir==='bull';zone(b[g.i-2].time,b[last].time,g.hi,g.lo,(bull?'BULLISH':'BEARISH')+' FVG',bull?'#35d39a':'#ff9c69',bull?'#35d39a30':'#ff9c6930','fvg',true);marks.push({time:b[g.i].time,position:bull?'belowBar':'aboveBar',color:bull?'#35d39a':'#ff9c69',shape:'square',text:bull?'FVG ↑':'FVG ↓'})}
+ for(const g of gaps.filter(x=>x.invertedAt!==undefined).slice(-3)){const bull=g.invDir==='bull',at=b[g.invertedAt];zone(b[g.i-2].time,b[last].time,g.hi,g.lo,(bull?'BULLISH':'BEARISH')+' iFVG',bull?'#35d39a':'#ff657a',bull?'#35d39a28':'#ff657a28','ifvg',true);marks.push({time:at.time,position:bull?'belowBar':'aboveBar',color:bull?'#35d39a':'#ff657a',shape:'arrowUp',text:bull?'iFVG ↑':'iFVG ↓'})}
+ // Independent BOS/CHoCH event segments and breaker-block rectangles.
+ let direction=0,events=[];
+ for(let i=from;i<=last;i++){
+  const prev=b[i-1],cur=b[i],hh=confirmedH.filter(p=>p.i<i).at(-1),ll=confirmedL.filter(p=>p.i<i).at(-1);
+  const up=!!(hh&&prev.close<=hh.p&&cur.close>hh.p),down=!!(ll&&prev.close>=ll.p&&cur.close<ll.p);
+  if(!up&&!down)continue;
+  const bullish=up,change=(direction!==0&&((direction<0&&bullish)||(direction>0&&!bullish)));
+  const label=change?(bullish?'CHoCH ↑':'CHoCH ↓'):(bullish?'BOS ↑':'BOS ↓'),level=bullish?hh.p:ll.p,pivot=bullish?hh:ll;
+  const a=atr(b.slice(0,i+1))||Math.max(cur.high-cur.low,1e-8),half=Math.max(a*.035,Math.abs(level)*.000003);
+  zone(pivot.t,cur.time,level+half,level-half,label,bullish?'#35d39a':'#ff657a',bullish?'#35d39a30':'#ff657a30','structure',false);
+  marks.push({time:cur.time,position:bullish?'belowBar':'aboveBar',color:bullish?'#35d39a':'#ff657a',shape:bullish?'arrowUp':'arrowDown',text:label});
+  events.push({i,bullish,change,level});
+  direction=bullish?1:-1;
+ }
+ for(const ev of events.slice(-4)){
+  let ob=null;for(let j=ev.i-1;j>=Math.max(0,ev.i-10);j--){if(ev.bullish?b[j].close<b[j].open:b[j].close>b[j].open){ob=b[j];break}}
+  if(ob)zone(ob.time,b[last].time,ob.high,ob.low,(ev.bullish?'BULLISH':'BEARISH')+' BREAKER BLOCK',ev.bullish?'#35d39a':'#ff657a',ev.bullish?'#35d39a30':'#ff657a30','breaker',true);
+ }
+ // Support/resistance role reversals are compact zones around the retested price, not chart-wide lines.
+ const hh=confirmedH.at(-1),ll=confirmedL.at(-1),lastBar=b[last],range=atr(b)||Math.max(lastBar.high-lastBar.low,1e-8);
+ if(ll){let broke=-1;for(let i=Math.max(1,last-35);i<last;i++)if(b[i-1].close>=ll.p&&b[i].close<ll.p)broke=i;if(broke>=0&&lastBar.high>=ll.p&&lastBar.close<ll.p){zone(b[broke].time,lastBar.time,ll.p+range*.08,ll.p-range*.08,'SBR · SUPPORT → RESISTANCE','#ff9c69','#ff9c6928','role-reversal',true);marks.push({time:lastBar.time,position:'aboveBar',color:'#ff9c69',shape:'circle',text:'SBR'})}}
+ if(hh){let broke=-1;for(let i=Math.max(1,last-35);i<last;i++)if(b[i-1].close<=hh.p&&b[i].close>hh.p)broke=i;if(broke>=0&&lastBar.low<=hh.p&&lastBar.close>hh.p){zone(b[broke].time,lastBar.time,hh.p+range*.08,hh.p-range*.08,'RBS · RESISTANCE → SUPPORT','#35d39a','#35d39a28','role-reversal',true);marks.push({time:lastBar.time,position:'belowBar',color:'#35d39a',shape:'circle',text:'RBS'})}}
+}
 function analyse(){
  const b=s.bars.filter(c=>!c.isOpen);s.zoneDefs=[];s.overlaySignal=null;if(b.length<35){$('bias').textContent='Need more candles';$('analysisTime').textContent='At least 35 candles are required';$('signal').innerHTML='<h3>Insufficient candles</h3><div class="muted">Load more real OHLC bars before analysis. Existing overlays are cleared to avoid showing stale levels.</div>';paint(null,[],[],[]);renderOverlay();return}
  const {h,l}=pivots(b,+s.k),sh=h.at(-1),sh2=h.at(-2),sl=l.at(-1),sl2=l.at(-2),x=b.at(-1),p=b.at(-2),a=atr(b)||Math.max(x.high-x.low,1e-8),body=Math.abs(x.close-x.open),bull=x.close>x.open,bear=x.close<x.open,dis=body>=a*s.disp;
@@ -127,6 +170,7 @@ function analyse(){
  if(fvgBear){levelLines.push(['Bearish FVG upper',b.at(-3).low,'#ff9c69']);levelLines.push(['Bearish FVG lower',x.high,'#ff9c69']);s.zoneDefs.push({start:b.at(-3).time,end:x.time,high:b.at(-3).low,low:x.high,label:'SMC BEARISH FVG',color:'#ff9c69',fill:'#ff9c6926'})}if(fvgBull){levelLines.push(['Bullish FVG upper',x.low,'#35d39a']);levelLines.push(['Bullish FVG lower',b.at(-3).high,'#35d39a']);s.zoneDefs.push({start:b.at(-3).time,end:x.time,high:x.low,low:b.at(-3).high,label:'SMC BULLISH FVG',color:'#35d39a',fill:'#35d39a26'})}
  if(sbr)levelLines.push(['SBR retest',priorSupport,'#ff9c69']);if(rbs)levelLines.push(['RBS retest',priorResistance,'#35d39a']);
  let marks=[];for(const z of h.slice(-8))marks.push({time:z.t,position:'aboveBar',color:'#f4bd57',shape:'circle',text:'SH'});for(const z of l.slice(-8))marks.push({time:z.t,position:'belowBar',color:'#70aaff',shape:'circle',text:'SL'});if(swH)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:'BSL sweep'});if(swL)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:'SSL sweep'});if(bearBreak)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:bias==='Bullish structure'?'CHoCH?':'BOS↓'});if(bullBreak)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:bias==='Bearish structure'?'CHoCH?':'BOS↑'});if(fvgBear)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'square',text:'FVG'});if(fvgBull)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'square',text:'FVG'});if(sbr)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'circle',text:'SBR'});if(rbs)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'circle',text:'RBS'});
+ addAdvancedAnnotations(b,marks);
  let side=null,why='';if((swH&&bear&&dis)||(swH&&bearBreak)||(bearBreak&&bear&&dis)){side='SELL';why=swH?'Buy-side liquidity sweep + bearish candle':bearBreak?'Bearish break of structure proxy + close':'Bearish displacement'}else if((swL&&bull&&dis)||(swL&&bullBreak)||(bullBreak&&bull&&dis)){side='BUY';why=swL?'Sell-side liquidity sweep + bullish candle':bullBreak?'Bullish break of structure proxy + close':'Bullish displacement'}
  if(side){let entry=x.close,stop=side==='SELL'?Math.max(x.high,sh?.p||x.high):Math.min(x.low,sl?.p||x.low),risk=Math.abs(entry-stop);if(risk>0){let set={symbol:s.symbol,tf:s.tf,side,entry,sl:stop,tp:side==='SELL'?entry-risk*s.rr:entry+risk*s.rr,rr:s.rr,reason:why,time:x.time,confidence:'unscored',status:'WAITING',movePct:0};s.overlaySignal=set;$('engine').textContent='APA + SMC PROXY';$('signal').innerHTML=`<h3 style="color:${side==='BUY'?'var(--g)':'var(--r)'}">${side} candidate · ${s.symbol}</h3><div class="muted">${why}. Generated from explicit heuristic checks; not a verified LOWKEY FX APA signal.</div><div class="levels"><div class="level"><span>ENTRY</span><b>${price(set.entry)}</b></div><div class="level"><span>STOP LOSS</span><b>${price(set.sl)}</b></div><div class="level"><span>TAKE PROFIT · 1:${set.rr}</span><b>${price(set.tp)}</b></div></div><p class="muted">Invalidation: price crosses the stop level. Entry is at the latest candle close, not a tested limit-order entry. Confirm HTF bias, zone quality, spread and news manually.</p>`;paint(set,levelLines,marks,trendDefs);log(set);renderOverlay();return}}
  // If the newest candle has no trigger, scan recent closed candles for the latest valid historical candidate.
