@@ -41,18 +41,18 @@ A structural break requires a candle **close** beyond the latest swing level tha
 The candle's wick must exceed a previously confirmed swing high/low and the same candle must close back inside the level. A wick through the level without reclaim is not labelled a sweep. Equal highs/lows and session liquidity pools are not yet modelled.
 
 ### Fair Value Gap
-A bullish FVG is defined as current candle low greater than the high two bars earlier; bearish is current candle high less than the low two bars earlier. The gap is reported as mitigated if any later candle overlaps its price range. This baseline does not yet distinguish partial fill, full fill, displacement qualification or close-through invalidation.
+A bullish FVG is defined as current candle low greater than the high two bars earlier; bearish is current candle high less than the low two bars earlier. The detector distinguishes OPEN, PARTIALLY_FILLED and FILLED. A partial overlap is not the same as filling the full gap. Close-through invalidation is handled separately by the iFVG proxy.
 
 ### Order-block candidate
-A candidate requires a three-candle FVG, a preceding impulse body meeting a configurable average-range threshold, and an opposing candle near the impulse. It is explicitly a **candidate**, not proof of institutional orders. Zone selection, BOS relationship, premium/discount, mitigation policy and breaker conversion require further refinement and annotated examples.
+A research-module candidate requires a three-candle FVG, a preceding impulse body meeting a configurable average-range threshold, and an opposing candle near the impulse. The live chart applies a stricter gate: displacement + FVG + close-confirmed structure break, with the zone candle selected before the impulse. Both remain candidates, not proof of institutional orders. The research module is still separate from the live browser signal engine.
 
 ### Not implemented in this module yet
 - Equal highs/lows and session-specific liquidity pools.
 - Internal versus swing structure, protected highs/lows and configurable BOS/CHoCH definitions.
-- Full/partial FVG mitigation, inverse FVG and invalidation conventions.
-- Breaker blocks, mitigation blocks, inducement, QML, SBR/RBS, trendlines and premium/discount.
+- Mitigation blocks, QML, trendlines and premium/discount as deterministic research-module detectors.
 - Multi-timeframe confluence rules.
 - Full APA logic and exact entry/management rules.
+- Integration of every research-module detector into the live browser signal engine.
 
 ## Required next steps before integration
 
