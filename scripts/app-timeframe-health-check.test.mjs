@@ -191,3 +191,12 @@ test('daily target tracker counts actual 1:3+ candidates without manufacturing s
   assert.match(html, /Only detected setups count; the scanner will not fabricate trades/);
   assert.match(html, /renderSignalMonitor\(\);renderSetupBoard\(\);renderDailyTarget\(\)/);
 });
+
+test('signal monitor exposes entry, stop, target, planned R:R, and setup trigger', () => {
+  assert.match(html, /<th>Entry<\/th><th>Stop loss<\/th><th>Take profit<\/th><th>Planned R:R<\/th><th>Setup trigger<\/th>/);
+  assert.match(html, /priceFor\(t\.entry,t\.symbol\)/);
+  assert.match(html, /priceFor\(t\.sl,t\.symbol\)/);
+  assert.match(html, /priceFor\(t\.tp,t\.symbol\)/);
+  assert.match(html, /Number\(t\.rr\|\|0\)\.toFixed\(2\)/);
+  assert.match(html, /t\.reason\|\|t\.scanEngine\|\|'Provisional structural trigger'/);
+});
