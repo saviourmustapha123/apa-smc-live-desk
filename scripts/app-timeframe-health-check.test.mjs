@@ -139,3 +139,7 @@ test('background scan iterates over every configured market except the active on
   assert.match(html, /otherPairNew\+=await scanBackgroundPair\(other\)/);
   assert.match(html, /QQQUSDT:\{label:'QQQUSDT · Binance perpetual'/);
 });
+
+test('QQQUSDT chart clearly identifies the instrument as a perpetual rather than ETF shares', () => {
+  assert.match(html, /Binance USDT-M perpetual, not QQQ ETF shares/);
+});
