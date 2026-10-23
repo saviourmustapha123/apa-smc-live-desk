@@ -55,7 +55,7 @@ for (const symbol of SYMBOLS) for (const timeframe of TIMEFRAMES) {
     const largeGaps=bars.slice(1).filter((b,i)=>b.time-bars[i].time>expectedSeconds*2).length;
     const report={symbol,timeframe,bars:bars.length,candidates:tested.length,wins,losses,skipped,unresolved,winRate:resolved?Math.round(wins/resolved*1000)/10:null,netR:Math.round(netR*100)/100,expectancyR:resolved?Math.round(netR/resolved*1000)/1000:null,profitFactor:grossLossR?Math.round(grossWinsR/grossLossR*100)/100:grossWinsR?'infinite':'n/a',maxDrawdownR:Math.round(maxDrawdown*100)/100,maxLosingStreak:maxLossStreak,historyDays:Math.round(spanDays),oneYearCoverage:spanDays>=365,largeGaps,firstBar:new Date(bars[0].time*1000).toISOString(),latestBar:new Date(bars.at(-1).time*1000).toISOString()};
     reports.push(report);
-    console.log(`PASS ${symbol} ${timeframe}: ${bars.length} closed bars over ${report.historyDays} days; ${tested.length} candidate events (${skipped} skipped at next open); ${wins} TP, ${losses} SL, ${unresolved} unresolved; win rate ${report.winRate??'n/a'}%; gross net ${report.netR}R; coverage ${report.oneYearCoverage?'at least 1 year':'LESS THAN 1 YEAR'}`);
+    console.log(`${report.oneYearCoverage?'PASS':'WARN'} ${symbol} ${timeframe}: ${bars.length} closed bars over ${report.historyDays} days; ${tested.length} candidate events (${skipped} skipped at next open); ${wins} TP, ${losses} SL, ${unresolved} unresolved; win rate ${report.winRate===null?'n/a':report.winRate+'%'}; gross net ${report.netR}R; coverage ${report.oneYearCoverage?'at least 1 year':'LESS THAN 1 YEAR — validation gate NOT passed'}`);
   } catch (error) {
     failures.push(`${symbol} ${timeframe}: ${error.message}`);
     console.error(`FAIL ${symbol} ${timeframe}: ${error.message}`);
@@ -68,14 +68,16 @@ const summaryLines=[
   `- Run time (UTC): ${new Date().toISOString()}`,
   '- Market data: Biquote public OHLC endpoint; only closed candles included.',
   `- Rules: current website proxy trigger, swing sensitivity ${K}, displacement ${DISPLACEMENT_ATR}×ATR, minimum target ratio ${MIN_RR}:1.`,
-  '- Simulation: next bars only; if stop and target are touched in the same candle, count stop first; unresolved trades remain unresolved.',
-  '- This is a heuristic proxy backtest, **not** validation of the complete proprietary LOWKEY FX APA strategy. It omits spread, commissions, slippage, session filters, and broker execution.',
+  '- Execution: enter at the next candle open; skip the entry if the open invalidates the stop or leaves less than 3R; same-candle stop/target ambiguity is a stop-first loss; gap-through-stop losses use the next open.',
+  '- Gross proxy only, **not** validation of the complete proprietary LOWKEY FX APA strategy. Historical spread, commissions, slippage, latency, financing and a non-overlapping portfolio simulation are not modelled.',
+  `- One-year history gate: ${reports.length===SYMBOLS.length*TIMEFRAMES.length&&reports.every(r=>r.oneYearCoverage)?'PASSED for all requested pair/timeframe combinations':'NOT PASSED for one or more pair/timeframe combinations; do not interpret the metrics as a full historical backtest.'}`,
   '',
   '| Pair | TF | Closed bars | History days | 1-year coverage | Candidates | Skipped | TP | SL | Unresolved | Win rate* | Expectancy R* | Profit factor* | Max DD R* | Max losing streak | Large gaps | Net R* |',
   '|---|---:|---:|---:|---:|---:|---:|---:|---:|',
   ...reports.map(r=>`| ${r.symbol} | ${r.timeframe} | ${r.bars} | ${r.historyDays} | ${r.oneYearCoverage?'yes':'NO'} | ${r.candidates} | ${r.skipped} | ${r.wins} | ${r.losses} | ${r.unresolved} | ${r.winRate===null?'n/a':r.winRate+'%'} | ${r.expectancyR===null?'n/a':r.expectancyR} | ${r.profitFactor} | ${r.maxDrawdownR} | ${r.maxLosingStreak} | ${r.largeGaps} | ${r.netR} | `),
   '',
-  '*Metrics are gross and descriptive only. Win rate and expectancy use resolved outcomes; skipped and unresolved events are not treated as wins or losses. Max drawdown is computed over this event sequence, not a tradable portfolio. A full-year coverage gate is explicitly reported and is not passed merely because the request succeeded.*',
+  '*Metrics are gross and descriptive only. Win rate and expectancy use resolved outcomes; skipped and unresolved events are not treated as wins or losses. Max drawdown is computed over this event sequence, not a tradable portfolio. Zero candidates means no qualifying events were found in this limited sample; it does not establish that the strategy never signals.*',
+  reports.some(r=>!r.oneYearCoverage||r.candidates===0) ? '\\n## Validation warnings\\n'+reports.filter(r=>!r.oneYearCoverage||r.candidates===0).map(r=>'- '+r.symbol+' '+r.timeframe+': '+(!r.oneYearCoverage?'history coverage below 365 days':'no candidate events in the available sample')).join('\\n') : '\\n## Validation warnings\\n- None',
   failures.length ? '\n## Data/test failures\n'+failures.map(x=>'- '+x).join('\n') : '\n## Data/test failures\n- None'
 ].join('\n');
 console.log('\n'+summaryLines);
