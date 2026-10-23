@@ -161,3 +161,6 @@ The candidate generator and journal must enforce a hard minimum reward-to-risk o
 - The proxy engine remains a simplified heuristic and does not implement the complete APA/SMC detector catalogue. No strategy profitability or signal accuracy claim is established.
 - The app's browser journal and settings are local browser storage, not encrypted-at-rest storage. Do not save secrets or broker credentials in the public website or its local journal.
 - No automated order placement or signal publication has been enabled. Candidate signals remain provisional/manual-review only.
+
+- A separate `.github/workflows/strategy-validation.yml` now runs the ten unit tests and rolling proxy backtest daily at 02:17 UTC, with manual dispatch available. The 15-minute workflow remains a lightweight feed/site health check. The current provider response still supplies only about 1–2 days for the tested intraday intervals, so the one-year gate remains failed.
+- The live journal now records the observed quote as the stop exit price when price gaps through a running stop, rather than falsely assuming every stop fills exactly at its stop level. Weekly top-down aggregation preserves open-candle state so an unfinished week is excluded from closed-bar context. Browser zoom is no longer disabled by the viewport declaration.
