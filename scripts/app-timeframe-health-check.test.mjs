@@ -108,9 +108,9 @@ test('weekly/monthly/yearly views reuse sufficiently deep daily history during r
 test('QQQUSDT is wired to the Binance USDⓈ-M perpetual feed, including candles and quote timestamps', () => {
   assert.match(html, /QQQUSDT:\{label:'QQQUSDT · Binance perpetual'/);
   assert.match(html, /https:\/\/fapi\.binance\.com/);
-  assert.match(html, /BINANCE_FUTURES_API\+'\/fapi\/v1\/klines/);
-  assert.match(html, /BINANCE_FUTURES_API\+'\/fapi\/v1\/ticker\/price/);
-  assert.match(html, /connect-src 'self' https:\/\/biquote\.io https:\/\/fapi\.binance\.com/);
+  assert.match(html, /qqqUrl\('\/fapi\/v1\/klines\? '\+q\)/);
+  assert.match(html, /qqqUrl\('\/fapi\/v1\/ticker\/price\?symbol=QQQUSDT'\)/);
+  assert.match(html, /connect-src 'self' https:\/\/biquote\.io https:\/\/fapi\.binance\.com https:\/\/\*\.workers\.dev/);
   assert.match(html, /if\(sym==='QQQUSDT'\)/);
   assert.match(html, /if\(sym==='QQQUSDT'\)return fetchBarsRaw\(sym,tf/);
 });
@@ -152,4 +152,23 @@ test('background scan iterates over every configured market except the active on
 
 test('QQQUSDT chart clearly identifies the instrument as a perpetual rather than ETF shares', () => {
   assert.match(html, /Binance USDT-M perpetual, not QQQ ETF shares/);
+});
+
+
+test('all-timeframe SMC zones are rebuilt into one symbol-wide overlay and mapped by timestamps', () => {
+  assert.match(html, /rebuildUnifiedAnnotations\(scanSets\)/);
+  assert.match(html, /function rebuildUnifiedAnnotations\(scanSets\)/);
+  assert.match(html, /label:'\\['\+tf\.toUpperCase\(\)\+'\] '\+z\.label/);
+  assert.match(html, /const unifiedZones=\[\.\.\.\(s\.globalZones\|\|\[\]\),\.\.\.localTradeZones\]/);
+  assert.match(html, /const x1=chartXForTime\(z\.start\),mappedX2=chartXForTime\(z\.end\)/);
+  assert.match(html, /t\.symbol===s\.symbol&&Number\.isFinite\(t\.time\).*slice\(0,120\)/);
+});
+
+test('QQQUSDT supports a configurable Cloudflare Workers proxy for region-restricted Binance data', () => {
+  assert.match(html, /function safeQqqProxy\(value\)/);
+  assert.match(html, /function qqqUrl\(path\)/);
+  assert.match(html, /id="qqqProxy"/);
+  assert.match(html, /qqqUrl\('\\/fapi\\/v1\\/klines\\?'\+q\\)/);
+  assert.match(html, /qqqUrl\('\\/fapi\\/v1\\/ticker\\/price\\?symbol=QQQUSDT'\\)/);
+  assert.match(html, /HTTP 451 · Binance has region-restricted this public API request/);
 });
