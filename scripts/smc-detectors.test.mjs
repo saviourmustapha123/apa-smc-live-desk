@@ -50,22 +50,21 @@ test('invalid candle geometry fails closed', () => {
   assert.deepEqual(detectStructureBreaks(invalid), []);
 });
 
-test('order block candidates require an opposing candle plus displacement/FVG context', () => {
-  const bars = [
-    bar(1, 10, 11, 9, 10),
-    bar(2, 11, 12, 8, 9),
-    bar(3, 9, 14, 9, 13.5),
-    bar(4, 13.5, 16, 13, 15.5),
-    bar(5, 15.5, 17, 14.5, 16.5),
-    bar(6, 16.5, 18, 15.5, 17.5),
-    bar(7, 17.5, 19, 16.5, 18.5),
-    bar(8, 18.5, 20, 17.5, 19.5),
-    bar(9, 19.5, 21, 18.5, 20.5),
-    bar(10, 20.5, 22, 19.5, 21.5),
-    bar(11, 21.5, 24, 21, 23.5)
-  ];
-  const blocks = detectOrderBlockCandidates(bars, { displacementBody: 0.5, maxGap: 2 });
-  assert.ok(blocks.every(b => ['CANDIDATE', 'INVALIDATED'].includes(b.status)));
+const bullishObSetup = () => [
+  bar(1, 9, 10, 8, 9), bar(2, 10, 11, 9, 10), bar(3, 11, 13, 10, 12),
+  bar(4, 11, 12, 9, 10), bar(5, 10, 11, 8, 9), bar(6, 11.5, 15, 11.5, 14.5),
+  bar(7, 14.5, 16, 13, 15.5)
+];
+
+test('order block requires opposing candle, displacement, FVG and close-confirmed BOS', () => {
+  const blocks = detectOrderBlockCandidates(bullishObSetup(), { displacementBody: 0.5, maxGap: 1, strength: 2 });
+  assert.ok(blocks.some(b => b.side === 'BULLISH' && b.status === 'CANDIDATE' && b.index === 4 && b.impulseIndex === 5));
+});
+
+test('breaker requires the failed OB, opposite BOS and retest from the other side', () => {
+  const bars = [...bullishObSetup(), bar(8, 14.5, 16, 6, 7), bar(9, 8, 10.5, 7, 7.5)];
+  const breakers = detectBreakerBlocks(bars, { displacementBody: 0.5, maxGap: 1, strength: 2 });
+  assert.ok(breakers.some(b => b.side === 'BEARISH' && b.status === 'RETEST_CONFIRMED' && b.invalidatedAt === 7 && b.retestAt === 8));
 });
 
 test('FVG fill status distinguishes partial touch from full fill', () => {
