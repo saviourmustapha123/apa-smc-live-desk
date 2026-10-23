@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const SITE = 'https://saviourmustapha123.github.io/apa-smc-live-desk/';
-const SOURCE = 'https://raw.githubusercontent.com/saviourmustapha123/apa-smc-live-desk/main/index.html';
+const SOURCE = `https://raw.githubusercontent.com/saviourmustapha123/apa-smc-live-desk/${process.env.GITHUB_SHA || 'main'}/index.html`;
 const API = 'https://biquote.io/api';
 const failures = [];
 const warnings = [];
