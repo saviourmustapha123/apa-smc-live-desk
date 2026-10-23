@@ -55,3 +55,9 @@ test('chart drawing isolates analysis exceptions instead of aborting candle disp
   assert.match(html, /try\{analyse\(\)\}catch\(e\)\{console\.error\('Strategy analysis failed without stopping the chart'/);
   assert.match(html, /Candles remain visible/);
 });
+
+test('historical opportunity scan uses monthly/yearly minimum history instead of a fixed 35-bar floor', () => {
+  assert.match(html, /for\(let i=minimum-1;i<b\.length;i\+\+\)/);
+  assert.match(html, /const scanStart=Math\.max\(minimumBars-1,b\.length-120\)/);
+  assert.match(html, /minimumBars=s\.tf==='1Y'\?10:s\.tf==='1M'\?20:35/);
+});
