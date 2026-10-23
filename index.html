@@ -295,24 +295,32 @@ function analyse(){
  const recent=b.slice(-12),priorSupport=sl?.p,priorResistance=sh?.p;
  const sbr=!!(priorSupport&&recent.some(c=>c.close<priorSupport)&&x.high>=priorSupport&&x.close<priorSupport);
  const rbs=!!(priorResistance&&recent.some(c=>c.close>priorResistance)&&x.low<=priorResistance&&x.close>priorResistance);
- // Detect simple five-pivot head-and-shoulders / inverse pattern from alternating pivot sequence.
- const piv=[...h.map(z=>({...z,type:'H'})),...l.map(z=>({...z,type:'L'}))].sort((u,v)=>u.i-v.i).slice(-7);
- let pattern='Not detected',neck=null,qml='Not detected';
- if(piv.length>=5){const z=piv.slice(-5);if(z.every((v,i)=>i===0||v.type!==z[i-1].type)){
-   if(z[0].type==='H'&&z[1].type==='L'&&z[2].type==='H'&&z[3].type==='L'&&z[4].type==='H'){
-    const shoulders=Math.abs(z[0].p-z[4].p)<=a*1.8,head=z[2].p>Math.max(z[0].p,z[4].p)+a*.35;
-    if(shoulders&&head){pattern='Possible head & shoulders';neck=(z[1].p+z[3].p)/2}
-    if(z[0].p<z[2].p&&z[2].p>z[4].p&&z[3].p<z[1].p)qml='Possible bearish QML structure';
-   }
-   if(z[0].type==='L'&&z[1].type==='H'&&z[2].type==='L'&&z[3].type==='H'&&z[4].type==='L'){
-    const shoulders=Math.abs(z[0].p-z[4].p)<=a*1.8,head=z[2].p<Math.min(z[0].p,z[4].p)-a*.35;
-    if(shoulders&&head){pattern='Possible inverse H&S';neck=(z[1].p+z[3].p)/2}
-    if(z[0].p>z[2].p&&z[2].p<z[4].p&&z[3].p>z[1].p)qml='Possible bullish QML structure';
-   }
-  }}
- // Inducement proxy: a recent internal pivot swept before an outer swing is broken; label explicitly as a proxy.
+ // Build an alternating swing sequence first. Raw pivot lists can contain adjacent highs or lows,
+ // which previously prevented many real five-swing shapes from ever being considered.
+ const rawPiv=[...h.map(z=>({...z,type:'H'})),...l.map(z=>({...z,type:'L'}))].sort((u,v)=>u.i-v.i);
+ const piv=[];
+ for(const v of rawPiv){const prev=piv.at(-1);if(!prev||prev.type!==v.type)piv.push(v);else if((v.type==='H'&&v.p>prev.p)||(v.type==='L'&&v.p<prev.p))piv[piv.length-1]=v;}
+ let pattern='Not detected',neck=null,qml='Not detected',hsMatch=null,qmlMatch=null;
+ const hsMatches=[],qmlMatches=[];
+ for(let i=0;i<=piv.length-5;i++){
+  const z=piv.slice(i,i+5);
+  if(z[0].type==='H'&&z[1].type==='L'&&z[2].type==='H'&&z[3].type==='L'&&z[4].type==='H'){
+   const shoulders=Math.abs(z[0].p-z[4].p)<=a*1.8,head=z[2].p>Math.max(z[0].p,z[4].p)+a*.35;
+   if(shoulders&&head){hsMatches.push({pivots:z,label:'Possible head & shoulders',neck:(z[1].p+z[3].p)/2});}
+   if(z[2].p>z[0].p&&z[2].p>z[4].p&&z[3].p<z[1].p)qmlMatches.push({pivots:z,label:'Possible bearish QML structure'});
+  }
+  if(z[0].type==='L'&&z[1].type==='H'&&z[2].type==='L'&&z[3].type==='H'&&z[4].type==='L'){
+   const shoulders=Math.abs(z[0].p-z[4].p)<=a*1.8,head=z[2].p<Math.min(z[0].p,z[4].p)-a*.35;
+   if(shoulders&&head)hsMatches.push({pivots:z,label:'Possible inverse H&S',neck:(z[1].p+z[3].p)/2});
+   if(z[2].p<z[0].p&&z[2].p<z[4].p&&z[3].p>z[1].p)qmlMatches.push({pivots:z,label:'Possible bullish QML structure'});
+  }
+ }
+ hsMatch=hsMatches.at(-1)||null;qmlMatch=qmlMatches.at(-1)||null;
+ if(hsMatch){pattern=hsMatch.label;neck=hsMatch.neck}
+ if(qmlMatch)qml=qmlMatch.label;
  const internalHigh=h.length>=2?h.at(-2):null,internalLow=l.length>=2?l.at(-2):null;
- const inducement=swH&&internalLow&&x.close<internalLow.p?'Possible bearish inducement sweep':swL&&internalHigh&&x.close>internalHigh.p?'Possible bullish inducement sweep':'No clear inducement proxy';
+ // This is deliberately labelled a proxy: a sweep alone cannot prove inducement.
+ const inducement=swH&&internalLow&&x.close<internalLow.p?'Possible bearish inducement proxy':swL&&internalHigh&&x.close>internalHigh.p?'Possible bullish inducement proxy':'No clear inducement proxy';
  const pdText=eq==null?'Range unavailable':x.close>eq?'Premium half':x.close<eq?'Discount half':'At equilibrium';
  const trendDefs=[];if(h.length>=2){const z=h.slice(-2);trendDefs.push({color:'#d1d5db',points:[{time:z[0].t,value:z[0].p},{time:z[1].t,value:z[1].p}]})}if(l.length>=2){const z=l.slice(-2);trendDefs.push({color:'#c4b5fd',points:[{time:z[0].t,value:z[0].p},{time:z[1].t,value:z[1].p}]})}
  const srText=sh&&sl?'R '+price(sh.p)+' / S '+price(sl.p):'Need confirmed pivots',obText=ob?(bull?'Demand candidate ':'Supply candidate ')+price(ob.low)+'–'+price(ob.high):'Not identified';
@@ -324,9 +332,10 @@ function analyse(){
  if(fvgBear){levelLines.push(['Bearish FVG upper',b.at(-3).low,'#ff9c69']);levelLines.push(['Bearish FVG lower',x.high,'#ff9c69']);s.zoneDefs.push({start:b.at(-3).time,end:x.time,high:b.at(-3).low,low:x.high,label:'SMC BEARISH FVG',color:'#ff9c69',fill:'#ff9c6926'})}if(fvgBull){levelLines.push(['Bullish FVG upper',x.low,'#35d39a']);levelLines.push(['Bullish FVG lower',b.at(-3).high,'#35d39a']);s.zoneDefs.push({start:b.at(-3).time,end:x.time,high:x.low,low:b.at(-3).high,label:'SMC BULLISH FVG',color:'#35d39a',fill:'#35d39a26'})}
  if(sbr)levelLines.push(['SBR retest',priorSupport,'#ff9c69']);if(rbs)levelLines.push(['RBS retest',priorResistance,'#35d39a']);
  let marks=[];for(const z of h.slice(-8))marks.push({time:z.t,position:'aboveBar',color:'#d1d5db',shape:'circle',text:'SH'});for(const z of l.slice(-8))marks.push({time:z.t,position:'belowBar',color:'#c4b5fd',shape:'circle',text:'SL'});
-  // Distinct, bounded pattern maps. These show detected geometry, not guaranteed trade signals.
-  if(pattern!=='Not detected'&&piv.length>=5){const z=piv.slice(-5),ph=z.filter(v=>v.type==='H'),pl=z.filter(v=>v.type==='L');const top=Math.max(...z.map(v=>v.p)),bottom=Math.min(...z.map(v=>v.p));s.zoneDefs.push({start:z[0].t,end:z[4].t,high:top,low:bottom,label:'HEAD & SHOULDERS PATTERN',color:'#e879f9',fill:'#e879f922',extendRight:false});for(const v of z)marks.push({time:v.t,position:v.type==='H'?'aboveBar':'belowBar',color:'#e879f9',shape:'circle',text:v.type==='H'?'H&S H':'H&S L'});if(neck!==null)levelLines.push(['H&S neckline',neck,'#e879f9'])}
-  if(qml!=='Not detected'&&piv.length>=5){const z=piv.slice(-5),top=Math.max(...z.map(v=>v.p)),bottom=Math.min(...z.map(v=>v.p));s.zoneDefs.push({start:z[0].t,end:z[4].t,high:top,low:bottom,label:'QUASIMODO · CANDIDATE',color:'#22d3ee',fill:'#22d3ee20',extendRight:false});for(const v of z)marks.push({time:v.t,position:v.type==='H'?'aboveBar':'belowBar',color:'#22d3ee',shape:'square',text:'QML'})}
+  // Draw up to the three most recent confirmed historical candidates, not just the latest five pivots.
+  for(const match of hsMatches.slice(-3)){const z=match.pivots,top=Math.max(...z.map(v=>v.p)),bottom=Math.min(...z.map(v=>v.p));s.zoneDefs.push({start:z[0].t,end:z[4].t,high:top,low:bottom,label:match.label.toUpperCase(),color:'#e879f9',fill:'#e879f922',extendRight:false});for(const v of z)marks.push({time:v.t,position:v.type==='H'?'aboveBar':'belowBar',color:'#e879f9',shape:'circle',text:v.type==='H'?'H&S H':'H&S L'});}
+  if(hsMatch&&neck!==null)levelLines.push(['H&S neckline',neck,'#e879f9']);
+  for(const match of qmlMatches.slice(-3)){const z=match.pivots,top=Math.max(...z.map(v=>v.p)),bottom=Math.min(...z.map(v=>v.p));s.zoneDefs.push({start:z[0].t,end:z[4].t,high:top,low:bottom,label:match.label.toUpperCase(),color:'#22d3ee',fill:'#22d3ee20',extendRight:false});for(const v of z)marks.push({time:v.t,position:v.type==='H'?'aboveBar':'belowBar',color:'#22d3ee',shape:'square',text:'QML'});}
   if(sbr){s.zoneDefs.push({start:b[Math.max(0,b.length-12)].time,end:x.time,high:priorSupport+a*.08,low:priorSupport-a*.08,label:'SBR · ROLE REVERSAL',color:'#fb923c',fill:'#fb923c28',extendRight:true});marks.push({time:x.time,position:'aboveBar',color:'#fb923c',shape:'circle',text:'SBR'})}
   if(rbs){s.zoneDefs.push({start:b[Math.max(0,b.length-12)].time,end:x.time,high:priorResistance+a*.08,low:priorResistance-a*.08,label:'RBS · ROLE REVERSAL',color:'#facc15',fill:'#facc1528',extendRight:true});marks.push({time:x.time,position:'belowBar',color:'#facc15',shape:'circle',text:'RBS'})}
   if(inducement!=='No clear inducement proxy'){marks.push({time:x.time,position:inducement.includes('bearish')?'aboveBar':'belowBar',color:'#a3e635',shape:'diamond',text:'IDM'});s.zoneDefs.push({start:b[Math.max(0,b.length-8)].time,end:x.time,high:Math.max(x.high,internalHigh?.p||x.high),low:Math.min(x.low,internalLow?.p||x.low),label:'INDUCEMENT PROXY',color:'#a3e635',fill:'#a3e63520',extendRight:false})}if(swH)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:'BSL sweep'});if(swL)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:'SSL sweep'});if(bearBreak)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:bias==='Bullish structure'?'CHoCH?':'BOS↓'});if(bullBreak)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:bias==='Bearish structure'?'CHoCH?':'BOS↑'});if(fvgBear)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'square',text:'FVG'});if(fvgBull)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'square',text:'FVG'});if(sbr)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'circle',text:'SBR'});if(rbs)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'circle',text:'RBS'});
