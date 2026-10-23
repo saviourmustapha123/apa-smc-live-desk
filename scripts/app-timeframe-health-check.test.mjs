@@ -1,8 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { Script } from 'node:vm';
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+
+test('the complete inline browser application JavaScript parses without syntax errors', () => {
+  const scripts = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)]
+    .map(match => match[1].trim())
+    .filter(Boolean);
+  assert.ok(scripts.length > 0, 'expected an inline application script');
+  assert.doesNotThrow(() => new Script(scripts[scripts.length - 1]), 'inline application script must be valid JavaScript');
+});
+
 
 test('chart exposes monthly and yearly timeframe controls', () => {
   assert.match(html, /data-t="1M">1M/);
