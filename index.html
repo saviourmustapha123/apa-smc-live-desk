@@ -67,6 +67,24 @@ function paint(set, levels=[], marks=[], trendDefs=[]){
   renderOverlay();
  }catch(e){console.log('Overlay rendering error',e);status('Overlay rendering issue: '+e.message,'bad');$('signal').insertAdjacentHTML('beforeend','<p class="muted">Chart overlay error: '+String(e.message).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))+'</p>')}
 }
+function chartXForTime(time){
+ if(!s.bars||!s.bars.length||!Number.isFinite(time))return null;
+ const ts=s.chart.timeScale(),bars=s.bars,n=bars.length;
+ if(n===1){const x=ts.timeToCoordinate(bars[0].time);return x==null?null:x+(time-bars[0].time)/60*8}
+ let lo=0,hi=n;
+ while(lo<hi){const mid=(lo+hi)>>1;if(bars[mid].time<time)lo=mid+1;else hi=mid}
+ if(lo<n&&bars[lo].time===time)return ts.logicalToCoordinate(lo);
+ if(lo>0&&lo<n){
+  const x0=ts.logicalToCoordinate(lo-1),x1=ts.logicalToCoordinate(lo);
+  if(x0==null||x1==null)return null;
+  const f=(time-bars[lo-1].time)/(bars[lo].time-bars[lo-1].time);
+  return x0+(x1-x0)*f;
+ }
+ const i=lo===0?0:n-1,base=ts.logicalToCoordinate(i),other=ts.logicalToCoordinate(i===0?1:n-2);
+ if(base==null||other==null)return null;
+ const dt=bars[i].time-bars[i===0?1:n-2].time,dx=base-other;
+ return base+(time-bars[i].time)*(dt?dx/dt:0);
+}
 function renderOverlay(){
  if(!s.overlay||!s.chart||!s.series)return;
  s.overlay.replaceChildren();const w=s.overlay.clientWidth,h=s.overlay.clientHeight;if(!w||!h)return;
@@ -84,7 +102,7 @@ function renderOverlay(){
  // Draw historical signal risk/reward rectangles for the active pair and timeframe.
  const visibleTrades=s.log.filter(t=>t.symbol===s.symbol&&Number.isFinite(t.time)&&Number.isFinite(t.entry)&&Number.isFinite(t.sl)&&Number.isFinite(t.tp)).slice(0,80);
  for(const t of visibleTrades){
-  const x1=ts.timeToCoordinate(t.time),lastBar=s.bars.at(-1),terminal=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED'].includes(t.status),endTime=terminal&&Number.isFinite(t.closedAt)?Math.floor(t.closedAt/1000):(lastBar?lastBar.time+Math.max(60,Math.round((lastBar.time-(s.bars.at(-2)?.time||lastBar.time-60))*0.6)):t.time+60),x2=ts.timeToCoordinate(endTime);
+  const x1=chartXForTime(t.time),terminal=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED'].includes(t.status),endTime=terminal&&Number.isFinite(t.closedAt)?Math.floor(t.closedAt/1000):null,x2=terminal?chartXForTime(endTime):w-6;
   if(x1==null||x2==null)continue;
   const left=Math.max(0,Math.min(x1,x2)),right=Math.min(w,Math.max(x1,x2));if(right-left<2||right<0||left>w)continue;
   const closed=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED'].includes(t.status);
