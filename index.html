@@ -105,7 +105,7 @@ function addAdvancedAnnotations(b,marks){
  for(const g of unfilled){const bull=g.dir==='bull';zone(b[g.i-2].time,b[last].time,g.hi,g.lo,(bull?'BULLISH':'BEARISH')+' FVG',bull?'#35d39a':'#ff9c69',bull?'#35d39a30':'#ff9c6930','fvg',true);marks.push({time:b[g.i].time,position:bull?'belowBar':'aboveBar',color:bull?'#35d39a':'#ff9c69',shape:'square',text:bull?'FVG ↑':'FVG ↓'})}
  for(const g of gaps.filter(x=>x.invertedAt!==undefined).slice(-3)){const bull=g.invDir==='bull',at=b[g.invertedAt];zone(b[g.i-2].time,b[last].time,g.hi,g.lo,(bull?'BULLISH':'BEARISH')+' iFVG',bull?'#35d39a':'#ff657a',bull?'#35d39a28':'#ff657a28','ifvg',true);marks.push({time:at.time,position:bull?'belowBar':'aboveBar',color:bull?'#35d39a':'#ff657a',shape:'arrowUp',text:bull?'iFVG ↑':'iFVG ↓'})}
  // Independent BOS/CHoCH event segments and breaker-block rectangles.
- let direction=0,events=[];
+ let direction=0,structureEvents=[];
  for(let i=from;i<=last;i++){
   const prev=b[i-1],cur=b[i],hh=confirmedH.filter(p=>p.i<i).at(-1),ll=confirmedL.filter(p=>p.i<i).at(-1);
   const up=!!(hh&&prev.close<=hh.p&&cur.close>hh.p),down=!!(ll&&prev.close>=ll.p&&cur.close<ll.p);
@@ -115,10 +115,10 @@ function addAdvancedAnnotations(b,marks){
   const a=atr(b.slice(0,i+1))||Math.max(cur.high-cur.low,1e-8),half=Math.max(a*.035,Math.abs(level)*.000003);
   zone(pivot.t,cur.time,level+half,level-half,label,bullish?'#35d39a':'#ff657a',bullish?'#35d39a30':'#ff657a30','structure',false);
   marks.push({time:cur.time,position:bullish?'belowBar':'aboveBar',color:bullish?'#35d39a':'#ff657a',shape:bullish?'arrowUp':'arrowDown',text:label});
-  events.push({i,bullish,change,level});
+  structureEvents.push({i,bullish,change,level});
   direction=bullish?1:-1;
  }
- for(const ev of events.slice(-4)){
+ for(const ev of structureEvents.slice(-4)){
   let ob=null;for(let j=ev.i-1;j>=Math.max(0,ev.i-10);j--){if(ev.bullish?b[j].close<b[j].open:b[j].close>b[j].open){ob=b[j];break}}
   if(ob)zone(ob.time,b[last].time,ob.high,ob.low,(ev.bullish?'BULLISH':'BEARISH')+' BREAKER BLOCK',ev.bullish?'#35d39a':'#ff657a',ev.bullish?'#35d39a30':'#ff657a30','breaker',true);
  }
@@ -138,7 +138,7 @@ function addAdvancedAnnotations(b,marks){
   const displacement=body>=atrNow*s.disp;
   if((bullReject||bearReject)&&rejectionCount<2){const isBull=bullReject;zone(cur.time,b[Math.min(last,i+2)].time,cur.high,cur.low,(isBull?'APA-STYLE BULLISH REJECTION':'APA-STYLE BEARISH REJECTION'),isBull?'#35d39a':'#ff657a',isBull?'#35d39a24':'#ff657a24','apa-rejection',i===last);marks.push({time:cur.time,position:isBull?'belowBar':'aboveBar',color:isBull?'#35d39a':'#ff657a',shape:'circle',text:isBull?'PA REJECT ↑':'PA REJECT ↓'});rejectionCount++}
   if((bullEngulf||bearEngulf)&&engulfCount<2){const isBull=bullEngulf;zone(cur.time,b[Math.min(last,i+2)].time,Math.max(cur.open,cur.close),Math.min(cur.open,cur.close),(isBull?'APA-STYLE BULLISH ENGULF':'APA-STYLE BEARISH ENGULF'),isBull?'#35d39a':'#ff657a',isBull?'#35d39a20':'#ff657a20','apa-engulf',i===last);marks.push({time:cur.time,position:isBull?'belowBar':'aboveBar',color:isBull?'#35d39a':'#ff657a',shape:'square',text:isBull?'ENGULF ↑':'ENGULF ↓'});engulfCount++}
-  if(displacement&&dispCount<2){const isBull=cur.close>cur.open;if(isBull||cur.close<cur.open){zone(cur.time,b[Math.min(last,i+2)].time,cur.high,cur.low,(isBull?'APA-STYLE BULLISH DISPLACEMENT':'APA-STYLE BEARISH DISPLACEMENT'),isBull?'#70aaff':'#ff9c69',isBull?'#70aaff20':'#ff9c6920','apa-displacement',i===last);marks.push({time:cur.time,position:isBull?'belowBar':'aboveBar',color:isBull?'#70aaff':'#ff9c69',shape:'arrowUp',text:isBull?'DISPLACEMENT ↑':'DISPLACEMENT ↓'});dispCount++}
+  if(displacement&&dispCount<2){const isBull=cur.close>cur.open;if(isBull||cur.close<cur.open){zone(cur.time,b[Math.min(last,i+2)].time,cur.high,cur.low,(isBull?'APA-STYLE BULLISH DISPLACEMENT':'APA-STYLE BEARISH DISPLACEMENT'),isBull?'#70aaff':'#ff9c69',isBull?'#70aaff20':'#ff9c6920','apa-displacement',i===last);marks.push({time:cur.time,position:isBull?'belowBar':'aboveBar',color:isBull?'#70aaff':'#ff9c69',shape:'arrowUp',text:isBull?'DISPLACEMENT ↑':'DISPLACEMENT ↓'});dispCount++}}
   if(rejectionCount>=2&&engulfCount>=2&&dispCount>=2)break;
  }
 
