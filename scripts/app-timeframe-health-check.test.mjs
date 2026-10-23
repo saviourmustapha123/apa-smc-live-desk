@@ -61,3 +61,23 @@ test('historical opportunity scan uses monthly/yearly minimum history instead of
   assert.match(html, /const scanStart=Math\.max\(minimumBars-1,b\.length-120\)/);
   assert.match(html, /minimumBars=s\.tf==='1Y'\?10:s\.tf==='1M'\?20:35/);
 });
+
+test('chart exposes 8H and 12H timeframe controls', () => {
+  assert.match(html, /data-t="8h">8H/);
+  assert.match(html, /data-t="12h">12H/);
+  assert.match(html, /'8h':28800/);
+  assert.match(html, /'12h':43200/);
+});
+
+test('8H and 12H candles are aggregated from hourly OHLC with UTC epoch-aligned buckets', () => {
+  assert.match(html, /function aggregateHours\(arr,hours\)/);
+  assert.match(html, /Math\.floor\(b\.time\/span\)\*span/);
+  assert.match(html, /aggregateHours\(hourly,tf==='8h'\?8:12\)/);
+  assert.match(html, /if\(x\.time\+span>now\)x\.isOpen=true/);
+});
+
+test('8H and 12H are included in top-down context and opportunity scanning', () => {
+  assert.match(html, /summarizeTf\('12H',h12\),summarizeTf\('8H',h8\)/);
+  assert.match(html, /\['8h',h8\],\['12h',h12\]/);
+  assert.match(html, /across 11 timeframes/);
+});
