@@ -13,6 +13,7 @@ test('chart exposes monthly and yearly timeframe controls', () => {
 test('yearly candles are bucketed by calendar year, not fixed 365-day offsets', () => {
   assert.match(html, /if\(tf==='1Y'\)return Date\.UTC\(d\.getUTCFullYear\(\),0,1\)\/1000/);
   assert.match(html, /calendarAggregate\(daily,'year'\)/);
+  assert.match(html, /minimumBars=s\.tf==='1Y'\?10:s\.tf==='1M'\?20:35/);
 });
 
 test('monthly and yearly contexts are included in the top-down and background scan sets', () => {
