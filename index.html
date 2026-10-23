@@ -42,7 +42,7 @@
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id), DB='apa-smc-live-db', STORE='bars', SIGNALS='signals';
-const s={symbol:'EURUSD',tf:'5m',api:'https://biquote.io/api',initial:600,refresh:5,rr:4,k:3,disp:1,db:null,chart:null,series:null,bars:[],data:[],minute:[],log:[],timer:null,stopLoad:false,busy:false,candleFeedOk:false,lines:[],trendSeries:[],markers:null,lastKey:'',didFit:false,overlay:null,zoneDefs:[],overlaySignal:null,topDownBusy:false,lastTopDownAt:0,lastOtherPairScan:0,topDownTimer:null,lastCandlePollAt:0,candlePollBusy:false};
+const s={symbol:'EURUSD',tf:'5m',api:'https://biquote.io/api',initial:600,refresh:5,rr:4,k:3,disp:1,db:null,chart:null,series:null,bars:[],data:[],minute:[],log:[],timer:null,stopLoad:false,busy:false,candleFeedOk:false,lines:[],trendSeries:[],markers:null,lastKey:'',didFit:false,overlay:null,zoneDefs:[],globalZones:[],globalAnnotationAt:0,overlaySignal:null,topDownBusy:false,lastTopDownAt:0,lastOtherPairScan:0,topDownTimer:null,lastCandlePollAt:0,candlePollBusy:false};
 const symbolConfig={EURUSD:{label:'EUR/USD',type:'forex',precision:5},BTCUSD:{label:'BTC/USD',type:'crypto',precision:2},QQQUSDT:{label:'QQQUSDT · Binance perpetual',type:'equity-perp',precision:2}};
 const BINANCE_FUTURES_API='https://fapi.binance.com';
 function escapeHTML(value){return String(value??'').replace(/[&<>\"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]))}
@@ -81,7 +81,7 @@ async function loadSignalStore(){
 function save(){try{localStorage.setItem('apa-desk-settings',JSON.stringify({api:s.api,initial:s.initial,refresh:s.refresh,k:s.k,disp:s.disp,symbol:s.symbol,tf:s.tf}))}catch(e){console.warn('Local settings could not be saved',e);if($('toast'))toast('Browser storage unavailable or full. Export your journal for backup.')}}
 function renderPairSelector(){const host=$('pairSelector');if(!host)return;host.innerHTML=Object.entries(symbolConfig).map(([symbol,meta])=>'<button class="pair '+(s.symbol===symbol?'active':'')+'" data-s="'+symbol+'">'+meta.label+'</button>').join('');host.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>switchSymbol(b.dataset.s))}
 function loadPrefs(){try{const p=JSON.parse(localStorage.getItem('apa-desk-settings')||'{}');if(p&&typeof p==='object'&&!Array.isArray(p)){s.api=safeApiBase(p.api);if(Number.isFinite(+p.initial))s.initial=Math.min(1000,Math.max(100,+p.initial));if(Number.isFinite(+p.refresh))s.refresh=Math.min(60,Math.max(2,+p.refresh));if(Number.isFinite(+p.k))s.k=Math.min(10,Math.max(2,+p.k));if(Number.isFinite(+p.disp))s.disp=Math.min(5,Math.max(.1,+p.disp));if(symbolConfig[p.symbol])s.symbol=p.symbol;if(Object.hasOwn(secs,p.tf))s.tf=p.tf}const log=JSON.parse(localStorage.getItem('apa-desk-log')||'[]');s.log=Array.isArray(log)?log.filter(t=>t&&typeof t==='object'&&Number(t.rr)>=3&&Number.isFinite(Number(t.time))&&['BUY','SELL'].includes(t.side)&&symbolConfig[t.symbol]&&Object.hasOwn(secs,t.tf)):[]}catch{s.log=[]}s.api=safeApiBase(s.api);if(!symbolConfig[s.symbol])s.symbol='EURUSD';if(!Object.hasOwn(secs,s.tf))s.tf='5m';s.rr=Number(s.rr)||4;$('apiBase').value=s.api;$('initialBars').value=s.initial;$('refreshSec').value=s.refresh;$('swing').value=s.k;$('disp').value=s.disp;document.querySelectorAll('[data-s]').forEach(b=>b.classList.toggle('active',b.dataset.s===s.symbol));document.querySelectorAll('[data-t]').forEach(b=>b.classList.toggle('active',b.dataset.t===s.tf))}
-async function json(url){let r;try{r=await fetch(url,{cache:'no-store',mode:'cors'})}catch(e){throw Error('Network/CORS failure. Open this file in Chrome with internet access, then test the feed. '+e.message)}if(!r.ok){let detail='';try{let d=await r.json();detail=d.message||d.error||''}catch{}throw Error('HTTP '+r.status+(detail?' · '+detail:''))}return r.json()}
+async function json(url){let r;try{r=await fetch(url,{cache:'no-store',mode:'cors'})}catch(e){throw Error('Network/CORS failure. Open this file in Chrome with internet access, then test the feed. '+e.message)}if(!r.ok){let detail='';try{let d=await r.json();detail=d.message||d.error||''}catch{}if(r.status===451)throw Error('HTTP 451 · Binance has region-restricted this public API request. QQQUSDT cannot be shown as live from this connection; a reachable market-data proxy/provider is required.');throw Error('HTTP '+r.status+(detail?' · '+detail:''))}return r.json()}
 function endpoint(p){s.api=safeApiBase(s.api);return s.api.replace(/\/$/,'')+p}
 function norm(d,sym=s.symbol){let rows=Array.isArray(d)?d:(d?.bars||d?.data||d?.candles||d?.ohlc||[]);let m=new Map();for(const b of rows){let raw=b.openTime??b.time??b.timestamp??b.date;let n=typeof raw==='number'?raw:(/^\d+(\.\d+)?$/.test(String(raw))?Number(raw):Date.parse(raw));let time=Math.floor(n>1e12?n/1000:n),reported=Number(b.volume),ticks=Number(b.tickVolume),useTicks=symbolConfig[sym]?.type==='forex'&&Number.isFinite(ticks)&&ticks>0,volume=useTicks?ticks:(Number.isFinite(reported)&&reported>0?reported:(Number.isFinite(ticks)&&ticks>0?ticks:0));let bar={time,open:Number(b.open),high:Number(b.high),low:Number(b.low),close:Number(b.close),volume,volumeKind:useTicks?'tick volume':Number.isFinite(reported)&&reported>0?'reported volume':Number.isFinite(ticks)&&ticks>0?'tick volume':'unavailable',isOpen:!!b.isOpen};if(Number.isFinite(time)&&time>0&&[bar.open,bar.high,bar.low,bar.close].every(Number.isFinite)&&bar.high>=Math.max(bar.open,bar.close,bar.low)&&bar.low<=Math.min(bar.open,bar.close,bar.high))m.set(time,bar)}return [...m.values()].sort((a,b)=>a.time-b.time)}
 async function fetchBarsRaw(sym,tf,lim,from,to){
@@ -231,6 +231,7 @@ async function refreshTopDown(force=false){
    summarizeTf('12H',h12),summarizeTf('8H',h8),summarizeTf('4H',h4),summarizeTf('1H',h1),summarizeTf('15M',m15),summarizeTf('5M',m5),summarizeTf('1M',m1)
   ];
   const scanSets=[['1m',m1],['5m',m5],['15m',m15],['1h',h1],['4h',h4],['8h',h8],['12h',h12],['1d',d1],['1W',weekly],['1M',monthly],['1Y',yearly]];
+  rebuildUnifiedAnnotations(scanSets);
   const additions=[],seen=new Set(s.log.map(t=>[t.symbol,t.tf,t.side,t.time].join('|')));
   for(const [tf,bars] of scanSets)for(const candidate of scanOpportunityHistory(sym,tf,bars)){
    const key=[candidate.symbol,candidate.tf,candidate.side,candidate.time].join('|');
@@ -304,8 +305,10 @@ function renderOverlay(){
  if(!s.overlay||!s.chart||!s.series)return;
  s.overlay.replaceChildren();const w=s.overlay.clientWidth,h=s.overlay.clientHeight;if(!w||!h)return;
  const ts=s.chart.timeScale(),plotRight=Math.max(0,w-64);
- for(const z of (s.zoneDefs||[])){
-  const x1=ts.timeToCoordinate(z.start),mappedX2=ts.timeToCoordinate(z.end),x2=z.extendRight?plotRight:mappedX2;
+ const localTradeZones=(s.zoneDefs||[]).filter(z=>['reward','risk','entry'].includes(z.kind));
+ const unifiedZones=[...(s.globalZones||[]),...localTradeZones];
+ for(const z of unifiedZones){
+  const x1=chartXForTime(z.start),mappedX2=chartXForTime(z.end),x2=z.extendRight?plotRight:mappedX2;
   const y1=s.series.priceToCoordinate(z.high),y2=s.series.priceToCoordinate(z.low);
   if(x1==null||x2==null||y1==null||y2==null)continue;
   const left=Math.max(0,Math.min(x1,x2)),right=Math.min(w,Math.max(x1,x2)),top=Math.max(0,Math.min(y1,y2)),bottom=Math.min(h,Math.max(y1,y2));
@@ -315,14 +318,14 @@ function renderOverlay(){
   const label=document.createElement('span');label.className='chart-zone-label';label.style.color=z.color;label.textContent=z.label;box.appendChild(label);s.overlay.appendChild(box);
  }
  // Draw historical signal risk/reward rectangles for the active pair and timeframe.
- const visibleTrades=s.log.filter(t=>t.symbol===s.symbol&&t.tf===s.tf&&Number.isFinite(t.time)&&Number.isFinite(t.entry)&&Number.isFinite(t.sl)&&Number.isFinite(t.tp)).slice(0,80);
+ const visibleTrades=s.log.filter(t=>t.symbol===s.symbol&&Number.isFinite(t.time)&&Number.isFinite(t.entry)&&Number.isFinite(t.sl)&&Number.isFinite(t.tp)).sort((a,b)=>Number(b.time)-Number(a.time)).slice(0,120);
  for(const t of visibleTrades){
   const x1=chartXForTime(t.time),terminal=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED','HISTORICAL'].includes(t.status),endTime=terminal&&Number.isFinite(t.closedAt)?Math.floor(t.closedAt/1000):null,x2=terminal?chartXForTime(endTime):plotRight;
   if(x1==null||x2==null)continue;
   const left=Math.max(0,Math.min(x1,x2)),right=Math.min(w,Math.max(x1,x2));if(right-left<2||right<0||left>w)continue;
   const closed=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED','HISTORICAL'].includes(t.status);
   const entryY=s.series.priceToCoordinate(t.entry);
-  if(entryY!=null&&entryY>=0&&entryY<=h){const line=document.createElement('div');line.style.position='absolute';line.style.left=left+'px';line.style.top=entryY+'px';line.style.width=Math.max(2,right-left)+'px';line.style.borderTop='1px dashed '+(t.side==='BUY'?'#35d39a':'#ff657a');line.style.pointerEvents='none';line.style.zIndex='4';s.overlay.appendChild(line);const tag=document.createElement('div');tag.className='chart-level-label';tag.style.left=Math.max(0,Math.min(w-190,left+4))+'px';tag.style.top=Math.max(2,Math.min(h-20,entryY-18))+'px';tag.style.color=t.side==='BUY'?'#35d39a':'#ff657a';tag.textContent=t.symbol+' '+t.tf+' '+t.side+' · '+tradeStateLabel(t)+(t.status==='RUNNING'&&Number.isFinite(t.movePct)?' · '+(t.movePct>0?'TP ': 'SL ')+Math.abs(t.movePct).toFixed(1)+'%':'');s.overlay.appendChild(tag)}
+  if(entryY!=null&&entryY>=0&&entryY<=h){const line=document.createElement('div');line.style.position='absolute';line.style.left=left+'px';line.style.top=entryY+'px';line.style.width=Math.max(2,right-left)+'px';line.style.borderTop='1px dashed '+(t.side==='BUY'?'#35d39a':'#ff657a');line.style.pointerEvents='none';line.style.zIndex='4';s.overlay.appendChild(line);const tag=document.createElement('div');tag.className='chart-level-label';tag.style.left=Math.max(0,Math.min(w-190,left+4))+'px';tag.style.top=Math.max(2,Math.min(h-20,entryY-18))+'px';tag.style.color=t.side==='BUY'?'#35d39a':'#ff657a';tag.textContent=t.symbol+' '+t.tf.toUpperCase()+' '+t.side+' · '+tradeStateLabel(t)+(t.status==='RUNNING'&&Number.isFinite(t.movePct)?' · '+(t.movePct>0?'TP ': 'SL ')+Math.abs(t.movePct).toFixed(1)+'%':'');s.overlay.appendChild(tag)}
   for(const z of [{high:Math.max(t.entry,t.tp),low:Math.min(t.entry,t.tp),label:(closed?'CLOSED ':'')+'TARGET',color:'#35d39a',fill:'#35d39a18'},{high:Math.max(t.entry,t.sl),low:Math.min(t.entry,t.sl),label:(closed?'CLOSED ':'')+'RISK · '+(t.status||'NOT RUNNING'),color:'#ff657a',fill:'#ff657a18'}]){
    const y1=s.series.priceToCoordinate(z.high),y2=s.series.priceToCoordinate(z.low);if(y1==null||y2==null)continue;
    const top=Math.max(0,Math.min(y1,y2)),bottom=Math.min(h,Math.max(y1,y2));if(bottom-top<1||bottom<0||top>h)continue;
@@ -434,6 +437,26 @@ function addAdvancedAnnotations(b,marks){
   if(rejectionCount>=2&&engulfCount>=2&&dispCount>=2)break;
  }
 
+}
+
+
+/** Build one symbol-wide annotation layer from every supported timeframe.
+ * Timestamp-based zones remain linked when the candle interval changes. These are provisional OHLC-derived proxies.
+ */
+function rebuildUnifiedAnnotations(scanSets){
+ const previousBars=s.bars,previousZones=s.zoneDefs,all=[];
+ try{
+  for(const [tf,bars] of scanSets){
+   if(!Array.isArray(bars)||bars.length<10)continue;
+   const closed=bars.filter(b=>!b.isOpen);if(closed.length<10)continue;
+   s.bars=closed;s.zoneDefs=[];const marks=[];addAdvancedAnnotations(closed,marks);
+   for(const z of s.zoneDefs)all.push({...z,sourceTf:tf,label:'['+tf.toUpperCase()+'] '+z.label});
+  }
+  const unique=new Map();for(const z of all){const key=[z.sourceTf,z.kind,z.start,z.end,z.high,z.low,z.label].join('|');unique.set(key,z)}
+  s.globalZones=[...unique.values()].sort((a,b)=>a.start-b.start||a.high-b.high);s.globalAnnotationAt=Date.now();
+ }catch(e){console.warn('Unified multi-timeframe annotation build failed',e)}
+ finally{s.bars=previousBars;s.zoneDefs=previousZones}
+ if(s.overlay)renderOverlay();
 }
 
 function structuralTarget(side,entry,stop,highPivot,lowPivot,bars){
@@ -655,7 +678,7 @@ async function tick(){try{let q;if(s.symbol==='QQQUSDT'){const raw=await json(BI
 async function history(){if(s.busy)return;s.busy=true;s.stopLoad=false;$('history').disabled=true;$('stop').disabled=false;let now=Math.floor(Date.now()/1000),start=now-365*86400,cursor=start,loaded=0,errors=0,chunk=1000*60;try{while(cursor<now&&!s.stopLoad){let end=Math.min(now,cursor+chunk);try{let arr=await getBars(s.symbol,'1m',1000,cursor,end);if(arr.length){await dbPut(arr,s.symbol,'1m');let m=new Map(s.minute.map(b=>[b.time,b]));arr.forEach(b=>m.set(b.time,b));s.minute=[...m.values()].sort((a,b)=>a.time-b.time);if(s.tf==='1m')s.data=s.minute;loaded+=arr.length}}catch(e){errors++;if(errors>4)throw e}cursor=end;$('progress').style.width=((cursor-start)/(now-start)*100)+'%';$('historyStatus').textContent=`Requested ${Math.round((cursor-start)/60).toLocaleString()} / 525,600 minutes · ${loaded.toLocaleString()} bars received${errors?' · '+errors+' errors':''}`;if(loaded%2500<1000)draw();await new Promise(r=>setTimeout(r,220))}if(s.tf==='1m')s.data=s.minute;draw();$('historyStatus').textContent=(s.stopLoad?'Stopped. ':'Finished. ')+loaded.toLocaleString()+' one-minute bars received; provider coverage may be incomplete.';toast('Historical mapping updated')}catch(e){$('historyStatus').textContent='Load stopped: '+e.message+'. Existing cache is preserved.'}finally{s.busy=false;$('history').disabled=false;$('stop').disabled=true}}
 function dl(name,content,type){let a=document.createElement('a'),u=URL.createObjectURL(new Blob([content],{type}));a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),2000)}
 async function exportBars(){let arr=await dbGet(s.symbol,s.tf),csv='time,open,high,low,close,volume\n'+arr.map(b=>[new Date(b.time*1000).toISOString(),b.open,b.high,b.low,b.close,b.volume||0].join(',')).join('\n');dl(s.symbol+'_candles.csv',csv,'text/csv')}
-async function switchSymbol(sym){if(s.symbol===sym)return;s.symbol=sym;if($('riskEntry'))$('riskEntry').value='';if($('riskStop'))$('riskStop').value='';updateRiskCalculator();s.lastKey='';s.didFit=false;save();document.querySelectorAll('[data-s]').forEach(b=>b.classList.toggle('active',b.dataset.s===sym));try{s.data=await dbGet(sym,s.tf);s.minute=await dbGet(sym,'1m')}catch{s.data=[];s.minute=[]}draw();await start()}
+async function switchSymbol(sym){if(s.symbol===sym)return;s.symbol=sym;s.globalZones=[];s.globalAnnotationAt=0;s.lastTopDownAt=0;if($('riskEntry'))$('riskEntry').value='';if($('riskStop'))$('riskStop').value='';updateRiskCalculator();s.lastKey='';s.didFit=false;save();document.querySelectorAll('[data-s]').forEach(b=>b.classList.toggle('active',b.dataset.s===sym));try{s.data=await dbGet(sym,s.tf);s.minute=await dbGet(sym,'1m')}catch{s.data=[];s.minute=[]}draw();await start()}
 function updateRiskCalculator(){
  const budgetEl=$('riskBudget'),customWrap=$('customRiskWrap'),out=$('riskOutput');if(!budgetEl||!out)return;
  const custom=budgetEl.value==='custom';if(customWrap)customWrap.classList.toggle('hidden',!custom);
