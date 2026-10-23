@@ -47,6 +47,10 @@ jobs:
         if: github.event_name != 'schedule'
         run: node --test scripts/research-backtest.test.mjs
 
+      - name: Run app timeframe and candle refresh regression tests
+        if: github.event_name != 'schedule'
+        run: node --test scripts/app-timeframe-health-check.test.mjs
+
       - name: Run rolling historical proxy backtest
         if: github.event_name != 'schedule'
         run: node scripts/proxy-backtest.mjs
