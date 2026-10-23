@@ -106,8 +106,8 @@ export function detectLiquiditySweeps(bars, { strength = 2 } = {}) {
  * Candidate is invalidated only by a later close beyond the far edge.
  * This is not a claim that the zone represents institutional orders.
  */
-export function detectOrderBlockCandidates(bars, { displacementBody = 1, maxGap = 1 } = {}) {
-  if (!validBars(bars) || !Number.isFinite(displacementBody) || displacementBody < 0 || !Number.isInteger(maxGap) || maxGap < 0) return [];
+export function detectOrderBlockCandidates(bars, { displacementBody = 1, maxGap = 1, strength = 2 } = {}) {
+  if (!validBars(bars) || !Number.isFinite(displacementBody) || displacementBody < 0 || !Number.isInteger(maxGap) || maxGap < 0 || !Number.isInteger(strength) || strength < 1) return [];
   const gaps = detectFairValueGaps(bars);
   const blocks = [];
   for (const gap of gaps) {
@@ -117,6 +117,12 @@ export function detectOrderBlockCandidates(bars, { displacementBody = 1, maxGap 
     const averageRange = bars.slice(Math.max(0, impulseIndex - 13), impulseIndex).map(b => b.high - b.low);
     const meanRange = averageRange.length ? averageRange.reduce((a, b) => a + b, 0) / averageRange.length : 0;
     if (!(meanRange > 0 && body >= meanRange * displacementBody)) continue;
+    const previous = bars[impulseIndex - 1];
+    if (!previous || impulseIndex < 1) continue;
+    const prior = confirmedPivots(bars.slice(0, impulseIndex), strength);
+    const swing = gap.side === 'BULLISH' ? prior.highs.at(-1) : prior.lows.at(-1);
+    const brokeStructure = swing && (gap.side === 'BULLISH' ? impulse.close > swing.price && previous.close <= swing.price : impulse.close < swing.price && previous.close >= swing.price);
+    if (!brokeStructure) continue;
     const start = Math.max(0, impulseIndex - maxGap - 1);
     let origin = -1;
     for (let j = impulseIndex - 1; j >= start; j--) {
