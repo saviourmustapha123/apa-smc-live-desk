@@ -89,10 +89,15 @@ Each candidate page should display:
 
 - Provisional live APA/SMC scanner: exists; not a complete formal APA implementation.
 - Unit-tested SMC detector module: exists as a separate research module; not yet connected to the live scanner.
-- Automated rule-combination discovery engine: NOT IMPLEMENTED.
-- Historical backtest engine with robust costs, walk-forward and untouched holdout: NOT IMPLEMENTED to the standard specified here.
-- Experiment database / complete trial registry: NOT IMPLEMENTED.
-- Research dashboard connected to live experiment data: NOT IMPLEMENTED.
+- Bounded deterministic hypothesis generator: IMPLEMENTED. It enumerates reproducible 2- and 3-feature combinations from the current four-feature registry, keeps the minimum planned R:R at or above 1:3, and labels all outputs PROPOSED / NOT TESTED. This is not an AI model, does not prove global novelty, and does not establish profitability.
+- Strategy Research Lab UI: connected to the hypothesis generator; users can generate and export proposals. It does not yet read persisted experiment records.
+- Chronological OHLC trade simulator: IMPLEMENTED as a separately tested research module. It enters at the next candle open, applies a supplied transaction-cost assumption in R units, rejects planned R:R below 1:3, handles ambiguous stop/target bars conservatively, and reports closed-trade metrics. It is a simulator, not a complete strategy-to-signal evaluator.
+- Integrated detector-to-hypothesis evaluator: NOT IMPLEMENTED.
+- Validated market-specific spread/slippage model: NOT IMPLEMENTED; the simulator requires explicit costs expressed in R units.
+- Walk-forward pipeline and untouched holdout orchestration: NOT IMPLEMENTED.
+- Experiment database / persistent complete trial registry: NOT IMPLEMENTED.
+- Multiple-testing correction and statistical confidence analysis: NOT IMPLEMENTED.
+- Paper-forward evaluation integrated with dashboard: NOT IMPLEMENTED.
 - Live brokerage execution: intentionally not implemented.
 
-Never describe any of the NOT IMPLEMENTED items as completed.
+Do not mark any proposal as successful or promote it into the live scanner until the missing evaluation, data, statistical and forward-test layers have been implemented and passed.
