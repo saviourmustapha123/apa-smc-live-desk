@@ -94,3 +94,18 @@ test('iFVG requires close invalidation and a later retest rejection', () => {
   const bars = [bar(1, 10, 11, 9, 10), bar(2, 11, 15, 10, 14), bar(3, 14, 17, 12, 16), bar(4, 12, 12.5, 10, 10.5), bar(5, 11, 12, 9.5, 10)];
   assert.ok(detectInvertedFairValueGaps(bars).some(x => x.type === 'IFVG' && x.side === 'BEARISH' && x.status === 'RETEST_CONFIRMED'));
 });
+
+test('equal swing highs use deterministic earliest-pivot tie handling', () => {
+  const bars = [
+    bar(1, 5, 6, 4, 5),
+    bar(2, 6, 10, 5, 8),
+    bar(3, 7, 9, 6, 8),
+    bar(4, 8, 10, 7, 9),
+    bar(5, 8, 8, 7.5, 8),
+    bar(6, 8, 8, 7.5, 8)
+  ];
+  const pivots = confirmedPivots(bars, 1);
+  assert.equal(pivots.highs.filter(p => p.price === 10).length, 1);
+  assert.equal(pivots.highs.find(p => p.price === 10).index, 1);
+  assert.equal(pivots.highs.find(p => p.price === 10).known_at, 3);
+});
