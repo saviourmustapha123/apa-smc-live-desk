@@ -38,7 +38,7 @@ try {
     ['forex tick-volume fallback is explicit', /useTicks\?ticks/.test(source) && /tick-volume proxy/.test(source)],
     ['unknown quote freshness fails closed', /!Number\.isFinite\(age\)/.test(source) && /age>300/.test(source)],
     ['volume profile warns it is approximate', /uniformly over the price bins/.test(source) && /volume-source unknown/.test(source)],
-    ['seven-timeframe opportunity scanner', /function scanOpportunityHistory/.test(source) && /scanSets=\[\['1m'/.test(source)],
+    ['eight-timeframe opportunity scanner including weekly and monthly', /function scanOpportunityHistory/.test(source) && /scanSets=\[\['1m'/.test(source) && /\['1W',weekly\]/.test(source) && /\['1M',monthly\]/.test(source) && /\['1W',calendarAggregate\(d1,'week'\)\]/.test(source)],
     ['both supported pairs scanned', /async function scanBackgroundPair/.test(source) && /scanBackgroundPair\(other\)/.test(source)],
     ['signal journal uses IndexedDB', /createObjectStore\(SIGNALS/.test(source) && /function persistSignals/.test(source)],
     ['continuous opportunity polling', /setInterval\(\(\)=>refreshTopDown\(\),60000\)/.test(source)],
