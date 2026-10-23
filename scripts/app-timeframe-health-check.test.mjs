@@ -7,6 +7,7 @@ const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 test('chart exposes monthly and yearly timeframe controls', () => {
   assert.match(html, /data-t="1M">1M/);
   assert.match(html, /data-t="1Y">1Y/);
+  assert.match(html, /'1W':604800/);
   assert.match(html, /'1Y':31536000/);
 });
 
