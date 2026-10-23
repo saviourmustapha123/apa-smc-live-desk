@@ -15,6 +15,7 @@ test('pivot detector finds a confirmed swing high and low', () => {
     bar(5, 9, 11, 5, 7),
     bar(6, 7, 9, 2, 4),
     bar(7, 4, 7, 3, 5),
+    bar(8, 5, 6, 4, 5),
   ];
   const found = pivots(bars, 2);
   assert.ok(found.highs.some(p => p.i === 3 && p.p === 15));
@@ -26,10 +27,12 @@ test('pivot detector does not mark unconfirmed right-edge candles', () => {
     bar(1, 5, 6, 4, 5),
     bar(2, 6, 7, 5, 6),
     bar(3, 6, 8, 5, 7),
-    bar(4, 7, 20, 6, 19),
+    bar(4, 7, 9, 6, 8),
+    bar(5, 8, 10, 7, 9),
+    bar(6, 9, 20, 8, 19),
   ];
   const found = pivots(bars, 2);
-  assert.equal(found.highs.some(p => p.i === 3), false);
+  assert.equal(found.highs.some(p => p.i === 5), false);
 });
 
 test('ATR returns null without enough bars and a finite value with sufficient bars', () => {
