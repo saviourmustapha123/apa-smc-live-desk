@@ -69,3 +69,19 @@ A candidate requires a three-candle FVG, a preceding impulse body meeting a conf
 ```sh
 node --test scripts/smc-detectors.test.mjs
 ```
+
+
+## Additional clarified conventions (2026-10-23)
+
+These definitions are operational hypotheses for deterministic testing, not universal market laws or proof of institutional intent.
+
+- **Liquidity pool:** a visible cluster of likely resting orders around prior swing highs/lows, equal highs/lows, or range extremes. OHLC candles cannot reveal the full live order book.
+- **Liquidity sweep:** price trades beyond a previously confirmed level and closes back on the original side. A wick beyond a level without reclaim is not enough under this rule; it may instead be a breakout.
+- **Inducement (IDM):** a proxy for the first confirmed countertrend swing/pullback after a BOS, before the next opposing structural break. It is only marked swept when price crosses that swing and closes back through it. The chart cannot establish that the swing was deliberately engineered to lure traders.
+- **Order block (OB):** a candidate zone based on the last opposing candle near a directional impulse/FVG. For trade-grade use, require a close-confirmed structure break, meaningful displacement, a fresh/untouched zone, and contextual alignment. An opposing candle alone is not an OB.
+- **Breaker block:** a previously identified OB fails by a close through its far edge, price establishes an opposite-direction structure break, and the old zone is retested/rejected from the opposite side. A broken zone without opposite structure and retest is only a failed OB candidate.
+- **SBR/RBS:** support broken by a close and then rejected as resistance (SBR), or resistance broken by a close and then accepted as support (RBS). These are level role reversals and are not automatically breaker blocks.
+- **FVG:** bullish when candle 3 low is above candle 1 high; bearish when candle 3 high is below candle 1 low. Statuses distinguish OPEN, PARTIALLY_FILLED and FILLED; a first touch is not the same as full fill.
+- **iFVG:** an FVG is invalidated by a candle close through its far edge and then retested/rejected as a zone in the opposite direction. A mere touch is not an iFVG.
+- **BOS/CHoCH:** this module requires a close beyond a previously confirmed swing. BOS is classified as continuation/initial directional break; CHoCH is the first break opposite the previously recorded directional state. Some trading schools use MSS/CHoCH differently, so labels must remain tied to the declared convention.
+- **No automatic trade:** a detected shape is context, not a signal. The live engine still needs independent end-to-end tests before these research detectors are presented as active live-chart rules.
