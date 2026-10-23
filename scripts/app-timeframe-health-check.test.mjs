@@ -159,7 +159,7 @@ test('all-timeframe SMC zones are rebuilt into one symbol-wide overlay and mappe
   assert.match(html, /rebuildUnifiedAnnotations\(scanSets\)/);
   assert.match(html, /function rebuildUnifiedAnnotations\(scanSets\)/);
   assert.ok(html.includes("label:'['+tf.toUpperCase()+'] '+z.label"));
-  assert.match(html, /const unifiedZones=\[\.\.\.\(s\.globalZones\|\|\[\]\)\.filter\(z=>z\.sourceTf!==s\.tf\),\.\.\.\(s\.zoneDefs\|\|\[\]\)\]/);
+  assert.match(html, /const allZones=\[\.\.\.\(s\.globalZones\|\|\[\]\)\.filter\(z=>z\.sourceTf!==s\.tf\),\.\.\.\(s\.zoneDefs\|\|\[\]\)\.map\(z=>\(\{\.\.\.z,sourceTf:s\.tf\}\)\)\]/);
   assert.match(html, /const x1=chartXForTime\(z\.start\),mappedX2=chartXForTime\(z\.end\)/);
   assert.match(html, /s\.globalMarks=allMarks\.sort/);
   assert.match(html, /for\(const mark of \(s\.globalMarks\|\|\[\]\)\)/);
@@ -174,4 +174,20 @@ test('QQQUSDT supports a configurable Cloudflare Workers proxy for region-restri
   assert.ok(html.includes("qqqUrl('/fapi/v1/klines?'+q)"));
   assert.ok(html.includes("qqqUrl('/fapi/v1/ticker/price?symbol=QQQUSDT')"));
   assert.match(html, /HTTP 451 · Binance has region-restricted this public API request/);
+});
+
+test('chart overlay offers clean, balanced, and full density with per-timeframe zone caps', () => {
+  assert.match(html, /id="overlayDensity"/);
+  assert.match(html, /value="clean" selected>Clean/);
+  assert.match(html, /value="balanced">Balanced/);
+  assert.match(html, /value="full">Full map/);
+  assert.match(html, /const zoneLimit=mode==='clean'\?2:mode==='balanced'\?6:24/);
+  assert.match(html, /const tradeLimit=mode==='clean'\?4:mode==='balanced'\?12:40/);
+});
+
+test('daily target tracker counts actual 1:3+ candidates without manufacturing signals', () => {
+  assert.match(html, /dailyTarget:6/);
+  assert.match(html, /function renderDailyTarget\(\)/);
+  assert.match(html, /Only detected setups count; the scanner will not fabricate trades/);
+  assert.match(html, /renderSignalMonitor\(\);renderSetupBoard\(\);renderDailyTarget\(\)/);
 });
