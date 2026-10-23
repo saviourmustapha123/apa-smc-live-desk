@@ -29,5 +29,8 @@ jobs:
       - name: Run background health checks
         run: node scripts/background-health-check.mjs
 
+      - name: Run strategy core unit tests
+        run: node --test scripts/strategy-core.test.mjs
+
       - name: Run rolling historical proxy backtest
         run: node scripts/proxy-backtest.mjs
