@@ -31,9 +31,9 @@ try {
 
   const checks = [
     ['minimum 1:3 reward/risk gate', /rr\s*<\s*3/.test(source)],
-    ['only supported symbols', /EURUSD/.test(source) && /BTCUSD/.test(source)],
+    ['supported EURUSD, BTCUSD and QQQUSDT instruments', /EURUSD/.test(source) && /BTCUSD/.test(source) && /QQQUSDT/.test(source) && /fapi\.binance\.com/.test(source)],
     ['unsafe dynamic content escaping helper', /function escapeHTML\(/.test(source)],
-    ['HTTPS-only API allowlist', /function safeApiBase\(/.test(source) && /https:\/\/biquote\.io\/api/.test(source)],
+    ['HTTPS-only Biquote allowlist plus fixed Binance Futures adapter', /function safeApiBase\(/.test(source) && /https:\/\/biquote\.io\/api/.test(source) && /https:\/\/fapi\.binance\.com/.test(source) && /sym==='QQQUSDT'/.test(source)],
     ['content security policy present', /Content-Security-Policy/.test(source)],
     ['forex tick-volume fallback is explicit', /useTicks\?ticks/.test(source) && /tick-volume proxy/.test(source)],
     ['unknown quote freshness fails closed', /!Number\.isFinite\(age\)/.test(source) && /age>300/.test(source)],
