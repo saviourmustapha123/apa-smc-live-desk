@@ -94,3 +94,17 @@ test('weekly/monthly/yearly views reuse sufficiently deep daily history during r
   assert.match(html, /reused in-memory daily history cache/);
   assert.match(html, /dailyHistoryCache\.set\(sym,\{at:Date\.now\(\),bars:daily\}\)/);
 });
+
+test('QQQUSDT is wired to the Binance USDⓈ-M perpetual feed, including candles and quote timestamps', () => {
+  assert.match(html, /QQQUSDT:\{label:'QQQUSDT · Binance perpetual'/);
+  assert.match(html, /https:\/\/fapi\.binance\.com/);
+  assert.match(html, /fapi\.binance\.com\/fapi\/v1\/klines/);
+  assert.match(html, /fapi\.binance\.com\/fapi\/v1\/ticker\/price/);
+  assert.match(html, /connect-src 'self' https:\/\/biquote\.io https:\/\/fapi\.binance\.com/);
+  assert.match(html, /if\(sym==='QQQUSDT'\)/);
+  assert.match(html, /if\(sym==='QQQUSDT'\)return fetchBarsRaw\(sym,tf/);
+});
+
+test('QQQUSDT risk sizing uses linear contract units instead of labelling the quantity as BTC', () => {
+  assert.match(html, /QQQUSDT contract units \(linear USDT-margined estimate\)/);
+});
