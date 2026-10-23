@@ -46,6 +46,7 @@ const s={symbol:'EURUSD',tf:'5m',api:'https://biquote.io/api',initial:600,refres
 const symbolConfig={EURUSD:{label:'EUR/USD',type:'forex',precision:5},BTCUSD:{label:'BTC/USD',type:'crypto',precision:2}};
 function escapeHTML(value){return String(value??'').replace(/[&<>\"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]))}
 function safeApiBase(value){try{const u=new URL(String(value||''));if(u.protocol!=='https:'||u.hostname!=='biquote.io'||u.username||u.password||u.search||u.hash||!['','/api','/api/'].includes(u.pathname))return 'https://biquote.io/api';return 'https://biquote.io/api'}catch{return 'https://biquote.io/api'}}
+const historyDiagnostics={};
 const secs={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400,'1W':604800,'1M':2592000,'1Y':31536000};
 function bucketStart(time,tf){const d=new Date(time*1000);if(tf==='1M')return Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1)/1000;if(tf==='1Y')return Date.UTC(d.getUTCFullYear(),0,1)/1000;if(tf==='1W'){const day=(d.getUTCDay()+6)%7;return Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()-day)/1000}const span=secs[tf]||60;return Math.floor(time/span)*span}
 function aggregateMonthly(arr){const m=new Map();for(const b of arr){const time=bucketStart(b.time,'1M'),x=m.get(time);if(!x)m.set(time,{time,open:b.open,high:b.high,low:b.low,close:b.close,volume:b.volume||0,volumeKind:b.volumeKind||'unavailable',isOpen:!!b.isOpen});else{x.high=Math.max(x.high,b.high);x.low=Math.min(x.low,b.low);x.close=b.close;x.volume+=(b.volume||0);x.isOpen=x.isOpen||!!b.isOpen;if(x.volumeKind!==(b.volumeKind||'unavailable'))x.volumeKind='mixed volume'}}return [...m.values()].sort((a,b)=>a.time-b.time)}
@@ -91,18 +92,20 @@ async function getBars(sym,tf,lim,from,to){
   for(const bar of latest){const previous=merged.get(bar.time);if(!previous||previous.open!==bar.open||previous.high!==bar.high||previous.low!==bar.low||previous.close!==bar.close||previous.volume!==bar.volume)dailyChanged=true;merged.set(bar.time,bar)}
   daily=[...merged.values()].sort((a,b)=>a.time-b.time);
   const years=tf==='1W'?5:25,target=Math.floor(Date.now()/1000)-years*365*86400;
-  let cursor=daily.length?daily[0].time:Math.floor(Date.now()/1000),rounds=0;
+  let cursor=daily.length?daily[0].time:Math.floor(Date.now()/1000),rounds=0,backfillReason='requested history target reached';
   while(cursor>target&&rounds<16){
    const fromTime=Math.max(target,cursor-800*86400),toTime=cursor-1;
-   let older=[];try{older=await fetchBarsRaw(sym,'1d',1000,fromTime,toTime)}catch(e){console.warn('Higher-timeframe history backfill stopped',e);break}
+   let older=[];try{older=await fetchBarsRaw(sym,'1d',1000,fromTime,toTime)}catch(e){backfillReason='provider request failed: '+e.message;console.warn('Higher-timeframe history backfill stopped',e);break}
    const earlier=older.filter(b=>b.time<cursor);
-   if(!earlier.length)break;
+   if(!earlier.length){backfillReason='provider returned no older daily candles for '+new Date(fromTime*1000).toISOString().slice(0,10)+' to '+new Date(toTime*1000).toISOString().slice(0,10);break}
    for(const bar of earlier){if(!merged.has(bar.time))dailyChanged=true;merged.set(bar.time,bar)}
    daily=[...merged.values()].sort((a,b)=>a.time-b.time);
-   const nextCursor=daily[0]?.time;if(!Number.isFinite(nextCursor)||nextCursor>=cursor)break;cursor=nextCursor;rounds++;
+   const nextCursor=daily[0]?.time;if(!Number.isFinite(nextCursor)||nextCursor>=cursor){backfillReason='provider response did not extend oldest timestamp';break}cursor=nextCursor;rounds++;
    if(cursor<=target)break;
   }
+  if(rounds>=16&&cursor>target)backfillReason='client backfill iteration limit reached';
   if(daily.length&&dailyChanged)await dbPut(daily,sym,'1d');
+  historyDiagnostics[sym]={dailyBars:daily.length,oldest:daily[0]?.time||null,newest:daily.at(-1)?.time||null,rounds,target:target,reason:backfillReason,timeframe:tf};
   if(tf==='1M')return aggregateMonthly(daily).slice(-Math.max(lim,300));
   if(tf==='1W')return calendarAggregate(daily,'week').slice(-Math.max(lim,260));
   return calendarAggregate(daily,'year').slice(-Math.max(lim,25));
@@ -210,7 +213,9 @@ async function refreshTopDown(force=false){
   const agreement=net>0?'Higher-timeframe tilt bullish':net<0?'Higher-timeframe tilt bearish':'Higher-timeframe context mixed';
   host.innerHTML=rows.map(x=>'<div style="padding:8px 0;border-bottom:1px solid #1e2b38"><div class="row"><span><b>'+x.tf+'</b></span><b style="color:'+(x.score>0?'var(--g)':x.score<0?'var(--r)':'var(--m)')+'">'+x.bias+'</b></div><div class="fine">'+x.detail+'</div><div class="fine">'+x.volume+'</div></div>').join('')+'<div class="note" style="margin-top:9px"><b>'+agreement+'</b><br>Directional votes: '+net+' across '+votes.length+' timeframes with readable structure. This is context, not an entry signal.</div>';
   let otherPairNew=0;if(Date.now()-s.lastOtherPairScan>=300000){s.lastOtherPairScan=Date.now();const other=sym==='EURUSD'?'BTCUSD':'EURUSD';try{otherPairNew=await scanBackgroundPair(other)}catch(e){console.warn('Background pair scan unavailable',e)}}
-  statusEl.textContent='Updated '+new Date().toLocaleTimeString()+' · '+(d1.length?d1.length+' daily candles loaded':'daily history unavailable')+' · scanning 9 timeframes; '+otherPairNew+' new candidates on other pair';
+  const hd=historyDiagnostics[sym]||{},coverage=hd.oldest?'oldest daily '+new Date(hd.oldest*1000).toISOString().slice(0,10):'oldest daily date unavailable';
+  const backfill=hd.reason||'history backfill status unavailable';
+  statusEl.textContent='Updated '+new Date().toLocaleTimeString()+' · '+(d1.length?d1.length+' daily candles loaded':'daily history unavailable')+' · '+coverage+' · '+monthly.filter(x=>!x.isOpen).length+' monthly / '+yearly.filter(x=>!x.isOpen).length+' yearly candles · backfill: '+backfill+' · scanning 9 timeframes; '+otherPairNew+' new candidates on other pair';
   s.lastTopDownAt=Date.now();
  }catch(e){statusEl.textContent='Context unavailable: '+e.message}
  finally{s.topDownBusy=false}
