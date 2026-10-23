@@ -44,7 +44,7 @@ The candle's wick must exceed a previously confirmed swing high/low and the same
 A bullish FVG is defined as current candle low greater than the high two bars earlier; bearish is current candle high less than the low two bars earlier. The detector distinguishes OPEN, PARTIALLY_FILLED and FILLED. A partial overlap is not the same as filling the full gap. Close-through invalidation is handled separately by the iFVG proxy.
 
 ### Order-block candidate
-A research-module candidate requires a three-candle FVG, a preceding impulse body meeting a configurable average-range threshold, and an opposing candle near the impulse. The live chart applies a stricter gate: displacement + FVG + close-confirmed structure break, with the zone candle selected before the impulse. Both remain candidates, not proof of institutional orders. The research module is still separate from the live browser signal engine.
+A research-module candidate requires a three-candle FVG, a preceding impulse body meeting a configurable average-range threshold, a close beyond a previously confirmed swing in the impulse direction, and an opposing candle near the impulse. The live chart applies a stricter gate: displacement + FVG + close-confirmed structure break, with the zone candle selected before the impulse. Both remain candidates, not proof of institutional orders. The research module is still separate from the live browser signal engine.
 
 ### Not implemented in this module yet
 - Equal highs/lows and session-specific liquidity pools.
