@@ -69,9 +69,15 @@ export function detectFairValueGaps(bars, { minGap = 0 } = {}) {
     }
   }
   return gaps.map(gap => {
-    const future = bars.slice(gap.index + 1);
-    const touched = future.some(b => b.low <= gap.upper && b.high >= gap.lower);
-    return { ...gap, status: touched ? 'MITIGATED' : 'OPEN' };
+    let status = 'OPEN';
+    for (let i = gap.index + 1; i < bars.length; i++) {
+      const b = bars[i], overlaps = b.low <= gap.upper && b.high >= gap.lower;
+      if (!overlaps) continue;
+      const filled = gap.side === 'BULLISH' ? b.low <= gap.lower : b.high >= gap.upper;
+      status = filled ? 'FILLED' : 'PARTIALLY_FILLED';
+      if (filled) break;
+    }
+    return { ...gap, status };
   });
 }
 
@@ -121,8 +127,105 @@ export function detectOrderBlockCandidates(bars, { displacementBody = 1, maxGap 
     const lower = Math.min(candle.open, candle.close, candle.low);
     const upper = Math.max(candle.open, candle.close, candle.high);
     const later = bars.slice(gap.index + 1);
-    const invalidated = later.some(b => gap.side === 'BULLISH' ? b.close < lower : b.close > upper);
-    blocks.push({ index: origin, impulseIndex, fvgIndex: gap.index, side: gap.side, lower, upper, status: invalidated ? 'INVALIDATED' : 'CANDIDATE' });
+    const invalidatedOffset = later.findIndex(b => gap.side === 'BULLISH' ? b.close < lower : b.close > upper);
+    const invalidated = invalidatedOffset >= 0;
+    blocks.push({ index: origin, impulseIndex, fvgIndex: gap.index, side: gap.side, lower, upper, status: invalidated ? 'INVALIDATED' : 'CANDIDATE', invalidatedAt: invalidated ? gap.index + 1 + invalidatedOffset : null });
   }
   return blocks;
+}
+
+
+/**
+ * Breaker block convention: an OB fails by close through its far edge,
+ * an opposite-direction structure break occurs, and price retests/rejects the old zone.
+ */
+export function detectBreakerBlocks(bars, options = {}) {
+  if (!validBars(bars)) return [];
+  const blocks = detectOrderBlockCandidates(bars, options);
+  const structure = detectStructureBreaks(bars, options);
+  const out = [];
+  for (const ob of blocks.filter(x => x.status === 'INVALIDATED' && Number.isInteger(x.invalidatedAt))) {
+    const side = ob.side === 'BULLISH' ? 'BEARISH' : 'BULLISH';
+    const broken = structure.find(e => e.index >= ob.invalidatedAt && e.side === side);
+    if (!broken) continue;
+    let retestAt = null;
+    for (let i = broken.index + 1; i < bars.length; i++) {
+      const b = bars[i], touches = b.low <= ob.upper && b.high >= ob.lower;
+      const rejects = side === 'BEARISH' ? b.close < ob.lower : b.close > ob.upper;
+      if (touches && rejects) { retestAt = i; break; }
+    }
+    out.push({ ...ob, side, type: 'BREAKER', structureBreakAt: broken.index, retestAt, status: retestAt == null ? 'FORMED_WAITING_RETEST' : 'RETEST_CONFIRMED' });
+  }
+  return out;
+}
+
+/**
+ * Inducement proxy: first confirmed countertrend pivot after a BOS.
+ * A later wick through with close back inside marks SWEPT. Intent cannot be inferred from OHLC.
+ */
+export function detectInducements(bars, { strength = 2 } = {}) {
+  if (!validBars(bars)) return [];
+  const pivots = confirmedPivots(bars, strength), events = detectStructureBreaks(bars, { strength }), out = [];
+  for (const event of events.filter(e => e.type === 'BOS')) {
+    const candidates = event.side === 'BULLISH' ? pivots.lows : pivots.highs;
+    const pivot = candidates.find(p => p.index > event.index && p.confirmedAt < bars.length);
+    if (!pivot) continue;
+    const opposingBreak = events.find(e => e.index > event.index && e.side !== event.side);
+    if (opposingBreak && opposingBreak.index < pivot.confirmedAt) continue;
+    let status = 'CANDIDATE', sweptAt = null, invalidatedAt = null;
+    for (let i = pivot.confirmedAt + 1; i < bars.length; i++) {
+      const b = bars[i];
+      const swept = event.side === 'BULLISH' ? b.low < pivot.price && b.close > pivot.price : b.high > pivot.price && b.close < pivot.price;
+      const broken = event.side === 'BULLISH' ? b.close < pivot.price : b.close > pivot.price;
+      if (swept) { status = 'SWEPT'; sweptAt = i; break; }
+      if (broken) { status = 'INVALIDATED'; invalidatedAt = i; break; }
+    }
+    out.push({ side: event.side, bosAt: event.index, index: pivot.index, confirmedAt: pivot.confirmedAt, price: pivot.price, status, sweptAt, invalidatedAt });
+  }
+  return out;
+}
+
+/** Support-break/retest = SBR; resistance-break/retest = RBS. These are role reversals, not breaker blocks. */
+export function detectRoleReversals(bars, { strength = 2 } = {}) {
+  if (!validBars(bars)) return [];
+  const pivots = confirmedPivots(bars, strength), out = [];
+  for (const p of pivots.lows) {
+    let brokenAt = -1;
+    for (let i = p.confirmedAt + 1; i < bars.length; i++) if (bars[i].close < p.price) { brokenAt = i; break; }
+    if (brokenAt < 0) continue;
+    for (let i = brokenAt + 1; i < bars.length; i++) {
+      if (bars[i].high >= p.price && bars[i].close < p.price) { out.push({ type: 'SBR', side: 'BEARISH', level: p.price, pivotAt: p.index, brokenAt, retestAt: i }); break; }
+    }
+  }
+  for (const p of pivots.highs) {
+    let brokenAt = -1;
+    for (let i = p.confirmedAt + 1; i < bars.length; i++) if (bars[i].close > p.price) { brokenAt = i; break; }
+    if (brokenAt < 0) continue;
+    for (let i = brokenAt + 1; i < bars.length; i++) {
+      if (bars[i].low <= p.price && bars[i].close > p.price) { out.push({ type: 'RBS', side: 'BULLISH', level: p.price, pivotAt: p.index, brokenAt, retestAt: i }); break; }
+    }
+  }
+  return out.sort((a, b) => a.retestAt - b.retestAt);
+}
+
+/** iFVG proxy: close through the far edge, then retest and rejection in the flipped direction. */
+export function detectInvertedFairValueGaps(bars, options = {}) {
+  if (!validBars(bars)) return [];
+  const gaps = detectFairValueGaps(bars, options), out = [];
+  for (const gap of gaps) {
+    let flippedAt = -1;
+    for (let i = gap.index + 1; i < bars.length; i++) {
+      if (gap.side === 'BULLISH' ? bars[i].close < gap.lower : bars[i].close > gap.upper) { flippedAt = i; break; }
+    }
+    if (flippedAt < 0) continue;
+    const side = gap.side === 'BULLISH' ? 'BEARISH' : 'BULLISH';
+    let retestAt = null;
+    for (let i = flippedAt + 1; i < bars.length; i++) {
+      const b = bars[i], touches = b.low <= gap.upper && b.high >= gap.lower;
+      const rejects = side === 'BEARISH' ? b.close < gap.lower : b.close > gap.upper;
+      if (touches && rejects) { retestAt = i; break; }
+    }
+    out.push({ ...gap, type: 'IFVG', side, flippedAt, retestAt, status: retestAt == null ? 'FLIPPED_WAITING_RETEST' : 'RETEST_CONFIRMED' });
+  }
+  return out;
 }
