@@ -108,7 +108,7 @@ async function getBars(sym,tf,lim,from,to){
   return aggregateHours(hourly,tf==='8h'?8:12).slice(-Math.max(lim,300));
  }
  if(tf==='1M'||tf==='1W'||tf==='1Y'){
-  const years=tf==='1W'?5:25,target=Math.floor(Date.now()/1000)-years*365*86400,cachedDaily=dailyHistoryCache.get(sym);
+  const years=tf==='1W'?5:25,target=Math.max(sym==='QQQUSDT'?Math.floor(Date.UTC(2026,3,6)/1000):0,Math.floor(Date.now()/1000)-years*365*86400),cachedDaily=dailyHistoryCache.get(sym);
   if(cachedDaily&&Date.now()-cachedDaily.at<30000&&cachedDaily.bars.length&&cachedDaily.bars[0].time<=target){const daily=cachedDaily.bars;historyDiagnostics[sym]={dailyBars:daily.length,oldest:daily[0]?.time||null,newest:daily.at(-1)?.time||null,rounds:0,target,reason:'reused in-memory daily history cache',timeframe:tf};if(tf==='1M')return aggregateMonthly(daily).slice(-Math.max(lim,300));if(tf==='1W')return calendarAggregate(daily,'week').slice(-Math.max(lim,260));return calendarAggregate(daily,'year').slice(-Math.max(lim,25))}
   let daily=[];try{daily=await dbGet(sym,'1d')}catch{}
   const latest=await fetchBarsRaw(sym,'1d',1000);
@@ -470,6 +470,55 @@ function renderSignalMonitor(){
   return '<tr><td>'+stamp(t.time)+'</td><td>'+escapeHTML(t.symbol)+' / '+escapeHTML(t.tf)+'</td><td style="color:'+(t.side==='BUY'?'var(--g)':'var(--r)')+'">'+escapeHTML(t.side)+'</td><td>'+escapeHTML(tradeStateLabel(t))+'</td><td style="color:'+(running&&Number.isFinite(t.movePct)?(t.movePct>=0?'var(--g)':'var(--r)'):'var(--muted)')+'">'+escapeHTML(progress)+'</td><td>'+escapeHTML(rNow)+'</td><td>'+escapeHTML(outcome)+'</td></tr>';
  }).join(''):'<tr><td colspan="7" class="muted">No signals yet. Signals appear after a confirmed rule set is detected.</td></tr>';
 }
+
+function recentQualifiedZones(b,k,dispMult){
+ const blocks=[],breakers=[],start=Math.max(3,b.length-240);
+ for(let i=start;i<b.length;i++){
+  const impulse=b[i],prior=b[i-1],baseAtr=atr(b.slice(0,i))||Math.max(impulse.high-impulse.low,1e-8),body=Math.abs(impulse.close-impulse.open);
+  if(body<baseAtr*dispMult)continue;
+  const priorPivots=pivots(b.slice(0,i),k),high=priorPivots.h.at(-1),low=priorPivots.l.at(-1);
+  const bullish=impulse.close>impulse.open&&high&&prior.close<=high.p&&impulse.close>high.p&&i>=2&&impulse.low>b[i-2].high;
+  const bearish=impulse.close<impulse.open&&low&&prior.close>=low.p&&impulse.close<low.p&&i>=2&&impulse.high<b[i-2].low;
+  if(!bullish&&!bearish)continue;
+  let origin=-1;for(let j=i-1;j>=Math.max(0,i-3);j--){if(bullish?b[j].close<b[j].open:b[j].close>b[j].open){origin=j;break}}
+  if(origin<0)continue;
+  const candle=b[origin],ob={index:origin,time:candle.time,low:candle.low,high:candle.high,side:bullish?'BULLISH':'BEARISH',impulseIndex:i,invalidatedAt:null};
+  for(let j=i+1;j<b.length;j++){if(ob.side==='BULLISH'?b[j].close<ob.low:b[j].close>ob.high){ob.invalidatedAt=j;break}}
+  if(ob.invalidatedAt==null){blocks.push(ob);continue}
+  const side=ob.side==='BULLISH'?'BEARISH':'BULLISH';let oppositeBreak=-1;
+  for(let j=ob.invalidatedAt+1;j<b.length;j++){
+   const p=pivots(b.slice(0,j),k),swing=side==='BEARISH'?p.l.at(-1):p.h.at(-1);
+   if(swing&&(side==='BEARISH'?b[j-1].close>=swing.p&&b[j].close<swing.p:b[j-1].close<=swing.p&&b[j].close>swing.p)){oppositeBreak=j;break}
+  }
+  if(oppositeBreak<0)continue;
+  for(let j=oppositeBreak+1;j<b.length;j++){const bar=b[j],touch=bar.low<=ob.high&&bar.high>=ob.low,reject=side==='BEARISH'?bar.close<ob.low:bar.close>ob.high;if(touch&&reject){breakers.push({...ob,side,retestIndex:j,retestTime:bar.time});break}}
+ }
+ return {ob:blocks.at(-1)||null,breaker:breakers.at(-1)||null}
+}
+function latestInducementProxy(b,k){
+ const pp=pivots(b,k),events=[];let trend='UNKNOWN';
+ for(let i=1;i<b.length;i++){
+  const high=pp.h.filter(p=>p.i+k<i).at(-1),low=pp.l.filter(p=>p.i+k<i).at(-1);
+  const up=high&&b[i].close>high.p&&b[i-1].close<=high.p,down=low&&b[i].close<low.p&&b[i-1].close>=low.p;
+  if(up){events.push({i,side:'BULLISH',type:trend==='BEARISH'?'CHoCH':'BOS'});trend='BULLISH'}else if(down){events.push({i,side:'BEARISH',type:trend==='BULLISH'?'CHoCH':'BOS'});trend='BEARISH'}
+ }
+ for(const event of events.filter(e=>e.type==='BOS').reverse()){
+  const candidates=event.side==='BULLISH'?pp.l:pp.h;
+  const pivot=candidates.find(p=>p.i>event.i&&p.i+k<b.length);
+  if(!pivot)continue;
+  const opposite=events.find(e=>e.i>event.i&&e.side!==event.side);
+  if(opposite&&opposite.i<=pivot.i+k)continue;
+  let state='CANDIDATE',eventIndex=null;
+  for(let j=pivot.i+k+1;j<b.length;j++){
+   const bar=b[j],swept=event.side==='BULLISH'?bar.low<pivot.p&&bar.close>pivot.p:bar.high>pivot.p&&bar.close<pivot.p;
+   const broken=event.side==='BULLISH'?bar.close<pivot.p:bar.close>pivot.p;
+   if(swept){state='SWEPT';eventIndex=j;break}if(broken){state='INVALIDATED';eventIndex=j;break}
+  }
+  return {side:event.side,level:pivot.p,time:b[pivot.i].time,bosTime:b[event.i].time,status:state,eventIndex};
+ }
+ return null
+}
+
 function analyse(){
  const b=s.bars.filter(c=>!c.isOpen);s.zoneDefs=[];s.overlaySignal=null;const minimumBars=s.tf==='1Y'?10:s.tf==='1M'?20:35;if(b.length<minimumBars){$('bias').textContent='Need more candles';$('analysisTime').textContent='At least '+minimumBars+' candles are required';$('signal').innerHTML='<h3>Insufficient candles</h3><div class="muted">Load more real OHLC bars before analysis. Existing overlays are cleared to avoid showing stale levels.</div>';paint(null,[],[],[]);renderOverlay();return}
  const {h,l}=pivots(b,+s.k),sh=h.at(-1),sh2=h.at(-2),sl=l.at(-1),sl2=l.at(-2),x=b.at(-1),p=b.at(-2),a=atr(b)||Math.max(x.high-x.low,1e-8),body=Math.abs(x.close-x.open),bull=x.close>x.open,bear=x.close<x.open,dis=body>=a*s.disp;
@@ -478,8 +527,8 @@ function analyse(){
  const fvgBear=b.length>3&&b.at(-3).low>x.high, fvgBull=b.length>3&&b.at(-3).high<x.low;
  const eqTol=a*.15,eqh=h.length>1&&Math.abs(h.at(-1).p-h.at(-2).p)<=eqTol,eql=l.length>1&&Math.abs(l.at(-1).p-l.at(-2).p)<=eqTol;
  const rangeHigh=sh?.p,rangeLow=sl?.p,eq=rangeHigh!=null&&rangeLow!=null?(rangeHigh+rangeLow)/2:null;
- // The order block candidate is the last opposing candle before a recent impulse; this is a heuristic, not a universal OB definition.
- let ob=null;for(let i=b.length-2;i>=Math.max(0,b.length-15);i--){if((bull&&b[i].close<b[i].open)||(bear&&b[i].close>b[i].open)){ob=b[i];break}}
+ // Only label an OB when an opposing candle precedes displacement + FVG + a close-confirmed structure break.
+ const qualifiedZones=recentQualifiedZones(b,+s.k,s.disp);let ob=qualifiedZones.ob,breaker=qualifiedZones.breaker;
  // Scan confirmed historical swing levels for role-reversal retests, not only the newest candle.
  const priorSupport=sl?.p,priorResistance=sh?.p,sbrMatches=[],rbsMatches=[];
  for(const level of l){
@@ -513,23 +562,24 @@ function analyse(){
  qmlMatch=qmlMatches.at(-1)||null;
  if(qmlMatch)qml=qmlMatch.label;
  const internalHigh=h.length>=2?h.at(-2):null,internalLow=l.length>=2?l.at(-2):null;
- // This is deliberately labelled a proxy: a sweep alone cannot prove inducement.
- const inducement=swH&&internalLow&&x.close<internalLow.p?'Possible bearish inducement proxy':swL&&internalHigh&&x.close>internalHigh.p?'Possible bullish inducement proxy':'No clear inducement proxy';
+ // Inducement is tied to a post-BOS pullback pivot; no candle shape can prove deliberate manipulation.
+ const inducementMatch=latestInducementProxy(b,+s.k),inducement=inducementMatch?(inducementMatch.side==='BULLISH'?'Possible bullish IDM '+inducementMatch.status.toLowerCase():'Possible bearish IDM '+inducementMatch.status.toLowerCase()):'No confirmed post-BOS inducement proxy';
  const pdText=eq==null?'Range unavailable':x.close>eq?'Premium half':x.close<eq?'Discount half':'At equilibrium';
  const trendDefs=[];if(h.length>=2){const z=h.slice(-2);trendDefs.push({color:'#d1d5db',points:[{time:z[0].t,value:z[0].p},{time:z[1].t,value:z[1].p}]})}if(l.length>=2){const z=l.slice(-2);trendDefs.push({color:'#c4b5fd',points:[{time:z[0].t,value:z[0].p},{time:z[1].t,value:z[1].p}]})}
- const srText=sh&&sl?'R '+price(sh.p)+' / S '+price(sl.p):'Need confirmed pivots',obText=ob?(bull?'Demand candidate ':'Supply candidate ')+price(ob.low)+'–'+price(ob.high):'Not identified';
+ const srText=sh&&sl?'R '+price(sh.p)+' / S '+price(sl.p):'Need confirmed pivots',obText=ob?(ob.side==='BULLISH'?'Bullish OB candidate ':'Bearish OB candidate ')+price(ob.low)+'–'+price(ob.high):'No qualified OB (needs displacement + FVG + BOS';
  $('bias').textContent=bias;$('analysisTime').textContent='Updated '+new Date().toLocaleTimeString();
- $('structure').innerHTML=[row('Latest swing high',sh?price(sh.p):'—'),row('Latest swing low',sl?price(sl.p):'—'),row('Structure event',swH?'Buy-side liquidity sweep':swL?'Sell-side liquidity sweep':bearBreak?'Bearish BOS proxy':bullBreak?'Bullish BOS proxy':'No fresh event'),row('CHoCH / structure shift',bearBreak&&bias==='Bullish structure'?'Possible bearish CHoCH':bullBreak&&bias==='Bearish structure'?'Possible bullish CHoCH':'Not confirmed'),row('Fair value gap',fvgBear?'Bearish 3-candle FVG':fvgBull?'Bullish 3-candle FVG':'Not detected on latest 3 bars'),row('Support / resistance',srText),row('Order block',obText),row('Equal highs / lows',eqh?'EQH · buy-side liquidity':eql?'EQL · sell-side liquidity':'No close equal-level pair'),row('Premium / discount',pdText),row('Displacement',`${(body/a).toFixed(2)}× ATR · ${dis?'passes filter':'below filter'}`),row('Candle',bull?'Bullish':bear?'Bearish':'Doji')].join('');
+ $('structure').innerHTML=[row('Latest swing high',sh?price(sh.p):'—'),row('Latest swing low',sl?price(sl.p):'—'),row('Structure event',swH?'Buy-side liquidity sweep':swL?'Sell-side liquidity sweep':bearBreak?'Bearish BOS proxy':bullBreak?'Bullish BOS proxy':'No fresh event'),row('CHoCH / structure shift',bearBreak&&bias==='Bullish structure'?'Possible bearish CHoCH':bullBreak&&bias==='Bearish structure'?'Possible bullish CHoCH':'Not confirmed'),row('Fair value gap',fvgBear?'Bearish 3-candle FVG':fvgBull?'Bullish 3-candle FVG':'Not detected on latest 3 bars'),row('Support / resistance',srText),row('Order block',obText),row('Breaker block',breaker?(breaker.side==='BULLISH'?'Bullish breaker retest ':'Bearish breaker retest ')+price(breaker.low)+'–'+price(breaker.high):'No confirmed failed-OB flip + retest'),row('Equal highs / lows',eqh?'EQH · buy-side liquidity':eql?'EQL · sell-side liquidity':'No close equal-level pair'),row('Premium / discount',pdText),row('Displacement',`${(body/a).toFixed(2)}× ATR · ${dis?'passes filter':'below filter'}`),row('Candle',bull?'Bullish':bear?'Bearish':'Doji')].join('');
  $('patterns').innerHTML=[row('Quasimodo (QML)',qml),row('SBR / RBS',sbr?'Support → resistance retest':rbs?'Resistance → support retest':'Not detected'),row('Trendlines','Latest 2 confirmed highs/lows drawn'),row('Inducement',inducement)].join('');
  let marks=[];let levelLines=[];if(sh)levelLines.push(['Resistance / swing high',sh.p,'#f4bd57']);if(sl)levelLines.push(['Support / swing low',sl.p,'#70aaff']);if(sh2)levelLines.push(['Prior swing high',sh2.p,'#9a7d3b']);if(sl2)levelLines.push(['Prior swing low',sl2.p,'#5075a6']);if(eqh&&sh2)levelLines.push(['Equal highs · BSL',Math.max(sh.p,sh2.p),'#f4bd57']);if(eql&&sl2)levelLines.push(['Equal lows · SSL',Math.min(sl.p,sl2.p),'#70aaff']);if(eq!==null)levelLines.push(['Range equilibrium',eq,'#a78bfa']);
- if(ob){const obBullish=bull,obColor=obBullish?'#35d39a':'#ff9c69';levelLines.push([(obBullish?'Demand':'Supply')+' OB high',ob.high,obColor]);levelLines.push([(obBullish?'Demand':'Supply')+' OB low',ob.low,obColor]);s.zoneDefs.push({start:ob.time,end:x.time,high:ob.high,low:ob.low,label:(obBullish?'BULLISH':'BEARISH')+' ORDER BLOCK CANDIDATE',color:obColor,fill:obColor+'26',extendRight:true,kind:'order-block'});marks.push({time:ob.time,position:obBullish?'belowBar':'aboveBar',color:obColor,shape:'square',text:obBullish?'BULL OB?':'BEAR OB?'})}
+ if(ob){const obBullish=ob.side==='BULLISH',obColor=obBullish?'#35d39a':'#ff9c69';levelLines.push([(obBullish?'Demand':'Supply')+' OB high',ob.high,obColor]);levelLines.push([(obBullish?'Demand':'Supply')+' OB low',ob.low,obColor]);s.zoneDefs.push({start:ob.time,end:x.time,high:ob.high,low:ob.low,label:(obBullish?'BULLISH':'BEARISH')+' ORDER BLOCK CANDIDATE',color:obColor,fill:obColor+'26',extendRight:true,kind:'order-block'});marks.push({time:ob.time,position:obBullish?'belowBar':'aboveBar',color:obColor,shape:'square',text:obBullish?'BULL OB?':'BEAR OB?'})}
+ if(breaker){const bc=breaker.side==='BULLISH'?'#35d39a':'#ff9c69';s.zoneDefs.push({start:breaker.time,end:breaker.retestTime,high:breaker.high,low:breaker.low,label:breaker.side+' BREAKER BLOCK · RETEST',color:bc,fill:bc+'26',extendRight:false,kind:'breaker-block'});marks.push({time:breaker.retestTime,position:breaker.side==='BULLISH'?'belowBar':'aboveBar',color:bc,shape:'square',text:breaker.side+' BREAKER'})}
  if(fvgBear){levelLines.push(['Bearish FVG upper',b.at(-3).low,'#ff9c69']);levelLines.push(['Bearish FVG lower',x.high,'#ff9c69']);s.zoneDefs.push({start:b.at(-3).time,end:x.time,high:b.at(-3).low,low:x.high,label:'SMC BEARISH FVG',color:'#ff9c69',fill:'#ff9c6926'})}if(fvgBull){levelLines.push(['Bullish FVG upper',x.low,'#35d39a']);levelLines.push(['Bullish FVG lower',b.at(-3).high,'#35d39a']);s.zoneDefs.push({start:b.at(-3).time,end:x.time,high:x.low,low:b.at(-3).high,label:'SMC BULLISH FVG',color:'#35d39a',fill:'#35d39a26'})}
  if(sbr)levelLines.push(['SBR retest',priorSupport,'#ff9c69']);if(rbs)levelLines.push(['RBS retest',priorResistance,'#35d39a']);
  for(const z of h.slice(-8))marks.push({time:z.t,position:'aboveBar',color:'#d1d5db',shape:'circle',text:'SH'});for(const z of l.slice(-8))marks.push({time:z.t,position:'belowBar',color:'#c4b5fd',shape:'circle',text:'SL'});
   for(const match of qmlMatches.slice(-3)){const z=match.pivots,top=Math.max(...z.map(v=>v.p)),bottom=Math.min(...z.map(v=>v.p));s.zoneDefs.push({start:z[0].t,end:z[4].t,high:top,low:bottom,label:match.label.toUpperCase(),color:'#22d3ee',fill:'#22d3ee20',extendRight:false});for(const v of z)marks.push({time:v.t,position:v.type==='H'?'aboveBar':'belowBar',color:'#22d3ee',shape:'square',text:'QML'});}
   for(const z of sbrMatches.slice(-3)){s.zoneDefs.push({start:z.start,end:z.end,high:z.level+a*.08,low:z.level-a*.08,label:'SBR · HISTORICAL RETEST',color:'#fb923c',fill:'#fb923c28',extendRight:false});marks.push({time:z.end,position:'aboveBar',color:'#fb923c',shape:'circle',text:'SBR'})}
   for(const z of rbsMatches.slice(-3)){s.zoneDefs.push({start:z.start,end:z.end,high:z.level+a*.08,low:z.level-a*.08,label:'RBS · HISTORICAL RETEST',color:'#facc15',fill:'#facc1528',extendRight:false});marks.push({time:z.end,position:'belowBar',color:'#facc15',shape:'circle',text:'RBS'})}
-  if(inducement!=='No clear inducement proxy'){marks.push({time:x.time,position:inducement.includes('bearish')?'aboveBar':'belowBar',color:'#a3e635',shape:'diamond',text:'IDM'});s.zoneDefs.push({start:b[Math.max(0,b.length-8)].time,end:x.time,high:Math.max(x.high,internalHigh?.p||x.high),low:Math.min(x.low,internalLow?.p||x.low),label:'INDUCEMENT PROXY',color:'#a3e635',fill:'#a3e63520',extendRight:false})}if(swH)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:'BSL sweep'});if(swL)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:'SSL sweep'});if(bearBreak)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:bias==='Bullish structure'?'CHoCH?':'BOS↓'});if(bullBreak)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:bias==='Bearish structure'?'CHoCH?':'BOS↑'});if(fvgBear)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'square',text:'FVG'});if(fvgBull)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'square',text:'FVG'});if(sbr)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'circle',text:'SBR'});if(rbs)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'circle',text:'RBS'});
+  if(inducementMatch){const im=inducementMatch;marks.push({time:im.time,position:im.side==='BEARISH'?'aboveBar':'belowBar',color:'#a3e635',shape:'diamond',text:'IDM '+im.status});s.zoneDefs.push({start:im.time,end:im.eventIndex!=null?b[im.eventIndex].time:x.time,high:im.level+a*.03,low:im.level-a*.03,label:'IDM '+im.status+' · proxy',color:'#a3e635',fill:'#a3e63520',extendRight:false})}if(swH)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:'BSL sweep'});if(swL)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:'SSL sweep'});if(bearBreak)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:bias==='Bullish structure'?'CHoCH?':'BOS↓'});if(bullBreak)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:bias==='Bearish structure'?'CHoCH?':'BOS↑'});if(fvgBear)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'square',text:'FVG'});if(fvgBull)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'square',text:'FVG'});if(sbr)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'circle',text:'SBR'});if(rbs)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'circle',text:'RBS'});
  addAdvancedAnnotations(b,marks);
  let side=null,why='';if((swH&&bear&&dis)||(swH&&bearBreak)||(bearBreak&&bear&&dis)){side='SELL';why=swH?'Buy-side liquidity sweep + bearish candle':bearBreak?'Bearish break of structure proxy + close':'Bearish displacement'}else if((swL&&bull&&dis)||(swL&&bullBreak)||(bullBreak&&bull&&dis)){side='BUY';why=swL?'Sell-side liquidity sweep + bullish candle':bullBreak?'Bullish break of structure proxy + close':'Bullish displacement'}
  if(side){let entry=x.close,stop=side==='SELL'?Math.max(x.high,sh?.p||x.high):Math.min(x.low,sl?.p||x.low),target=structuralTarget(side,entry,stop,sh,sl,b);if(target){let set={symbol:s.symbol,tf:s.tf,side,entry,sl:stop,tp:target.tp,rr:target.rr,reason:why,time:x.time,confidence:'unscored',status:'NOT RUNNING',movePct:0,rNow:0};const priorStatus=s.log.find(t=>t.symbol===set.symbol&&t.tf===set.tf&&t.time===set.time);if(priorStatus)Object.assign(set,priorStatus);s.overlaySignal=set;$('engine').textContent='APA + SMC PROXY';$('signal').innerHTML=`<h3 style="color:${side==='BUY'?'var(--g)':'var(--r)'}">${side} candidate · ${s.symbol}</h3><div class="muted">${why}. Generated from explicit heuristic checks; not a verified LOWKEY FX APA signal.</div><div class="levels"><div class="level"><span>ENTRY</span><b>${price(set.entry)}</b></div><div class="level"><span>STOP LOSS</span><b>${price(set.sl)}</b></div><div class="level"><span>TAKE PROFIT · 1:${set.rr}</span><b>${price(set.tp)}</b></div></div><p class="muted">Invalidation: price crosses the stop level. Entry is at the latest candle close, not a tested limit-order entry. Confirm HTF bias, zone quality, spread and news manually.</p>`;paint(set,levelLines,marks,trendDefs);log(set);renderOverlay();return}}
