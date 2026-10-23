@@ -307,7 +307,7 @@ function renderOverlay(){
  if(!s.overlay||!s.chart||!s.series)return;
  s.overlay.replaceChildren();const w=s.overlay.clientWidth,h=s.overlay.clientHeight;if(!w||!h)return;
  const ts=s.chart.timeScale(),plotRight=Math.max(0,w-64);
- const unifiedZones=(s.globalZones||[]);
+ const unifiedZones=[...(s.globalZones||[]).filter(z=>z.sourceTf!==s.tf),...(s.zoneDefs||[])];
  for(const z of unifiedZones){
   const x1=chartXForTime(z.start),mappedX2=chartXForTime(z.end),x2=z.extendRight?plotRight:mappedX2;
   const y1=s.series.priceToCoordinate(z.high),y2=s.series.priceToCoordinate(z.low);
