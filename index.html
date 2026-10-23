@@ -152,7 +152,7 @@ async function refreshTopDown(force=false){
   }
   if(additions.length){
    additions.sort((a,b)=>b.time-a.time);s.log.unshift(...additions);s.log.sort((a,b)=>Number(b.time)-Number(a.time));
-   save();persistSignals(additions);renderLog();status('Opportunity scan updated · '+additions.length+' new provisional 1:3+ candidates across 7 timeframes','ok');
+   save();await persistSignals(additions);renderLog();status('Opportunity scan updated · '+additions.length+' new provisional 1:3+ candidates across 7 timeframes','ok');
   }
   const votes=rows.slice(0,5).filter(x=>x.score!==0),net=votes.reduce((a,x)=>a+x.score,0);
   const agreement=net>0?'Higher-timeframe tilt bullish':net<0?'Higher-timeframe tilt bearish':'Higher-timeframe context mixed';
@@ -232,7 +232,7 @@ function renderOverlay(){
   const x1=chartXForTime(t.time),terminal=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED','HISTORICAL'].includes(t.status),endTime=terminal&&Number.isFinite(t.closedAt)?Math.floor(t.closedAt/1000):null,x2=terminal?chartXForTime(endTime):plotRight;
   if(x1==null||x2==null)continue;
   const left=Math.max(0,Math.min(x1,x2)),right=Math.min(w,Math.max(x1,x2));if(right-left<2||right<0||left>w)continue;
-  const closed=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED'].includes(t.status);
+  const closed=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED','HISTORICAL'].includes(t.status);
   const entryY=s.series.priceToCoordinate(t.entry);
   if(entryY!=null&&entryY>=0&&entryY<=h){const line=document.createElement('div');line.style.position='absolute';line.style.left=left+'px';line.style.top=entryY+'px';line.style.width=Math.max(2,right-left)+'px';line.style.borderTop='1px dashed '+(t.side==='BUY'?'#35d39a':'#ff657a');line.style.pointerEvents='none';line.style.zIndex='4';s.overlay.appendChild(line);const tag=document.createElement('div');tag.className='chart-level-label';tag.style.left=Math.max(0,Math.min(w-190,left+4))+'px';tag.style.top=Math.max(2,Math.min(h-20,entryY-18))+'px';tag.style.color=t.side==='BUY'?'#35d39a':'#ff657a';tag.textContent=t.symbol+' '+t.tf+' '+t.side+' · '+tradeStateLabel(t)+(t.status==='RUNNING'&&Number.isFinite(t.movePct)?' · '+(t.movePct>0?'TP ': 'SL ')+Math.abs(t.movePct).toFixed(1)+'%':'');s.overlay.appendChild(tag)}
   for(const z of [{high:Math.max(t.entry,t.tp),low:Math.min(t.entry,t.tp),label:(closed?'CLOSED ':'')+'TARGET',color:'#35d39a',fill:'#35d39a18'},{high:Math.max(t.entry,t.sl),low:Math.min(t.entry,t.sl),label:(closed?'CLOSED ':'')+'RISK · '+(t.status||'NOT RUNNING'),color:'#ff657a',fill:'#ff657a18'}]){
@@ -365,6 +365,7 @@ function structuralTarget(side,entry,stop,highPivot,lowPivot,bars){
 }
 function tradeStateLabel(t){
  const st=t.status||'NOT RUNNING';
+ if(st==='HISTORICAL')return 'HISTORICAL CANDIDATE';
  if(['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED'].includes(st))return 'CLOSED · '+st;
  if(st==='TRIGGERED'||st==='RUNNING')return 'RUNNING';
  return 'NOT RUNNING';
@@ -375,7 +376,7 @@ function renderSignalMonitor(){
  $('signalMonitor').innerHTML=rows.length?rows.map(t=>{
   const closed=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED'].includes(t.status);
   const running=t.status==='RUNNING'||t.status==='TRIGGERED';
-  const outcome=t.status==='TAKE PROFIT'?'SUCCESS':t.status==='STOP LOSS'?'LOSS':t.status==='INVALIDATED'?'INVALIDATED':t.status==='MISSED ENTRY'?'MISSED':closed?'CLOSED':'PENDING';
+  const outcome=t.status==='TAKE PROFIT'?'SUCCESS':t.status==='STOP LOSS'?'LOSS':t.status==='INVALIDATED'?'INVALIDATED':t.status==='MISSED ENTRY'?'MISSED':t.status==='HISTORICAL'?'HISTORICAL':closed?'CLOSED':'PENDING';
   const progress=running&&Number.isFinite(t.movePct)?(t.movePct>0?('TP progress '+t.movePct.toFixed(1)+'%'):t.movePct<0?('SL distance used '+Math.abs(t.movePct).toFixed(1)+'%'):'At entry · 0.0%'):'—';
   const rNow=running&&Number.isFinite(t.rNow)?t.rNow.toFixed(2)+'R':'—';
   return '<tr><td>'+stamp(t.time)+'</td><td>'+escapeHTML(t.symbol)+' / '+escapeHTML(t.tf)+'</td><td style="color:'+(t.side==='BUY'?'var(--g)':'var(--r)')+'">'+escapeHTML(t.side)+'</td><td>'+escapeHTML(tradeStateLabel(t))+'</td><td style="color:'+(running&&Number.isFinite(t.movePct)?(t.movePct>=0?'var(--g)':'var(--r)'):'var(--muted)')+'">'+escapeHTML(progress)+'</td><td>'+escapeHTML(rNow)+'</td><td>'+escapeHTML(outcome)+'</td></tr>';
@@ -458,9 +459,9 @@ function log(set){
  if(existing){s.lastKey=key;return}
  if(s.lastKey===key)return;
  s.lastKey=key;
- s.log.unshift({...set,status:set.status||'NOT RUNNING',loggedAt:Date.now()});
- 
- save();
+ const item={...set,status:set.status||'NOT RUNNING',loggedAt:Date.now()};
+ s.log.unshift(item);
+ save();persistSignals([item]);
  renderLog();renderSignalMonitor();
 }
 
