@@ -118,3 +118,29 @@ Build a local-first, phone-friendly analysis desk that computes context across t
 ## Risk/reward eligibility rule
 
 The candidate generator and journal must enforce a hard minimum reward-to-risk of 1:3. A setup with a structurally calculated target below 3R is rejected rather than displayed as an eligible signal. This is a selection filter, not evidence that a 3R target will be reached. Backtests must report the resulting trade frequency, win rate, expectancy and drawdown, including the effects of costs and missed entries.
+
+
+## Engineering progress update (2026-10-23, automated validation added)
+
+### Added to the repository
+- `scripts/strategy-core.mjs` isolates the historical proxy's pivot, ATR, minimum reward/risk, signal-candidate and outcome-simulation functions so they can be tested independently.
+- `scripts/strategy-core.test.mjs` includes eight unit tests for confirmed swing pivots, right-edge/no-confirmation behaviour, ATR input sufficiency, the 1:3 threshold, target wins, stop losses, same-candle ambiguity and unresolved outcomes.
+- `scripts/background-health-check.mjs` checks the published page, source JavaScript syntax, selected security/risk safeguards, quote response shape and 5-minute OHLC candle quality.
+- `scripts/proxy-backtest.mjs` runs the current heuristic proxy on EURUSD and BTCUSD at 5M and 15M, using up to 1,000 returned bars per combination.
+- `.github/workflows/background-health-check.yml` now runs on pushes to `main`, can be started manually, and is scheduled every 15 minutes.
+
+### What these additions do not establish
+- Unit tests of the proxy are not validation of the browser application's full signal engine or the proprietary LOWKEY FX APA method.
+- Up to 1,000 five-minute bars covers only a few days, not 12 months. The new backtest does **not** satisfy the 12-month validation gate.
+- The proxy backtest does not yet model spread, commission, slippage, delayed entries, gap-through-stop, out-of-sample selection, walk-forward optimization or broker execution.
+- The background workflow has been triggered by a repository push. Its first completed result must be reviewed before reporting live data or test success.
+- No automatic signal publication or broker order execution has been enabled. Signal publication remains a separate, unimplemented feature; the desk is for manual analysis and review.
+- Direct browser testing on Android Chrome and full visual verification of chart overlays remain outstanding.
+
+### Next gates
+1. Review the first completed GitHub Actions run and fix any failing health, data or unit checks.
+2. Verify actual data source, timestamp freshness, instrument definitions, candle continuity and available history for every supported timeframe.
+3. Add annotated positive, negative and boundary fixtures for the browser's actual detectors; avoid tests that merely repeat the expected result in a duplicate implementation.
+4. Separate APA and SMC rules into documented engines only where the APA source rules can be established. Do not invent proprietary rules.
+5. Extend chronological replay to sufficient history, add execution-cost assumptions and out-of-sample metrics, then begin forward paper tracking.
+6. Validate the deployed chart and all bounded annotations on Android Chrome before describing them as visually verified.
