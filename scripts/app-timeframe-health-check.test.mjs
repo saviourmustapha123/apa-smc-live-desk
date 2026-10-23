@@ -108,7 +108,7 @@ test('weekly/monthly/yearly views reuse sufficiently deep daily history during r
 test('QQQUSDT is wired to the Binance USDⓈ-M perpetual feed, including candles and quote timestamps', () => {
   assert.match(html, /QQQUSDT:\{label:'QQQUSDT · Binance perpetual'/);
   assert.match(html, /https:\/\/fapi\.binance\.com/);
-  assert.match(html, /qqqUrl\('\/fapi\/v1\/klines\? '\+q\)/);
+  assert.match(html, /qqqUrl\('\/fapi\/v1\/klines\?'\+q\)/);
   assert.match(html, /qqqUrl\('\/fapi\/v1\/ticker\/price\?symbol=QQQUSDT'\)/);
   assert.match(html, /connect-src 'self' https:\/\/biquote\.io https:\/\/fapi\.binance\.com https:\/\/\*\.workers\.dev/);
   assert.match(html, /if\(sym==='QQQUSDT'\)/);
