@@ -1099,7 +1099,12 @@ async function runAutomaticPairScan(){
  try{
   const count=await scanBackgroundPair(market,true);
   const statusEl=$('signalEngineStatus');
-  if(statusEl)statusEl.textContent='Automatic scan · '+market+' · 8 execution timeframes checked · '+count+' new qualifying candidates · '+new Date().toLocaleTimeString();
+  const executionTfs=['1m','5m','15m','1h','4h','8h','12h','1d'];
+  const diagnostics=executionTfs.map(tf=>strategyScanDiagnostics.get(market+'|'+tf)).filter(Boolean);
+  const foundTfs=diagnostics.filter(d=>d.candidateFound).map(d=>d.tf.toUpperCase());
+  const blockers=diagnostics.filter(d=>!d.candidateFound).map(d=>d.tf.toUpperCase()+': '+d.latestRejection);
+  const explanation=count?count+' new qualifying candidates':foundTfs.length?'No new signal: a qualifying setup already exists or the timeframe has an open setup ('+foundTfs.slice(0,3).join(', ')+')':'No signal: '+(blockers.slice(0,2).join(' · ')||'waiting for enough confirmed candles');
+  if(statusEl)statusEl.textContent='Automatic scan · '+market+' · 8 execution timeframes checked · '+explanation+' · '+new Date().toLocaleTimeString();
  }catch(error){const statusEl=$('signalEngineStatus');if(statusEl)statusEl.textContent='Automatic scan failed for '+market+' · '+(error?.message||String(error))+' · retrying automatically';console.warn('Automatic signal scan failed for '+market,error)}
  finally{automaticScanBusy=false}
 }
