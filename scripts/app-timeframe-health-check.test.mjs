@@ -14,6 +14,21 @@ test('the complete inline browser application JavaScript parses without syntax e
 });
 
 
+test('both automatic signal scanners include the one-minute scalp timeframe', () => {
+  assert.match(html, /signalSets=sets\.filter\(\(\[tf\]\)=>\['1m','5m','15m','1h','4h','8h','12h','1d'\]\.includes\(tf\)\)/);
+  assert.match(html, /signalSets=scanSets\.filter\(\(\[tf\]\)=>\['1m','5m','15m','1h','4h','8h','12h','1d'\]\.includes\(tf\)\)/);
+});
+
+test('candidate labels do not claim strategy verification while the live engine remains heuristic', () => {
+  assert.match(html, /verificationState:'PROVISIONAL-HEURISTIC'/);
+  assert.doesNotMatch(html, /verificationState:'RULE-VERIFIED'/);
+});
+
+test('signal admission avoids arbitrary daily quotas while retaining one open candidate per timeframe', () => {
+  assert.doesNotMatch(html, /openCount>=2\|\|dailySignalAdmission\(candidate,additions\)/);
+  assert.match(html, /if\(seen\.has\(key\)\|\|openTf\.has\(tf\)\)continue/);
+});
+
 test('chart exposes monthly and yearly timeframe controls', () => {
   assert.match(html, /data-t="1M">1M/);
   assert.match(html, /data-t="1Y">1Y/);
