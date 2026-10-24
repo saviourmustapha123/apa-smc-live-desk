@@ -142,3 +142,18 @@ test('stale short candidate beyond stop or target is rejected before admission',
   assert.equal(vmContext.candidateAlreadyPastLevels(candidate, [{ isOpen: false, close: 84 }]), true);
   assert.equal(vmContext.candidateAlreadyPastLevels(candidate, [{ isOpen: false, close: 95 }]), false);
 });
+
+
+test('a persisted MISSED ENTRY remains a distinct terminal lifecycle state after refresh', () => {
+  const signal = evaluate({ status: 'MISSED ENTRY', bar: { open: 98, high: 105, low: 97, close: 103 } });
+  assert.equal(signal.status, 'MISSED ENTRY');
+  assert.equal(signal.outcome, 'PENDING');
+  assert.equal(signal.triggeredAt, undefined);
+});
+
+test('production storage no longer rewrites missed entries into generic expiry', () => {
+  assert.match(html, /Preserve MISSED ENTRY as its own lifecycle outcome/);
+  assert.doesNotMatch(html, /status:'EXPIRED',outcome:'EXPIRED',exitPrice:null,rNow:null,movePct:null,key/);
+  assert.match(html, /function allActiveSignals\(\)\{const terminal=new Set\(\[[^\]]*'MISSED ENTRY','MISSED'/);
+  assert.match(html, /if\(st==='EXPIRED'\|\|st==='MISSED ENTRY'\|\|st==='MISSED'\)return 'MISSED/);
+});
