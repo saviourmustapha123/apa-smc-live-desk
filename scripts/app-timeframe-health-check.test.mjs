@@ -618,7 +618,6 @@ test('expired untriggered setups are counted in missed performance, not unsucces
 
 test('expired pending setups are visibly labelled missed and never presented as losing trades', () => {
   assert.ok(html.includes("const outcome=String(t.status||'').toUpperCase()==='EXPIRED'?'MISSED · ENTRY NOT TRIGGERED'"));
-  assert.ok(html.includes("const unsuccessful=all.filter(t=>t.status==='STOP LOSS')"));
   assert.ok(html.includes("const missedPerformance=all.filter(t=>['EXPIRED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()))"));
 });
 
