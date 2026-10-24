@@ -385,6 +385,14 @@ function scanOpportunityHistory(symbol,tf,bars){
  return found;
 }
 
+function realizedSignalR(t){
+ const entry=Number(t.entry),sl=Number(t.sl),exit=Number(t.exitPrice),rr=Number(t.rr),risk=Math.abs(entry-sl);
+ if(!Number.isFinite(entry)||!Number.isFinite(sl)||!(risk>0))return null;
+ if(Number.isFinite(exit)&&exit>0)return ((exit-entry)*(t.side==='BUY'?1:-1))/risk;
+ if(t.status==='TAKE PROFIT'&&Number.isFinite(rr))return rr;
+ if(t.status==='STOP LOSS')return -1;
+ return null;
+}
 function resolveSignalOutcomes(symbol,tf,bars){
  const closedBars=(bars||[]).filter(b=>!b.isOpen&&Number.isFinite(b.time)&&Number.isFinite(b.high)&&Number.isFinite(b.low)).sort((a,b)=>a.time-b.time);
  if(!closedBars.length)return [];
@@ -411,6 +419,12 @@ function resolveSignalOutcomes(symbol,tf,bars){
      continue;
     }
    }
+   // Account for a gap beyond a stop at the candle open instead of pretending
+   // the stop always fills at its requested price. Target fills remain capped at TP.
+   const gapStop=t.side==='BUY'?bar.open<=sl:bar.open>=sl;
+   const gapTarget=t.side==='BUY'?bar.open>=tp:bar.open<=tp;
+   if(gapStop){finalStatus='STOP LOSS';exitPrice=bar.open;closedAt=bar.time*1000;break}
+   if(gapTarget){finalStatus='TAKE PROFIT';exitPrice=tp;closedAt=bar.time*1000;break}
    if(stopTouched){finalStatus='STOP LOSS';exitPrice=sl;closedAt=bar.time*1000;break}
    if(targetTouched){finalStatus='TAKE PROFIT';exitPrice=tp;closedAt=bar.time*1000;break}
   }
@@ -418,15 +432,16 @@ function resolveSignalOutcomes(symbol,tf,bars){
   if(finalStatus){
    t.status=finalStatus;t.outcome=finalStatus==='TAKE PROFIT'?'SUCCESS':finalStatus==='STOP LOSS'?'LOSS':finalStatus==='MISSED ENTRY'?'MISSED ENTRY':'INVALIDATED';
    t.exitPrice=exitPrice;t.closedAt=closedAt;t.triggeredAt=triggeredAt;t.movePct=null;
-   t.rNow=finalStatus==='TAKE PROFIT'?Number(t.rr):finalStatus==='STOP LOSS'?-1:null;
+   t.rNow=realizedSignalR(t);t.lastActivityAt=closedAt;t.lastPriceUpdateAt=closedAt;
   }else if(entered){
-   t.status='RUNNING';t.outcome='OPEN';t.triggeredAt=triggeredAt;
+   const previousStatus=t.status;t.status='RUNNING';t.outcome='OPEN';t.triggeredAt=triggeredAt;
+   if(previousStatus!==t.status)t.lastActivityAt=triggeredAt||now;
    const last=closedBars.at(-1),p=last.close,favourable=(p-entry)*dir,denom=favourable>=0?Math.abs(tp-entry):risk;
-   t.lastObservedPrice=p;t.movePct=denom>0?Math.max(-100,Math.min(100,favourable/denom*100)):null;t.rNow=(p-entry)*dir/(risk||1e-12);
+   t.lastObservedPrice=p;t.lastPriceUpdateAt=last.time*1000;t.movePct=denom>0?Math.max(-100,Math.min(100,favourable/denom*100)):null;t.rNow=(p-entry)*dir/(risk||1e-12);
   }else if(t.status!=='HISTORICAL'){
    // Keep every market's live panel current from its latest CLOSED candle, even when it is not selected.
    const last=closedBars.at(-1),mark=last.close;
-   if(Number.isFinite(mark)&&mark>0){t.lastObservedPrice=mark;const favourable=(mark-entry)*dir;t.movePct=entered?(favourable>=0?favourable/Math.abs(tp-entry)*100:-Math.abs(favourable)/risk*100):null;t.rNow=entered?favourable/(risk||1e-12):null}
+   if(Number.isFinite(mark)&&mark>0){t.lastObservedPrice=mark;t.lastPriceUpdateAt=last.time*1000;const favourable=(mark-entry)*dir;t.movePct=entered?(favourable>=0?favourable/Math.abs(tp-entry)*100:-Math.abs(favourable)/risk*100):null;t.rNow=entered?favourable/(risk||1e-12):null}
    // A valid setup stays pending until entry is touched, price invalidates it, or TP is reached before entry.
    // Do not expire a live signal merely because a later candle closes or the market session ended.
    t.status=t.status==='NOT RUNNING'?'NOT RUNNING':'PENDING';t.outcome='PENDING';if(!entered){t.movePct=null;t.rNow=null}
@@ -798,7 +813,7 @@ function renderSignalMonitor(){
  const all=[...s.log].sort((a,b)=>Number(b.time)-Number(a.time));
  const wins=all.filter(t=>t.status==='TAKE PROFIT').length,losses=all.filter(t=>t.status==='STOP LOSS').length,resolved=wins+losses;
  const activeCount=all.filter(active).length,other=all.filter(t=>['MISSED ENTRY','INVALIDATED'].includes(t.status)).length;
- const netR=all.reduce((sum,t)=>sum+(t.status==='TAKE PROFIT'?Number(t.rr||0):t.status==='STOP LOSS'?-1:0),0);
+ const netR=all.reduce((sum,t)=>sum+(['TAKE PROFIT','STOP LOSS'].includes(t.status)?(realizedSignalR(t)||0):0),0);
  $('performanceCount').textContent=all.length+' signals in history';
  $('perfWinRate').textContent=resolved?((wins/resolved)*100).toFixed(1)+'%':'—';
  $('perfResolved').textContent=wins+' wins · '+losses+' losses · '+resolved+' resolved';
@@ -807,7 +822,8 @@ function renderSignalMonitor(){
  $('perfOther').textContent=other+' missed or invalidated';
  $('performanceHistory').innerHTML=all.length?all.map(t=>{
   const outcome=t.outcome||(t.status==='TAKE PROFIT'?'SUCCESS':t.status==='STOP LOSS'?'LOSS':t.status==='INVALIDATED'?'INVALIDATED':t.status==='MISSED ENTRY'?'MISSED':t.status==='HISTORICAL'?'UNRESOLVED':'PENDING');
-  const r=Number.isFinite(t.rNow)?t.rNow.toFixed(2)+'R':t.status==='TAKE PROFIT'?(Number(t.rr||0).toFixed(2)+'R'):t.status==='STOP LOSS'?'-1.00R':'—';
+  const realized=realizedSignalR(t);
+  const r=Number.isFinite(realized)?(realized>=0?'+':'')+realized.toFixed(2)+'R':Number.isFinite(t.rNow)?t.rNow.toFixed(2)+'R':'—';
   return '<tr><td>'+stamp(t.time)+'</td><td>'+escapeHTML(t.symbol)+' / '+escapeHTML(t.tf)+'</td><td style="color:'+(t.side==='BUY'?'var(--g)':'var(--r)')+'">'+escapeHTML(t.side)+'</td><td>'+escapeHTML(tradeStateLabel(t))+'</td><td>'+escapeHTML(priceFor(t.entry,t.symbol))+'</td><td>'+escapeHTML(priceFor(t.sl,t.symbol))+'</td><td>'+escapeHTML(priceFor(t.tp,t.symbol))+'</td><td>1:'+Number(t.rr||0).toFixed(2)+'</td><td>'+r+'</td><td>'+escapeHTML(outcome)+'</td><td>'+escapeHTML(Array.isArray(t.reason)?t.reason.join(' · '):(t.reason||t.scanEngine||'Provisional structural trigger'))+'</td></tr>';
  }).join(''):'<tr><td colspan="11" class="muted">No signal history yet.</td></tr>';
 }
@@ -947,6 +963,7 @@ function log(set){
 function monitorTrades(p){
  let changed=false;const now=Date.now(),changedSignals=[];
  for(const t of s.log){
+  const previousStatus=t.status;
   if(t.symbol!==s.symbol||t.status==='HISTORICAL'||t.status==='CLOSED'||t.status==='TAKE PROFIT'||t.status==='STOP LOSS'||t.status==='INVALIDATED'||t.status==='MISSED ENTRY')continue;
   const terminal=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED'].includes(t.status);
   const dir=t.side==='BUY'?1:-1;
@@ -967,7 +984,9 @@ function monitorTrades(p){
    t.movePct=denominator>0?Math.max(-100,Math.min(100,favourable/denominator*100)):null;
    t.rNow=(p-t.entry)*dir/(Math.abs(t.entry-t.sl)||1e-12);
   }else t.movePct=null;
-  if(t.lastObservedPrice!==p){t.lastActivityAt=now}t.lastObservedPrice=p;
+  if(t.status!==previousStatus)t.lastActivityAt=now;
+  if(t.lastObservedPrice!==p)t.lastPriceUpdateAt=now;
+  t.lastObservedPrice=p;
  }
  if(s.overlaySignal){const active=s.log.find(t=>t.symbol===s.overlaySignal.symbol&&t.tf===s.overlaySignal.tf&&t.time===s.overlaySignal.time);if(active)s.overlaySignal={...active}}
  if(changed){save();persistSignals(changedSignals)}renderLog();renderSignalMonitor();renderOverlay()
