@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { Script } from 'node:vm';
+import { Script, runInNewContext } from 'node:vm';
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 
@@ -236,4 +236,61 @@ test('live opportunity scanner is scheduled with the normal quote and candle ref
 test('signal monitor displays completed R results, not only open-trade R values', () => {
   assert.match(html, /const rNow=Number\.isFinite\(t\.rNow\)\?t\.rNow\.toFixed\(2\)\+'R':'—'/);
   assert.match(html, /const outcome=t\.outcome\|\|\(t\.status==='TAKE PROFIT'\?'SUCCESS':t\.status==='STOP LOSS'\?'LOSS'/);
+});
+
+
+function runOutcomeResolver(signal, bars) {
+  const start = html.indexOf('function resolveSignalOutcomes(symbol,tf,bars)');
+  const end = html.indexOf('async function scanBackgroundPair(symbol)', start);
+  assert.ok(start >= 0 && end > start, 'resolver source should be present');
+  const context = {
+    s: { log: [{ symbol: 'QQQUSDT', tf: '5m', side: 'BUY', entry: 100, sl: 95, tp: 115, rr: 3, time: 100, status: 'HISTORICAL', ...signal }] },
+    save() {},
+    persistSignals() {},
+    renderLog() {},
+    Date
+  };
+  const resolver = runInNewContext(html.slice(start, end) + '\\nresolveSignalOutcomes', context);
+  resolver('QQQUSDT', '5m', bars);
+  return context.s.log[0];
+}
+
+test('historical signal becomes a win when target is reached after entry', () => {
+  const result = runOutcomeResolver({}, [
+    { time: 100, open: 100, high: 101, low: 99, close: 100 },
+    { time: 200, open: 100, high: 110, low: 99, close: 108 },
+    { time: 300, open: 108, high: 116, low: 105, close: 114 }
+  ]);
+  assert.equal(result.status, 'TAKE PROFIT');
+  assert.equal(result.outcome, 'SUCCESS');
+  assert.equal(result.rNow, 3);
+});
+
+test('historical signal becomes a loss when stop is reached, including same-candle TP/SL ambiguity', () => {
+  const result = runOutcomeResolver({}, [
+    { time: 100, open: 100, high: 101, low: 99, close: 100 },
+    { time: 200, open: 100, high: 116, low: 94, close: 105 }
+  ]);
+  assert.equal(result.status, 'STOP LOSS');
+  assert.equal(result.outcome, 'LOSS');
+  assert.equal(result.rNow, -1);
+});
+
+test('historical signal stays explicitly unresolved when price never reaches entry or either outcome', () => {
+  const result = runOutcomeResolver({}, [
+    { time: 100, open: 100, high: 101, low: 99, close: 100 },
+    { time: 200, open: 103, high: 110, low: 101, close: 108 }
+  ]);
+  assert.equal(result.status, 'HISTORICAL');
+  assert.equal(result.outcome, 'UNRESOLVED');
+  assert.equal(result.rNow, null);
+});
+
+test('historical signal is marked missed when target trades beyond entry without filling entry', () => {
+  const result = runOutcomeResolver({}, [
+    { time: 100, open: 100, high: 101, low: 99, close: 100 },
+    { time: 200, open: 116, high: 118, low: 116, close: 117 }
+  ]);
+  assert.equal(result.status, 'MISSED ENTRY');
+  assert.equal(result.outcome, 'MISSED ENTRY');
 });
