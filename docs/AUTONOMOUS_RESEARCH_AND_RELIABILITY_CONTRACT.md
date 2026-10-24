@@ -125,3 +125,18 @@ The research engine may automatically collect evidence, diagnose, generate candi
 ### Required research status labels
 
 Use explicit statuses: QUEUED, RUNNING, BLOCKED_DATA, FAILED_TEST, INCONCLUSIVE, CANDIDATE_IMPROVEMENT, REGRESSION_FOUND, APPROVED_FOR_SHADOW, SHADOW_PASS, REJECTED, and PROMOTED_WITH_AUTHORIZATION. Each result must show its code version, data window, sample size, coverage, and next action.
+
+
+## Live web-app verification and visible implementation requirement
+
+Research is not complete when a script passes in isolation. After an isolated candidate passes its relevant tests, it must be verified in the deployed web app using a clearly separated shadow/research signal stream. This means checking the visible signal tables and the actual live chart visualisation together, using the same instrument, timeframe, candle timestamps, strategy version, and rule inputs.
+
+- Research/shadow signals must be visibly labelled as experimental and must never be confused with approved production signals or real orders. No brokerage execution is part of this verification.
+- For each test case, record the expected scanner decision and expected chart rendering, then compare both with what the web app actually displays. Verify pending, triggered/active, invalidated, expired, missed, TP, SL, and ambiguous states wherever applicable.
+- Check that entry, invalidation, stop, target, reward-to-risk, structure breaks, liquidity/sweeps, inducement, displacement, FVG/IFVG, order-block/retest zones, and session restrictions are consistent between the strategy decision and chart annotations when those features apply.
+- Any strategy update is incomplete until the relevant rule is reflected in both the production signal-generation path and the chart visualisation, and a regression fixture proves that correspondence. A source-code match, green build, or decorative chart label is insufficient.
+- Record browser-visible verification with release/code version, pair, timeframe, candle timestamp, expected state, observed state, screenshot or structured evidence where available, and pass/fail result. If automated browser verification is unavailable, state that the deployed UI parity has not yet been verified.
+- Keep the parity gate visibly marked NOT VERIFIED until reproducible tests pass for both the signal and chart output. Do not manually label it verified based only on an intended implementation.
+- After fixes, re-run the same cases against the deployed site and confirm the updated signal generation and chart annotations are visible. If either disagrees, block promotion and preserve the defect for follow-up.
+
+The operational objective is iterative reliability, not a claim of mathematical perfection: continue quick regression checks, intraday and swing replay, multi-timeframe interaction tests, and forward shadow observation; publish unresolved defects and data coverage honestly. A live web app displaying research signals is a validation surface, not permission to route trades to a broker.
