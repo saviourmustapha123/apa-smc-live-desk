@@ -54,30 +54,30 @@ function normalizeGate(rows) {
 async function fetchBars(symbol, tf) {
   const errors = [];
   if (symbol === 'EURUSD' || symbol === 'BTCUSD') {
+    let best = null;
+    const consider = (bars, provider, exact) => {
+      if (bars.length >= 100 && (!best || bars.length > best.bars.length)) best = { bars, provider, exact };
+    };
     try {
       const json = await getJson('https://biquote.io/api/' + symbol + '/ohlc?interval=' + tf + '&limit=1000');
       const rows = Array.isArray(json) ? json : json.bars || json.data || json.candles || [];
-      const bars = rows.map(normalizeBiquoteRow).filter(Boolean).sort((a,b)=>a.time-b.time);
-      if (bars.length >= 100) return { bars, provider: 'Biquote ' + symbol, exact: true };
-      errors.push('Biquote returned only ' + bars.length + ' valid bars');
+      consider(rows.map(normalizeBiquoteRow).filter(Boolean).sort((a,b)=>a.time-b.time), 'Biquote ' + symbol, true);
+      if (!best) errors.push('Biquote returned fewer than 100 valid bars');
     } catch (e) { errors.push('Biquote: ' + e.message); }
     const yahooSymbol = symbol === 'EURUSD' ? 'EURUSD=X' : 'BTC-USD';
     try {
-      const range = tf === '1h' ? '730d' : '60d';
+      // Keep requests bounded, but prefer a deeper history than the first provider that responds.
+      const range = tf === '5m' ? '14d' : '60d';
       const json = await getJson('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(yahooSymbol) + '?range=' + range + '&interval=' + tf);
-      const bars = normalizeYahoo(json).sort((a,b)=>a.time-b.time);
-      if (bars.length >= 100) return { bars, provider: 'Yahoo chart ' + yahooSymbol + ' fallback', exact: true };
-      errors.push('Yahoo returned only ' + bars.length + ' valid bars');
+      consider(normalizeYahoo(json).sort((a,b)=>a.time-b.time), 'Yahoo chart ' + yahooSymbol + ' fallback', true);
     } catch (e) { errors.push('Yahoo: ' + e.message); }
-    // BTCUSDT is a different venue/symbol from BTCUSD; do not silently treat it as identical.
     if (symbol === 'BTCUSD') {
       try {
         const rows = await getJson('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=' + tf + '&limit=1000');
-        const bars = normalizeBinance(rows);
-        if (bars.length >= 100) return { bars, provider: 'Binance BTCUSDT proxy for BTCUSD (symbol differs)', exact: false };
-        errors.push('Binance BTCUSDT returned only ' + bars.length + ' bars');
+        consider(normalizeBinance(rows), 'Binance BTCUSDT proxy for BTCUSD (symbol differs)', false);
       } catch (e) { errors.push('Binance BTCUSDT fallback: ' + e.message); }
     }
+    if (best) return best;
   } else {
     const providers = [
       ['Binance USD-M', async () => normalizeBinance(await getJson('https://fapi.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
@@ -88,10 +88,11 @@ async function fetchBars(symbol, tf) {
     for (const [provider, fetcher] of providers) {
       try {
         const bars = (await fetcher()).sort((a,b)=>a.time-b.time);
-        if (bars.length >= 100) return { bars, provider, exact: true };
-        errors.push(provider + ' returned only ' + bars.length + ' valid bars');
+        if (bars.length >= 100 && (!best || bars.length > best.bars.length)) best = { bars, provider, exact: true };
+        else if (bars.length < 100) errors.push(provider + ' returned only ' + bars.length + ' valid bars');
       } catch (e) { errors.push(provider + ': ' + e.message); }
     }
+    if (best) return best;
   }
   throw new Error(errors.join('; '));
 }
@@ -133,14 +134,28 @@ function executeSignal(signal, bars, index) {
 }
 
 function runBacktest(symbol, tf, bars, provider, exact) {
-  const engine = createProductionScannerReplay({ now: Date.now() });
-  const { signals, diagnostic } = engine.scan(symbol, tf, bars);
   const byTime = new Map(bars.map((b,i)=>[b.time,i]));
   const unique = new Map();
-  for (const signal of signals) {
-    if (!Number.isFinite(signal.time) || !byTime.has(signal.time)) continue;
-    const key = [signal.time,signal.side,signal.entry,signal.sl,signal.tp,signal.setupType].join('|');
-    if (!unique.has(key)) unique.set(key, signal);
+  const coreSize = 250;
+  const overlap = 250;
+  let diagnostic = null;
+  // The production scanner intentionally retains at most 2,000 bars. Replay overlapping
+  // windows so longer available history is not silently discarded; only count each
+  // signal inside the non-overlapping core of its window.
+  for (let coreStart = 0; coreStart < bars.length - 1; coreStart += coreSize) {
+    const coreEnd = Math.min(bars.length - 1, coreStart + coreSize);
+    const windowStart = Math.max(0, coreStart - overlap);
+    const windowEnd = Math.min(bars.length, coreEnd + overlap);
+    const windowBars = bars.slice(windowStart, windowEnd);
+    const engine = createProductionScannerReplay({ now: Date.now() });
+    const result = engine.scan(symbol, tf, windowBars);
+    diagnostic = result.diagnostic || diagnostic;
+    const coreTimes = new Set(bars.slice(coreStart, coreEnd).map(b=>b.time));
+    for (const signal of result.signals) {
+      if (!Number.isFinite(signal.time) || !coreTimes.has(signal.time) || !byTime.has(signal.time)) continue;
+      const key = [signal.time,signal.side,signal.entry,signal.sl,signal.tp,signal.setupType].join('|');
+      if (!unique.has(key)) unique.set(key, signal);
+    }
   }
   const candidates = [...unique.values()].sort((a,b)=>a.time-b.time);
   const outcomes = candidates.map(signal => ({ signal, ...executeSignal(signal, bars, byTime.get(signal.time)) }));
