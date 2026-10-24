@@ -928,8 +928,8 @@ function allActiveSignals(){const terminal=new Set(['TAKE PROFIT','STOP LOSS','I
 function renderVerifiedSignalCards(){
  const pane=$('verifiedSignalCards');if(!pane)return;
  const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED','HISTORICAL']);
- const rows=s.log.filter(t=>t.symbol===s.symbol&&t.verificationState==='RULE-VERIFIED'&&!terminal.has(String(t.status||'NOT TRIGGERED').toUpperCase())).sort((a,b)=>Number(b.verifiedAt||b.identifiedAt||b.time*1000)-Number(a.verifiedAt||a.identifiedAt||a.time*1000));
- const head='<div class="verified-pane-head"><b>Verified signal pane · '+escapeHTML(s.symbol)+'</b><span class="pill">'+rows.length+' not triggered / running</span></div>';
+ const rows=s.log.filter(t=>t.verificationState==='RULE-VERIFIED'&&!terminal.has(String(t.status||'NOT TRIGGERED').toUpperCase())&&Number(t.rr)>=3).sort((a,b)=>Number(b.verifiedAt||b.identifiedAt||b.time*1000)-Number(a.verifiedAt||a.identifiedAt||a.time*1000));
+ const head='<div class="verified-pane-head"><b>Verified signal pane · all active markets</b><span class="pill">'+rows.length+' pending / running</span></div>';
  if(!rows.length){pane.innerHTML=head+'<div class="fine">No rule-verified pending or running signal is currently recorded for this pair. When a setup passes validation, its entry, SL and TP will appear here automatically.</div>';return}
  pane.innerHTML=head+rows.slice(0,12).map(t=>{
   const entry=Number(t.entry),sl=Number(t.sl),tp=Number(t.tp),p=Number(t.lastObservedPrice),hasPrice=Number.isFinite(p)&&p>0,dir=t.side==='BUY'?1:-1,risk=Math.abs(entry-sl),reward=Math.abs(tp-entry);
@@ -941,7 +941,7 @@ function renderVerifiedSignalCards(){
   const reason=Array.isArray(t.reason)?t.reason.join(' · '):(t.reason||t.scanEngine||'Passed programmed setup rules');
   const width=tpPct===null?0:Math.max(0,Math.min(100,tpPct)),riskWidth=slPct===null?0:slPct;
   const progressMarkup=running?'<div class="verified-progress"><div class="verified-status">Current R: '+(Number.isFinite(t.rNow)?t.rNow.toFixed(2)+'R':'Waiting for fresh quote')+'</div><small>Target progress · '+(tpPct===null?'—':tpPct.toFixed(1)+'%')+'</small><div class="bar"><div style="width:'+width.toFixed(1)+'%;background:var(--g)"></div></div><small>Stop loss risk consumed · '+(slPct===null?'—':slPct.toFixed(1)+'%')+'</small><div class="bar"><div style="width:'+riskWidth.toFixed(1)+'%;background:var(--r)"></div></div></div>':'';
-  return '<article class="verified-signal-card"><div class="verified-signal-title"><span>'+escapeHTML(t.side)+' · '+escapeHTML(t.tf.toUpperCase())+' · '+(running?'TRIGGERED / RUNNING':'NOT TRIGGERED')+'</span><span class="pill">1:'+Number(t.rr).toFixed(2)+' R:R</span></div><div class="verified-status">RULE-VERIFIED · '+escapeHTML(tradeStateLabel(t))+' · Identified '+escapeHTML(stamp(t.time))+'</div><div class="verified-levels"><div class="verified-level"><small>ENTRY</small><b>'+escapeHTML(priceFor(entry,t.symbol))+'</b></div><div class="verified-level"><small>STOP LOSS</small><b style="color:var(--r)">'+escapeHTML(priceFor(sl,t.symbol))+'</b></div><div class="verified-level"><small>TAKE PROFIT</small><b style="color:var(--g)">'+escapeHTML(priceFor(tp,t.symbol))+'</b></div></div><div class="verified-status">Latest price: '+(hasPrice?escapeHTML(priceFor(p,t.symbol)):'Not available')+' · '+escapeHTML(progressText)+'</div>'+progressMarkup+'<div class="fine">'+escapeHTML(reason)+'</div></article>'
+  return '<article class="verified-signal-card"><div class="verified-signal-title"><span>'+escapeHTML(t.symbol)+' · '+escapeHTML(t.side)+' · '+escapeHTML(t.tf.toUpperCase())+' · '+(running?'TRIGGERED / RUNNING':'NOT TRIGGERED')+'</span><span class="pill">1:'+Number(t.rr).toFixed(2)+' R:R</span></div><div class="verified-status">RULE-VERIFIED · '+escapeHTML(tradeStateLabel(t))+' · Identified '+escapeHTML(stamp(t.time))+'</div><div class="verified-levels"><div class="verified-level"><small>ENTRY</small><b>'+escapeHTML(priceFor(entry,t.symbol))+'</b></div><div class="verified-level"><small>STOP LOSS</small><b style="color:var(--r)">'+escapeHTML(priceFor(sl,t.symbol))+'</b></div><div class="verified-level"><small>TAKE PROFIT</small><b style="color:var(--g)">'+escapeHTML(priceFor(tp,t.symbol))+'</b></div></div><div class="verified-status">Latest price: '+(hasPrice?escapeHTML(priceFor(p,t.symbol)):'Not available')+' · '+escapeHTML(progressText)+'</div>'+progressMarkup+'<div class="fine">'+escapeHTML(reason)+'</div></article>'
  }).join('');
 }
 
@@ -949,7 +949,7 @@ function renderSignalMonitor(){
  renderVerifiedSignalCards();
  const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED','HISTORICAL']);
  const isToday=t=>{const d=new Date(Number(t.identifiedAt)||Number(t.time)*1000),n=new Date();return Number.isFinite(Number(t.time))&&d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()};
- const active=t=>!terminal.has(String(t.status||'NOT RUNNING').toUpperCase());
+ const active=t=>!terminal.has(String(t.status||'NOT TRIGGERED').toUpperCase());
  const daily=s.log.filter(t=>isToday(t)||active(t)).sort((a,b)=>Number(b.time)-Number(a.time));
  const rowDaily=t=>{
   const running=['RUNNING','TRIGGERED'].includes(t.status),closed=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED'].includes(t.status);
@@ -1131,7 +1131,7 @@ function log(set){
  if(s.lastKey===key)return;
  s.lastKey=key;
  const verifiedAt=Number(set.verifiedAt)||Date.now();
- const item={...set,status:set.status||'NOT RUNNING',verificationState:'RULE-VERIFIED',verifiedAt,identifiedAt:Number(set.identifiedAt)||verifiedAt,loggedAt:Date.now()};
+ const item={...set,status:set.status||'NOT TRIGGERED',verificationState:'RULE-VERIFIED',verifiedAt,identifiedAt:Number(set.identifiedAt)||verifiedAt,loggedAt:Date.now()};
  s.log.unshift(item);
  save();persistSignals([item]);
  renderLog();renderSignalMonitor();
