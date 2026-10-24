@@ -41,7 +41,7 @@ test('monthly and yearly contexts are included in the top-down and background sc
 
 test('selected chart candles are refreshed from the OHLC endpoint separately from quote polling', () => {
   assert.match(html, /async function refreshSelectedCandles\(force=false\)/);
-  assert.match(html, /await tick\(\);await refreshSelectedCandles\(false\)/);
+  assert.match(html, /await tick\(\);await monitorBackgroundQuotes\(\);await refreshSelectedCandles\(false\)/);
   assert.match(html, /Candle refresh failed · retaining cached bars/);
 });
 
