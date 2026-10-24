@@ -93,7 +93,7 @@ test('production scanner retains monthly/yearly minimum history and chart does n
   const end = html.indexOf('\nfunction log(set){', start);
   assert.ok(start >= 0 && end > start);
   const analyseSource = html.slice(start, end);
-  assert.match(analyseSource, /chartSignalFor\(s\.log,s\.symbol,s\.tf\)/);
+  assert.match(analyseSource, /chartSignalFor\(\[\.\.\.\(s\.log\|\|\[\]\),\.\.\.\(s\.backgroundLog\|\|\[\]\)\],s\.symbol,s\.tf\)/);
   assert.doesNotMatch(analyseSource, /let recentSet=null/);
 });
 
