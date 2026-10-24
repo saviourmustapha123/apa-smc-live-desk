@@ -41,11 +41,25 @@ try {
   }
 } catch (e) { if (/HTTP 451/.test(e.message)) warn('Binance QQQUSDT public REST feed is region-restricted from this CI runner', 'Binance connector has returned live QQQUSDT quotes and candles, but the deployed browser feed remains dependent on the viewer\'s network region.'); else fail('Binance QQQUSDT market feed', e.message); }
 
+  try {
+    const response = await (await get('https://api.bybit.com/v5/market/tickers?category=linear&symbol=QQQUSDT')).json();
+    const ticker = response.result?.list?.[0];
+    if (Number(response.retCode) === 0 && ticker?.symbol === 'QQQUSDT' && Number(ticker.lastPrice) > 0) pass('Bybit QQQUSDT perpetual live quote', ticker.lastPrice);
+    else fail('Bybit QQQUSDT perpetual live quote', response.retMsg || 'Missing valid ticker');
+    for (const interval of ['1', '60', '480', '720']) {
+      const data = await (await get('https://api.bybit.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + interval + '&limit=3')).json();
+      const rows = data.result?.list;
+      if (Number(data.retCode) === 0 && Array.isArray(rows) && rows.length && rows.every(r => Array.isArray(r) && [0,1,2,3,4,5].every(i => Number.isFinite(Number(r[i]))))) pass('Bybit QQQUSDT interval ' + interval, rows.length + ' valid OHLCV rows');
+      else fail('Bybit QQQUSDT interval ' + interval, data.retMsg || 'No valid OHLCV rows');
+    }
+  } catch (e) { if (/HTTP (403|451)/.test(e.message)) warn('Bybit public market-data endpoint is region-restricted from this CI runner', e.message); else fail('Bybit QQQUSDT market feed', e.message); }
+
   const checks = [
     ['minimum 1:3 reward/risk gate', /rr\s*<\s*3/.test(source)],
-    ['EURUSD, BTCUSD and QQQUSDT supported', /EURUSD/.test(source) && /BTCUSD/.test(source) && /QQQUSDT/.test(source) && /fapi\.binance\.com/.test(source)],
+    ['EURUSD, BTCUSD and QQQUSDT supported', /EURUSD/.test(source) && /BTCUSD/.test(source) && /QQQUSDT/.test(source) && /fapi\.binance\.com/.test(source) && /api\.bybit\.com/.test(source) && /qqqProvider/.test(source)],
     ['unsafe dynamic content escaping helper', /function escapeHTML\(/.test(source)],
-    ['HTTPS-only Biquote allowlist plus fixed Binance Futures adapter', /function safeApiBase\(/.test(source) && /https:\/\/biquote\.io\/api/.test(source) && /https:\/\/fapi\.binance\.com/.test(source) && /sym==='QQQUSDT'/.test(source)],
+    ['HTTPS-only Biquote plus Bybit/Binance QQQUSDT adapters', /function safeApiBase\(/.test(source) && /https:\/\/biquote\.io\/api/.test(source) && /https:\/\/fapi\.binance\.com/.test(source) && /https:\/\/api\.bybit\.com/.test(source) && /sym==='QQQUSDT'/.test(source)],
+    ['QQQUSDT provider selector and separate venue cache', /id="qqqProvider"/.test(source) && /function qqqCacheSymbol\(/.test(source) && /QQQUSDT_/.test(source)],
     ['content security policy present', /Content-Security-Policy/.test(source)],
     ['forex tick-volume fallback is explicit', /useTicks\?ticks/.test(source) && /tick-volume proxy/.test(source)],
     ['unknown quote freshness fails closed', /!Number\.isFinite\(age\)/.test(source) && /age>300/.test(source)],
