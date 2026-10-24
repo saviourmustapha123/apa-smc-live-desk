@@ -357,14 +357,19 @@ function pendingOrderBlockOpportunity(symbol,tf,bars){
  return null;
 }
 
+const strategyScanDiagnostics = new Map();
 function scanOpportunityHistory(symbol,tf,bars){
  // Analyse the full retained candle history supplied by the timeframe loader, not only the last 1,000 bars.
  const b=(bars||[]).filter(x=>!x.isOpen).slice(-2000),minimum=tf==='1Y'?10:tf==='1M'?20:35;
- if(b.length<minimum)return [];
+ const diag={symbol,tf,candles:b.length,minimum,eligible:false,eligibilityReason:null,candidateFound:false,latestRejection:'No qualifying directional trigger on the latest closed candle',updatedAt:Date.now()};
+ const diagKey=symbol+'|'+tf;
+ if(b.length<minimum){diag.latestRejection='Insufficient closed candles: '+b.length+' available; '+minimum+' required';strategyScanDiagnostics.set(diagKey,diag);return []}
  const eligibilityReason=signalEligibilityReason(symbol,tf,b);
- const liveEligible=!eligibilityReason;
+ const liveEligible=!eligibilityReason;diag.eligible=liveEligible;diag.eligibilityReason=eligibilityReason;
  const found=[];
  for(let i=minimum-1;i<b.length;i++){
+  const latestBar=i===b.length-1;
+  const rejectLatest=reason=>{if(latestBar)diag.latestRejection=reason};
   const hist=b.slice(0,i+1),cur=hist.at(-1),prev=hist.at(-2);if(!prev)continue;
   const pp=pivots(hist,+s.k),hh=pp.h.at(-1),ll=pp.l.at(-1),aa=atr(hist)||Math.max(cur.high-cur.low,1e-8),body=Math.abs(cur.close-cur.open);
   const up=cur.close>cur.open,dn=cur.close<cur.open,disp=body>=aa*s.disp;
@@ -449,7 +454,7 @@ function scanOpportunityHistory(symbol,tf,bars){
     ((inducementEvent.side==='BULLISH'&&up&&slSweep)||(inducementEvent.side==='BEARISH'&&dn&&shSweep)));
   if(inducementSweep){
    const inducementSide=inducementEvent.side==='BULLISH'?'BUY':'SELL';
-   if(side!==inducementSide)continue;
+   if(side!==inducementSide){rejectLatest('Inducement direction conflicts with the candidate direction');continue;}
    reasons.push(inducementSide+' post-BOS inducement sweep and reclaim');
   }
 
@@ -464,7 +469,7 @@ function scanOpportunityHistory(symbol,tf,bars){
   if(side==='SELL'&&mid!=null&&cur.close>mid)reasons.push('Premium-half context');
 
   // Strict entry model: a zone or pattern label alone is never enough. Require a complete, repeatable sequence.
-  if(!side)continue;
+  if(!side){rejectLatest('No directional trigger: latest candle lacks a qualifying sweep, structure break, or confirmed retest');continue;}
   const hasSweep=shSweep||slSweep,hasStructure=upBreak||downBreak,hasZoneRetest=!!selectedGapRetest||!!blockRetest;
   const hasRoleReversal=reasons.some(r=>r.startsWith('SBR')||r.startsWith('RBS'));
   // A retest can happen several candles after the original break. Confirm a recent
@@ -482,7 +487,7 @@ function scanOpportunityHistory(symbol,tf,bars){
   const hasEntryZone=hasZoneRetest||hasPatternOrRole;
   const hasLiquidityConfluence=recentDirectionalSweep||inducementSweep||hasPatternOrRole;
   const validatedSequence=hasEntryZone&&recentStructuralDisplacement&&hasLiquidityConfluence;
-  if(!validatedSequence)continue;
+  if(!validatedSequence){rejectLatest('Confluence incomplete: requires POI/pattern retest, recent same-direction displacement, and liquidity/pattern confirmation');continue;}
   if(disp)reasons.push('Displacement confirmed (ATR filter)');
   if(recentStructuralDisplacement)reasons.push('Recent same-direction BOS/CHoCH with displacement');
   if(recentDirectionalSweep)reasons.push('Recent directional liquidity sweep');
@@ -491,26 +496,29 @@ function scanOpportunityHistory(symbol,tf,bars){
   // The final trigger candle must confirm direction. A liquidity sweep may qualify
   // without ATR displacement; a plain structure break must show displacement or a
   // directional close, while all candidates still pass the hard 1:3 target gate.
-  if(side==='BUY'&&!(up&&(slSweep||upBreak||fvgRetest||patternRetest?.side==='BUY'||blockRetest?.side==='BUY'||reasons.some(r=>r.startsWith('RBS')))))continue;
-  if(side==='SELL'&&!(dn&&(shSweep||downBreak||fvgRetest||patternRetest?.side==='SELL'||blockRetest?.side==='SELL'||reasons.some(r=>r.startsWith('SBR')))))continue;
+  if(side==='BUY'&&!(up&&(slSweep||upBreak||fvgRetest||patternRetest?.side==='BUY'||blockRetest?.side==='BUY'||reasons.some(r=>r.startsWith('RBS'))))){rejectLatest('Final trigger candle did not confirm bullish direction');continue;}
+  if(side==='SELL'&&!(dn&&(shSweep||downBreak||fvgRetest||patternRetest?.side==='SELL'||blockRetest?.side==='SELL'||reasons.some(r=>r.startsWith('SBR'))))){rejectLatest('Final trigger candle did not confirm bearish direction');continue;}
   const rawEntry=selectedGapRetest?(selectedGapRetest.lo+selectedGapRetest.hi)/2:blockRetest?(blockRetest.low+blockRetest.high)/2:patternRetest?patternRetest.level:cur.close;
   const buffer=aa*0.1,stop=side==='SELL'?Math.max(cur.high,hh?hh.p:cur.high)+buffer:Math.min(cur.low,ll?ll.p:cur.low)-buffer;
   const entry=rawEntry;
-  if(!(Number.isFinite(entry)&&Number.isFinite(stop)&&(side==='BUY'?stop<entry:stop>entry)))continue;
-  const target=structuralTarget(side,entry,stop,hh,ll,hist);if(!target||!Number.isFinite(target.rr)||target.rr<3)continue;
+  if(!(Number.isFinite(entry)&&Number.isFinite(stop)&&(side==='BUY'?stop<entry:stop>entry))){rejectLatest('Invalid entry or stop: structural risk direction is not valid');continue;}
+  const target=structuralTarget(side,entry,stop,hh,ll,hist);if(!target||!Number.isFinite(target.rr)){rejectLatest('No valid structural target could be calculated');continue;}if(target.rr<3){rejectLatest('Structural target fails the minimum 1:3 reward-to-risk gate');continue;}
   const ageBars=b.length-1-i;
-  if(ageBars===0&&!liveEligible)continue;
+  if(ageBars===0&&!liveEligible){rejectLatest('Current setup blocked by market/data eligibility: '+eligibilityReason);continue;}
   const uniqueReasons=[...new Set(reasons)];
   const timing=estimateTargetHorizon(tf,hist,entry,target.tp);
-  found.push({symbol,tf,side,entry,sl:stop,tp:target.tp,rr:target.rr,reason:uniqueReasons,...timing,time:cur.time,confidence:'provisional-sequence-filtered',setupType:patternRetest?.type||blockRetest?.type||(ifvgRetest?'IFVG retest':fvgRetest?'FVG retest':hasRoleReversal?'SBR/RBS retest':'BOS/CHoCH retest'),status:ageBars===0?'NOT RUNNING':'HISTORICAL',movePct:0,rNow:0,ageBars,scanEngine:'APA-SMC strict sequence heuristic; unvalidated'});
+  found.push({symbol,tf,side,entry,sl:stop,tp:target.tp,rr:target.rr,reason:uniqueReasons,...timing,time:cur.time,confidence:'provisional-sequence-filtered',setupType:patternRetest?.type||blockRetest?.type||(ifvgRetest?'IFVG retest':fvgRetest?'FVG retest':hasRoleReversal?'SBR/RBS retest':'BOS/CHoCH retest'),status:ageBars===0?'NOT RUNNING':'HISTORICAL',movePct:null,rNow:null,ageBars,scanEngine:'APA-SMC strict sequence heuristic; unvalidated'});
+  if(ageBars===0){diag.candidateFound=true;diag.latestRejection='Production scanner accepted a provisional candidate';}
  }
  // Create an actionable pending setup after a confirmed BOS even before price returns to the order block.
  // This is the missing lifecycle stage between detecting structure and waiting for an entry fill.
  const latest=b.at(-1);
  if(latest&&liveEligible&&!found.some(candidate=>candidate.time===latest.time&&candidate.status==='NOT RUNNING')){
   const pending=pendingOrderBlockOpportunity(symbol,tf,b);
-  if(pending)found.push(pending);
+  if(pending){found.push(pending);diag.candidateFound=true;diag.latestRejection='Production scanner accepted a provisional pending order-block setup';}
  }
+ if(!liveEligible&&!diag.candidateFound)diag.latestRejection='Current setup blocked by market/data eligibility: '+eligibilityReason;
+ diag.updatedAt=Date.now();strategyScanDiagnostics.set(diagKey,diag);
  return found;
 }
 
