@@ -522,7 +522,7 @@ function resolveSignalOutcomes(symbol,tf,bars){
   const entry=Number(t.entry),sl=Number(t.sl),tp=Number(t.tp);
   if(!(Number.isFinite(entry)&&Number.isFinite(sl)&&Number.isFinite(tp)&&sl!==entry&&tp!==entry))continue;
   const risk=Math.abs(entry-sl),dir=t.side==='BUY'?1:-1;
-  const triggeredAt=t.triggeredAt||null;
+  let triggeredAt=t.triggeredAt||null;
   // Persisted active trades must remain active across reloads and shortened
   // candle history. Reconstruct entry state from the stored trigger timestamp,
   // then evaluate only the candle that contains that trigger and later candles.
