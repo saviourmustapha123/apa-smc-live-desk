@@ -286,7 +286,7 @@ test('live opportunity scanner is scheduled with the normal quote and candle ref
 });
 
 test('invalidated setups are not counted as missed trades in performance', () => {
-  assert.match(html, /const missedPerformance=all\.filter\(t=>\['EXPIRED','MISSED ENTRY','MISSED'\]\.includes\(String\(t\.status\|\|'\)\.toUpperCase\(\)\)\)/);
+  assert.ok(html.includes("const missedPerformance=all.filter(t=>['EXPIRED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));"));
   assert.match(html, /const activeCount=all\.filter\(active\)\.length,other=all\.filter\(t=>\['EXPIRED','INVALIDATED','CLOSED'\]\.includes\(t\.status\)\)\.length/);
 });
 
