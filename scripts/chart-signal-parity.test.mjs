@@ -56,3 +56,13 @@ test('analyse uses the production journal selector and no longer creates a separ
   assert.doesNotMatch(source, /let recentSet=null|structuralTarget\(side,entry,stop/);
   assert.doesNotMatch(source, /log\(set\)/);
 });
+
+test('production scanner records concrete rejection reasons for empty signal scans', () => {
+  assert.match(html, /const strategyScanDiagnostics = new Map\(\)/);
+  assert.match(html, /Insufficient closed candles:/);
+  assert.match(html, /No directional trigger:/);
+  assert.match(html, /Confluence incomplete:/);
+  assert.match(html, /Structural target fails the minimum 1:3 reward-to-risk gate/);
+  assert.match(html, /Current setup blocked by market\/data eligibility:/);
+  assert.match(html, /No signal: '\+\(blockers\.slice\(0,2\)/);
+});
