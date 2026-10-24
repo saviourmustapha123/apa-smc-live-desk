@@ -47,6 +47,8 @@ jobs:
 
       - name: Run production scanner against current closed candles
         id: paper_trader
+        env:
+          QQQ_PROXY_URL: ${{ vars.QQQ_PROXY_URL }}
         run: node scripts/background-paper-trader.mjs
 
       - name: Add paper-trading report to run summary
