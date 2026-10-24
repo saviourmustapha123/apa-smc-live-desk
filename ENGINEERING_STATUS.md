@@ -79,6 +79,15 @@ Append a dated entry for each material change. Include the commit, reason, check
 - During testing, a constant/mutable timestamp binding defect was found and corrected before the successful run.
 - Limitations remain: CI is not a full browser-on-phone acceptance test, and the strategy engine remains provisional. No profitability claim is implied.
 
+### 2026-10-24 — Release cache refresh and final regression verification
+
+- App release marker bumped to `2026.10.24.20` in `e4d8cdf3ff5cb3bf0962982464b440b8c524dbc3`.
+- Service worker shell cache bumped to `apa-smc-shell-2026-10-24-17` in `90abe50d54fe7b1c57084cb708c692948959fcd3`, so installed/offline shells can receive the changed app.
+- Updated the release-marker regression assertion in `57012d8b25a3be6eb4130c5d47a5893377374c16`. The previous run correctly caught the stale hard-coded `.19` assertion; the test expectation is now aligned with `.20`.
+- Latest background health check at `57012d8b25a3be6eb4130c5d47a5893377374c16`: success. Engineering audit passed 18/18 controls; app timeframe tests, signal lifecycle tests, strategy core, SMC detector, strategy discovery, research backtest and rolling proxy backtest all passed.
+- Pages deployment for the app/cache revision `90abe50d54fe7b1c57084cb708c692948959fcd3` completed successfully. The latest commit only updates tests; its Pages workflow is running separately.
+- Remaining limitation: public feed warnings can occur due market-session/region/provider restrictions. Passing tests do not prove strategy profitability or full manual mobile UI acceptance.
+
 ## Open work, in priority order
 
 1. Verify the live UI on the deployed site: Untriggered, Active and Missed must be separate, and performance must separate successful, unsuccessful and missed signals. Confirm that pending signals show no TP/SL progress.
