@@ -235,6 +235,53 @@ function scanOpportunityHistory(symbol,tf,bars){
  return found;
 }
 
+function resolveSignalOutcomes(symbol,tf,bars){
+ const closedBars=(bars||[]).filter(b=>!b.isOpen&&Number.isFinite(b.time)&&Number.isFinite(b.high)&&Number.isFinite(b.low)).sort((a,b)=>a.time-b.time);
+ if(!closedBars.length)return [];
+ const changed=[],now=Date.now();
+ const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED']);
+ for(const t of s.log){
+  if(t.symbol!==symbol||t.tf!==tf||terminal.has(t.status))continue;
+  const entry=Number(t.entry),sl=Number(t.sl),tp=Number(t.tp);
+  if(!(Number.isFinite(entry)&&Number.isFinite(sl)&&Number.isFinite(tp)&&sl!==entry&&tp!==entry))continue;
+  const risk=Math.abs(entry-sl),dir=t.side==='BUY'?1:-1;
+  let entered=false,finalStatus=null,exitPrice=null,closedAt=null,triggeredAt=t.triggeredAt||null;
+  for(const bar of closedBars){
+   if(bar.time<=Number(t.time))continue;
+   const entryTouched=bar.low<=entry&&bar.high>=entry;
+   const stopTouched=t.side==='BUY'?bar.low<=sl:bar.high>=sl;
+   const targetTouched=t.side==='BUY'?bar.high>=tp:bar.low<=tp;
+   if(!entered){
+    if(entryTouched){entered=true;triggeredAt=triggeredAt||bar.time*1000}
+    else{
+     const targetPassed=t.side==='BUY'?bar.low>entry&&bar.high>=tp:bar.high<entry&&bar.low<=tp;
+     const stopPassed=t.side==='BUY'?bar.high<entry&&bar.low<=sl:bar.low>entry&&bar.high>=sl;
+     if(stopPassed){finalStatus='INVALIDATED';exitPrice=bar.close;closedAt=bar.time*1000;break}
+     if(targetPassed){finalStatus='MISSED ENTRY';exitPrice=bar.close;closedAt=bar.time*1000;break}
+     continue;
+    }
+   }
+   if(stopTouched){finalStatus='STOP LOSS';exitPrice=sl;closedAt=bar.time*1000;break}
+   if(targetTouched){finalStatus='TAKE PROFIT';exitPrice=tp;closedAt=bar.time*1000;break}
+  }
+  const oldStatus=t.status,oldOutcome=t.outcome,oldR=t.rNow,oldExit=t.exitPrice,oldClosed=t.closedAt;
+  if(finalStatus){
+   t.status=finalStatus;t.outcome=finalStatus==='TAKE PROFIT'?'SUCCESS':finalStatus==='STOP LOSS'?'LOSS':finalStatus==='MISSED ENTRY'?'MISSED ENTRY':'INVALIDATED';
+   t.exitPrice=exitPrice;t.closedAt=closedAt;t.triggeredAt=triggeredAt;t.movePct=null;
+   t.rNow=finalStatus==='TAKE PROFIT'?Number(t.rr):finalStatus==='STOP LOSS'?-1:null;
+  }else if(entered){
+   t.status='RUNNING';t.outcome='OPEN';t.triggeredAt=triggeredAt;
+   const last=closedBars.at(-1),p=last.close,favourable=(p-entry)*dir,denom=favourable>=0?Math.abs(tp-entry):risk;
+   t.movePct=denom>0?Math.max(-100,Math.min(100,favourable/denom*100)):null;t.rNow=(p-entry)*dir/(risk||1e-12);
+  }else if(closedBars.at(-1).time>Number(t.time)){
+   t.status='HISTORICAL';t.outcome='UNRESOLVED';t.movePct=null;t.rNow=null;
+  }
+  if(t.status!==oldStatus||t.outcome!==oldOutcome||t.rNow!==oldR||t.exitPrice!==oldExit||t.closedAt!==oldClosed)changed.push(t);
+ }
+ if(changed.length){save();persistSignals(changed);renderLog()}
+ return changed;
+}
+
 async function scanBackgroundPair(symbol){
  const load=async(tf,limit)=>{let cached=[];try{cached=await dbGet(symbol,tf)}catch{}try{const fresh=await getBars(symbol,tf,limit);if(fresh.length)await dbPut(fresh,symbol,tf);const map=new Map(cached.map(b=>[b.time,b]));fresh.forEach(b=>map.set(b.time,b));return [...map.values()].sort((a,b)=>a.time-b.time).slice(-2000)}catch{return cached.slice(-2000)}};
  const [m1,m5,m15,h1,h4,h8,h12,d1]=await Promise.all([load('1m',1000),load('5m',1000),load('15m',1000),load('1h',1000),load('4h',1000),load('8h',300),load('12h',300),load('1d',1000)]);
@@ -245,7 +292,9 @@ async function scanBackgroundPair(symbol){
   const key=[candidate.symbol,candidate.tf,candidate.side,candidate.time].join('|');
   if(!seen.has(key)){seen.add(key);additions.push(candidate)}
  }
- if(additions.length){additions.sort((a,b)=>b.time-a.time);s.log.unshift(...additions);s.log.sort((a,b)=>Number(b.time)-Number(a.time));save();await persistSignals(additions);renderLog()}
+ if(additions.length){additions.sort((a,b)=>b.time-a.time);s.log.unshift(...additions);s.log.sort((a,b)=>Number(b.time)-Number(a.time));save();await persistSignals(additions)}
+ let resolved=0;for(const [tf,bars] of sets)resolved+=resolveSignalOutcomes(symbol,tf,bars).length;
+ renderLog();
  return additions.length;
 }
 
@@ -273,8 +322,10 @@ async function refreshTopDown(force=false){
   }
   if(additions.length){
    additions.sort((a,b)=>b.time-a.time);s.log.unshift(...additions);s.log.sort((a,b)=>Number(b.time)-Number(a.time));
-   save();await persistSignals(additions);renderLog();status('Opportunity scan updated · '+additions.length+' new provisional 1:3+ candidates across 11 timeframes','ok');
+   save();await persistSignals(additions);status('Opportunity scan updated · '+additions.length+' new provisional 1:3+ candidates across 11 timeframes','ok');
   }
+  let resolvedSelected=0;for(const [tf,bars] of scanSets)resolvedSelected+=resolveSignalOutcomes(sym,tf,bars).length;
+  renderLog();
   const votes=rows.slice(0,5).filter(x=>x.score!==0),net=votes.reduce((a,x)=>a+x.score,0);
   const agreement=net>0?'Higher-timeframe tilt bullish':net<0?'Higher-timeframe tilt bearish':'Higher-timeframe context mixed';
   host.innerHTML=rows.map(x=>'<div style="padding:8px 0;border-bottom:1px solid #1e2b38"><div class="row"><span><b>'+x.tf+'</b></span><b style="color:'+(x.score>0?'var(--g)':x.score<0?'var(--r)':'var(--m)')+'">'+x.bias+'</b></div><div class="fine">'+x.detail+'</div><div class="fine">'+x.volume+'</div></div>').join('')+'<div class="note" style="margin-top:9px"><b>'+agreement+'</b><br>Directional votes: '+net+' across '+votes.length+' timeframes with readable structure. This is context, not an entry signal.</div>';
@@ -567,9 +618,9 @@ function renderSignalMonitor(){
  $('signalMonitor').innerHTML=rows.length?rows.map(t=>{
   const closed=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED'].includes(t.status);
   const running=t.status==='RUNNING'||t.status==='TRIGGERED';
-  const outcome=t.status==='TAKE PROFIT'?'SUCCESS':t.status==='STOP LOSS'?'LOSS':t.status==='INVALIDATED'?'INVALIDATED':t.status==='MISSED ENTRY'?'MISSED':t.status==='HISTORICAL'?'HISTORICAL':closed?'CLOSED':'PENDING';
+  const outcome=t.outcome||(t.status==='TAKE PROFIT'?'SUCCESS':t.status==='STOP LOSS'?'LOSS':t.status==='INVALIDATED'?'INVALIDATED':t.status==='MISSED ENTRY'?'MISSED':t.status==='HISTORICAL'?'UNRESOLVED':closed?'CLOSED':'PENDING');
   const progress=running&&Number.isFinite(t.movePct)?(t.movePct>0?('TP progress '+t.movePct.toFixed(1)+'%'):t.movePct<0?('SL distance used '+Math.abs(t.movePct).toFixed(1)+'%'):'At entry · 0.0%'):'—';
-  const rNow=running&&Number.isFinite(t.rNow)?t.rNow.toFixed(2)+'R':'—';
+  const rNow=Number.isFinite(t.rNow)?t.rNow.toFixed(2)+'R':'—';
   return '<tr><td>'+stamp(t.time)+'</td><td>'+escapeHTML(t.symbol)+' / '+escapeHTML(t.tf)+'</td><td style="color:'+(t.side==='BUY'?'var(--g)':'var(--r)')+'">'+escapeHTML(t.side)+'</td><td>'+escapeHTML(tradeStateLabel(t))+'</td><td>'+escapeHTML(priceFor(t.entry,t.symbol))+'</td><td>'+escapeHTML(priceFor(t.sl,t.symbol))+'</td><td>'+escapeHTML(priceFor(t.tp,t.symbol))+'</td><td>1:'+Number(t.rr||0).toFixed(2)+'</td><td>'+escapeHTML(Array.isArray(t.reason)?t.reason.join(' · '):(t.reason||t.scanEngine||'Provisional structural trigger'))+'</td><td style="color:'+(running&&Number.isFinite(t.movePct)?(t.movePct>=0?'var(--g)':'var(--r)'):'var(--muted)')+'">'+escapeHTML(progress)+'</td><td>'+escapeHTML(rNow)+'</td><td>'+escapeHTML(outcome)+'</td></tr>';
  }).join(''):'<tr><td colspan="12" class="muted">No qualifying candidates have been logged yet. Check feed status and refresh the scanner.</td></tr>';
 }
@@ -709,7 +760,7 @@ function log(set){
 function monitorTrades(p){
  let changed=false;const now=Date.now(),changedSignals=[];
  for(const t of s.log){
-  if(t.symbol!==s.symbol||t.status==='HISTORICAL')continue;
+  if(t.symbol!==s.symbol||t.status==='HISTORICAL'||t.status==='CLOSED'||t.status==='TAKE PROFIT'||t.status==='STOP LOSS'||t.status==='INVALIDATED'||t.status==='MISSED ENTRY')continue;
   const terminal=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED'].includes(t.status);
   const dir=t.side==='BUY'?1:-1;
   const stopTouched=t.side==='BUY'?p<=t.sl:p>=t.sl,targetTouched=t.side==='BUY'?p>=t.tp:p<=t.tp;
