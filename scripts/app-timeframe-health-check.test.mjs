@@ -360,12 +360,14 @@ test('equal highs/lows and premium/discount contribute context without acting as
 });
 
 
-test('QML and head-and-shoulders patterns require a neckline retest and directional rejection before becoming signal triggers', () => {
+test('QML retests its protected swing level while head-and-shoulders retests its projected neckline', () => {
   assert.match(html, /function detectPatternRetest\(bars,k\)/);
-  assert.match(html, /QML neckline retest/);
-  assert.match(html, /Inverse QML neckline retest/);
+  assert.match(html, /QML level retest/);
+  assert.match(html, /Inverse QML level retest/);
   assert.match(html, /Head-and-shoulders neckline retest/);
   assert.match(html, /Inverse head-and-shoulders neckline retest/);
+  assert.match(html, /const level=bearishQml\?z\[1\]\.p:neckline/);
+  assert.match(html, /const level=bullishQml\?z\[1\]\.p:neckline/);
   assert.match(html, /const patternRetest=detectPatternRetest\(hist,\+s\.k\)/);
 });
 
