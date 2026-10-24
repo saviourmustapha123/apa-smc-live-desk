@@ -229,6 +229,12 @@ test('daily target tracker counts actual 1:3+ candidates without manufacturing s
   assert.match(html, /renderSignalMonitor\(\);renderSetupBoard\(\);renderDailyTarget\(\)/);
 });
 
+test('pending limit signals trigger on the correct directional entry crossing and on first quote observation', () => {
+  assert.match(html, /t\.side==='BUY'\?p<=t\.entry:p>=t\.entry/);
+  assert.match(html, /t\.side==='BUY'\?\(prior>t\.entry&&p<=t\.entry\):\(prior<t\.entry&&p>=t\.entry\)/);
+  assert.match(html, /t\.status='RUNNING';t\.triggeredAt=t\.triggeredAt\|\|now/);
+});
+
 test('signal monitor exposes entry, stop, target, planned R:R, and setup trigger', () => {
   assert.match(html, /<th>Entry<\/th><th>Stop loss<\/th><th>Take profit<\/th><th>Planned R:R<\/th><th>Setup trigger<\/th>/);
   assert.match(html, /priceFor\(t\.entry,t\.symbol\)/);
