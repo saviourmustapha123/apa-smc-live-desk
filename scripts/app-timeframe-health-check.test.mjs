@@ -477,3 +477,21 @@ test('FVG entry retests require displacement and a prior close-confirmed structu
   assert.match(html, /broken=gapPivots\.h\.at\(-1\)&&third\.close>gapPivots\.h\.at\(-1\)\.p/);
   assert.match(html, /broken=gapPivots\.l\.at\(-1\)&&third\.close<gapPivots\.l\.at\(-1\)\.p/);
 });
+
+
+test('signal pane exposes explicit refresh-all and clear-and-rescan controls with honest status', () => {
+  assert.match(html, /id="refreshSignals"/);
+  assert.match(html, /id="clearAndRescanSignals"/);
+  assert.match(html, /id="signalEngineStatus"/);
+  assert.match(html, /async function refreshAllSignals\(\{clearFirst=false\}=\{\}\)/);
+  assert.match(html, /await refreshTopDown\(true,s\.signalFreshMode\)/);
+  assert.match(html, /Object\.keys\(symbolConfig\)\.filter\(market=>market!==s\.symbol\)/);
+  assert.match(html, /await clearSignalStore\(\)/);
+});
+
+test('clear-and-rescan mode excludes historical candidates so old signal history is not immediately re-imported', () => {
+  assert.match(html, /signalFreshMode:false/);
+  assert.match(html, /if\(freshOnly&&candidate\.status==='HISTORICAL'\)continue/);
+  assert.match(html, /signalFreshMode:s\.signalFreshMode/);
+  assert.match(html, /if\(typeof p\.signalFreshMode==='boolean'\)s\.signalFreshMode=p\.signalFreshMode/);
+});
