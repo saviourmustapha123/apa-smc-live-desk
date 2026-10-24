@@ -70,3 +70,13 @@ test('summary keeps missed, invalidated, and unresolved setups out of win-rate d
   assert.equal(summary.invalidated, 1);
   assert.equal(summary.unresolved, 1);
 });
+
+test('pending order is marked missed if target was already touched on its signal candle', () => {
+  const trade = applyCandlesToTrade(pending({ signalTime: 1, lastProcessedBarTime: 1 }), [
+    candle(1, 99, 107, 100, 104),
+    candle(2, 99, 101)
+  ]);
+  assert.equal(trade.status, 'MISSED ENTRY');
+  assert.match(trade.outcome, /signal candle/);
+  assert.equal(trade.resultR, null);
+});
