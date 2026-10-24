@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-24 — v0.4.1 (QQQUSDT provider recovery)
+
+- Added Bybit V5 public market-data support for QQQUSDT as an alternative to the existing Binance USDⓈ-M Futures adapter.
+- Added a Settings selector so the user can choose a venue and test its quote/candle endpoints.
+- Added separate IndexedDB candle namespaces per QQQUSDT venue to prevent mixing bars from different exchanges.
+- Updated the chart label to identify the selected venue and clarify that QQQUSDT is an ETF-linked perpetual, not QQQ ETF shares.
+- Extended the background health check to probe Bybit QQQUSDT quotes and 1m/1h/8h/12h candles, while treating region restrictions from CI as a warning.
+- This is a provider-recovery improvement, not proof of a working feed in every browser/network. Run Settings → Test feed on the live site and inspect the latest Actions run before relying on it.
+
 ## 2026-10-23 — v0.4.0 (audit-driven patch)
 
 - Added an explicit app/detector version marker in the UI.
