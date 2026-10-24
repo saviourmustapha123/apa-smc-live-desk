@@ -1039,7 +1039,9 @@ function renderSignalMonitor(){
  const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED','HISTORICAL']);
  const isToday=t=>{const d=new Date(Number(t.identifiedAt)||Number(t.time)*1000),n=new Date();return Number.isFinite(Number(t.time))&&d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()};
  const active=t=>!terminal.has(String(t.status||'NOT TRIGGERED').toUpperCase());
- const daily=s.log.filter(t=>isToday(t)||active(t)).sort((a,b)=>Number(b.time)-Number(a.time));
+ // Only actionable setups and live trades belong in the live queue. Terminal outcomes
+ // remain available in the separate performance history.
+ const daily=s.log.filter(active).sort((a,b)=>Number(b.time)-Number(a.time));
  const rowDaily=t=>{
   const running=['RUNNING','TRIGGERED'].includes(t.status),closed=['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED'].includes(t.status);
   const outcome=t.outcome||(t.status==='TAKE PROFIT'?'SUCCESS':t.status==='STOP LOSS'?'LOSS':t.status==='INVALIDATED'?'INVALIDATED':t.status==='EXPIRED'?'EXPIRED':t.status==='HISTORICAL'?'UNRESOLVED':closed?'CLOSED':'PENDING');
@@ -1047,7 +1049,7 @@ function renderSignalMonitor(){
   const rNow=Number.isFinite(t.rNow)?t.rNow.toFixed(2)+'R':'—';
   return '<tr><td>'+stamp(t.time)+'</td><td>'+escapeHTML(t.symbol)+' / '+escapeHTML(t.tf)+'</td><td style="color:'+(t.side==='BUY'?'var(--g)':'var(--r)')+'">'+escapeHTML(t.side)+'</td><td>'+escapeHTML(tradeStateLabel(t))+'</td><td>'+escapeHTML(priceFor(t.entry,t.symbol))+'</td><td>'+escapeHTML(priceFor(t.sl,t.symbol))+'</td><td>'+escapeHTML(priceFor(t.tp,t.symbol))+'</td><td>1:'+Number(t.rr||0).toFixed(2)+'</td><td>'+escapeHTML(Array.isArray(t.reason)?t.reason.join(' · '):(t.reason||t.scanEngine||'Provisional structural trigger'))+'</td><td style="color:'+(running&&Number.isFinite(t.movePct)?(t.movePct>=0?'var(--g)':'var(--r)'):'var(--muted)')+'">'+escapeHTML(progress)+'</td><td>'+escapeHTML(rNow)+'</td><td>'+escapeHTML(outcome)+'</td></tr>';
  };
- $('signalCount').textContent=daily.length+' visible · '+s.log.filter(isToday).length+' identified today';$('tabTodayCount').textContent=String(daily.length);
+ $('signalCount').textContent=daily.length+' actionable · '+s.log.filter(t=>isToday(t)&&active(t)).length+' identified today';$('tabTodayCount').textContent=String(daily.length);
  $('signalMonitor').innerHTML=daily.length?daily.map(rowDaily).join(''):'<tr><td colspan="12" class="muted">No signal was identified today and no older signal is still pending or running. Open Full signal performance to review the complete history.</td></tr>';
  const activeRows=allActiveSignals().filter(t=>['RUNNING','TRIGGERED'].includes(String(t.status||'').toUpperCase()));
  $('activeActivityCount').textContent=activeRows.length+' running';$('tabActiveCount').textContent=String(activeRows.length);
