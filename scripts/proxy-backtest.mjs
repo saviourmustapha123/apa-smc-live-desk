@@ -7,6 +7,8 @@ const ATR_PERIOD = 14;
 const DISPLACEMENT_ATR = 1;
 const MIN_RR = 3;
 const MAX_FORWARD_BARS = 100;
+// Transparent cost stress test in units of initial risk (R). These are assumptions, not measured historical spreads.
+const COST_SCENARIOS_R = [0, 0.05, 0.10, 0.20];
 const failures = [];
 const reports = [];
 
@@ -53,9 +55,9 @@ for (const symbol of SYMBOLS) for (const timeframe of TIMEFRAMES) {
     const spanDays=Math.max(0,(bars.at(-1).time-bars[0].time)/86400);
     const expectedSeconds=timeframe==='5m'?300:900;
     const largeGaps=bars.slice(1).filter((b,i)=>b.time-bars[i].time>expectedSeconds*2).length;
-    const report={symbol,timeframe,bars:bars.length,candidates:tested.length,wins,losses,skipped,unresolved,winRate:resolved?Math.round(wins/resolved*1000)/10:null,netR:Math.round(netR*100)/100,expectancyR:resolved?Math.round(netR/resolved*1000)/1000:null,profitFactor:grossLossR?Math.round(grossWinsR/grossLossR*100)/100:grossWinsR?'infinite':'n/a',maxDrawdownR:Math.round(maxDrawdown*100)/100,maxLosingStreak:maxLossStreak,historyDays:Math.round(spanDays),oneYearCoverage:spanDays>=365,largeGaps,firstBar:new Date(bars[0].time*1000).toISOString(),latestBar:new Date(bars.at(-1).time*1000).toISOString()};
+    const report={symbol,timeframe,bars:bars.length,candidates:tested.length,wins,losses,skipped,unresolved,winRate:resolved?Math.round(wins/resolved*1000)/10:null,netR:Math.round(netR*100)/100,netR05:Math.round((netR-COST_SCENARIOS_R[1]*resolved)*100)/100,netR10:Math.round((netR-COST_SCENARIOS_R[2]*resolved)*100)/100,netR20:Math.round((netR-COST_SCENARIOS_R[3]*resolved)*100)/100,expectancyR:resolved?Math.round(netR/resolved*1000)/1000:null,profitFactor:grossLossR?Math.round(grossWinsR/grossLossR*100)/100:grossWinsR?'infinite':'n/a',maxDrawdownR:Math.round(maxDrawdown*100)/100,maxLosingStreak:maxLossStreak,historyDays:Math.round(spanDays),oneYearCoverage:spanDays>=365,largeGaps,firstBar:new Date(bars[0].time*1000).toISOString(),latestBar:new Date(bars.at(-1).time*1000).toISOString()};
     reports.push(report);
-    console.log(`${report.oneYearCoverage?'PASS':'WARN'} ${symbol} ${timeframe}: ${bars.length} closed bars over ${report.historyDays} days; ${tested.length} candidate events (${skipped} skipped at next open); ${wins} TP, ${losses} SL, ${unresolved} unresolved; win rate ${report.winRate===null?'n/a':report.winRate+'%'}; gross net ${report.netR}R; coverage ${report.oneYearCoverage?'at least 1 year':'LESS THAN 1 YEAR — validation gate NOT passed'}`);
+    console.log(`${report.oneYearCoverage?'PASS':'WARN'} ${symbol} ${timeframe}: ${bars.length} closed bars over ${report.historyDays} days; ${tested.length} candidate events (${skipped} skipped at next open); ${wins} TP, ${losses} SL, ${unresolved} unresolved; win rate ${report.winRate===null?'n/a':report.winRate+'%'}; gross ${report.netR}R; net after assumed costs: ${report.netR05}R at 0.05R/trade, ${report.netR10}R at 0.10R/trade, ${report.netR20}R at 0.20R/trade; coverage ${report.oneYearCoverage?'at least 1 year':'LESS THAN 1 YEAR — validation gate NOT passed'}`);
   } catch (error) {
     failures.push(`${symbol} ${timeframe}: ${error.message}`);
     console.error(`FAIL ${symbol} ${timeframe}: ${error.message}`);
@@ -69,12 +71,12 @@ const summaryLines=[
   '- Market data: Biquote public OHLC endpoint; only closed candles included.',
   `- Rules: current website proxy trigger, swing sensitivity ${K}, displacement ${DISPLACEMENT_ATR}×ATR, minimum target ratio ${MIN_RR}:1.`,
   '- Execution: enter at the next candle open; skip the entry if the open invalidates the stop or leaves less than 3R; same-candle stop/target ambiguity is a stop-first loss; gap-through-stop losses use the next open.',
-  '- Gross proxy only, **not** validation of the complete proprietary LOWKEY FX APA strategy. Historical spread, commissions, slippage, latency, financing and a non-overlapping portfolio simulation are not modelled.',
+  '- Gross proxy only, **not** validation of the complete proprietary LOWKEY FX APA strategy. Cost sensitivity subtracts explicit illustrative assumptions of 0.05R, 0.10R and 0.20R per resolved trade; these are not measured historical spread, commission, slippage, latency or financing. A true net backtest requires venue-specific historical cost data.',
   `- One-year history gate: ${reports.length===SYMBOLS.length*TIMEFRAMES.length&&reports.every(r=>r.oneYearCoverage)?'PASSED for all requested pair/timeframe combinations':'NOT PASSED for one or more pair/timeframe combinations; do not interpret the metrics as a full historical backtest.'}`,
   '',
-  '| Pair | TF | Closed bars | History days | 1-year coverage | Candidates | Skipped | TP | SL | Unresolved | Win rate* | Expectancy R* | Profit factor* | Max DD R* | Max losing streak | Large gaps | Net R* |',
-  '|---|---:|---:|---:|---:|---:|---:|---:|---:|',
-  ...reports.map(r=>`| ${r.symbol} | ${r.timeframe} | ${r.bars} | ${r.historyDays} | ${r.oneYearCoverage?'yes':'NO'} | ${r.candidates} | ${r.skipped} | ${r.wins} | ${r.losses} | ${r.unresolved} | ${r.winRate===null?'n/a':r.winRate+'%'} | ${r.expectancyR===null?'n/a':r.expectancyR} | ${r.profitFactor} | ${r.maxDrawdownR} | ${r.maxLosingStreak} | ${r.largeGaps} | ${r.netR} | `),
+  '| Pair | TF | Closed bars | History days | 1-year coverage | Candidates | Skipped | TP | SL | Unresolved | Win rate* | Expectancy R* | Profit factor* | Max DD R* | Max losing streak | Large gaps | Gross R* | Net @0.05R cost* | Net @0.10R cost* | Net @0.20R cost* |',
+  '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|',
+  ...reports.map(r=>`| ${r.symbol} | ${r.timeframe} | ${r.bars} | ${r.historyDays} | ${r.oneYearCoverage?'yes':'NO'} | ${r.candidates} | ${r.skipped} | ${r.wins} | ${r.losses} | ${r.unresolved} | ${r.winRate===null?'n/a':r.winRate+'%'} | ${r.expectancyR===null?'n/a':r.expectancyR} | ${r.profitFactor} | ${r.maxDrawdownR} | ${r.maxLosingStreak} | ${r.largeGaps} | ${r.netR} | ${r.netR05} | ${r.netR10} | ${r.netR20} | `),
   '',
   '*Metrics are gross and descriptive only. Win rate and expectancy use resolved outcomes; skipped and unresolved events are not treated as wins or losses. Max drawdown is computed over this event sequence, not a tradable portfolio. Zero candidates means no qualifying events were found in this limited sample; it does not establish that the strategy never signals.*',
   reports.some(r=>!r.oneYearCoverage||r.candidates===0) ? '\n## Validation warnings\n'+reports.filter(r=>!r.oneYearCoverage||r.candidates===0).map(r=>'- '+r.symbol+' '+r.timeframe+': '+(!r.oneYearCoverage?'history coverage below 365 days':'no candidate events in the available sample')).join('\n') : '\n## Validation warnings\n- None',
