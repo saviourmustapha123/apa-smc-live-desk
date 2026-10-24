@@ -586,7 +586,7 @@ test('signal admission has no artificial daily quota and scans eight execution t
   assert.match(html, /function candidateAlreadyPastLevels\(candidate,bars\)/);
   assert.match(html, /Automatic scan · '\+market\+' · 8 execution timeframes checked/);
   assert.match(html, /setInterval\(\(\)=>runAutomaticPairScan\(\),20000\)/);
-  assert.match(html, /content="2026\.10\.24\.19"/);
+  assert.match(html, /name="app-release" content="2026\.10\.24\.20"/);
   assert.match(html, /t\.verificationState='PROVISIONAL-HEURISTIC'/);
 });
 
