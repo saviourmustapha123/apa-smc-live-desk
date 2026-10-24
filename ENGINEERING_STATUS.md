@@ -68,6 +68,17 @@ Append a dated entry for each material change. Include the commit, reason, check
 - A test run exposed a follow-up defect during implementation: the trigger timestamp was declared constant while the resolver may set it on a new entry. Changed it to a mutable binding; the complete background check then passed.
 - Limitation: tests verify deterministic lifecycle behavior, not the full rendered UI on every phone/browser or strategy profitability.
 
+### 2026-10-24 — Active trade persistence and outcome category separation
+
+- Production lifecycle changes: `ff0b772002fd2f1b862930ad0fb316d79a300f12` and `e69d548e22f79c060c7875323f43682f770ee128`.
+- Regression coverage: `6584e902314de0d4836b58405789af353287a53b`, `e0bf75fe376eee0d3b77b9dbf5c91c3b094fd940`.
+- Performance classification fixes: `da7b15209da220c891b203195f23e2e0c6b2bc55`, `6d2db6787162045b2ac1a9b2ace6f5d4c9dcb3e9`; regression assertions: `80b9109322d9ed7337e851f9f8a22f871d024113`, `32dab2d5f31788a10f872a6903e2dde92dbb2130`.
+- Active-trade defect: the resolver reset its in-memory entry state on every refresh, which could replay pre-entry candles or revert a persisted running trade to pending when the retained history no longer contained the original entry touch. The resolver now restores entry state from persisted trigger metadata and avoids replaying candles that ended before that trigger.
+- Classification defect: invalidated setups were counted as missed trades. They now have a dedicated **Invalidated** performance filter and are excluded from the **Missed** count in both performance history and the signal desk. They are not counted as wins or losses.
+- Verification at `32dab2d5f31788a10f872a6903e2dde92dbb2130`: background health check passed; engineering audit passed 18/18 controls; timeframe regression tests and all eight production lifecycle tests passed; strategy core, SMC detector, discovery and research backtest tests passed. The Pages deployment for this revision was still in progress at the time of this record.
+- During testing, a constant/mutable timestamp binding defect was found and corrected before the successful run.
+- Limitations remain: CI is not a full browser-on-phone acceptance test, and the strategy engine remains provisional. No profitability claim is implied.
+
 ## Open work, in priority order
 
 1. Verify the live UI on the deployed site: Untriggered, Active and Missed must be separate, and performance must separate successful, unsuccessful and missed signals. Confirm that pending signals show no TP/SL progress.
