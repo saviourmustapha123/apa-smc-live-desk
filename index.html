@@ -1024,7 +1024,9 @@ function structuralTarget(side,entry,stop,highPivot,lowPivot,bars){
 function tradeStateLabel(t){
  const st=t.status||'NOT TRIGGERED';
  if(st==='HISTORICAL')return 'HISTORICAL CANDIDATE';
- if(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED'].includes(st))return 'CLOSED · '+st;
+ if(st==='EXPIRED')return 'MISSED · ENTRY NOT TRIGGERED';
+ if(st==='INVALIDATED')return 'INVALIDATED BEFORE ENTRY';
+ if(['TAKE PROFIT','STOP LOSS','CLOSED'].includes(st))return 'CLOSED · '+st;
  if(st==='TRIGGERED'||st==='RUNNING')return 'RUNNING';
  return 'NOT TRIGGERED';
 }
