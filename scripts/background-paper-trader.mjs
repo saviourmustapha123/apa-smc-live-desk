@@ -8,6 +8,7 @@ const SYMBOLS = ['EURUSD', 'BTCUSD', 'QQQUSDT'];
 const TIMEFRAMES = ['1m', '5m', '15m', '1h'];
 const SECONDS = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600 };
 const MAX_FORWARD_BARS = 100;
+const MIN_RR = 3;
 const nowMs = Date.now();
 const nowSeconds = Math.floor(nowMs / 1000);
 const iso = value => Number.isFinite(value) ? new Date(value * 1000).toISOString() : 'n/a';
@@ -144,7 +145,7 @@ function validSignal(signal, signalBar) {
   if (targetTouchedOnSignal || entryTouchedOnSignal) return false;
   const risk = signal.side === 'BUY' ? signal.entry - signal.sl : signal.sl - signal.entry;
   const reward = signal.side === 'BUY' ? signal.tp - signal.entry : signal.entry - signal.tp;
-  return Number.isFinite(risk) && Number.isFinite(reward) && risk > 0 && reward / risk >= 3;
+  return Number.isFinite(risk) && Number.isFinite(reward) && risk > 0 && reward / risk >= MIN_RR;
 }
 function newTradeId(signal) {
   return [signal.symbol, signal.tf, signal.time, signal.side, signal.entry, signal.sl, signal.tp].join('|');
