@@ -62,6 +62,9 @@ jobs:
       - name: Run production signal lifecycle regression tests
         if: github.event_name != 'schedule'
         run: node --test scripts/signal-lifecycle-regression.test.mjs
+      - name: Run production chart signal parity regression tests
+        if: github.event_name != 'schedule'
+        run: node --test scripts/chart-signal-parity.test.mjs
 
       - name: Run rolling historical proxy backtest
         run: node scripts/proxy-backtest.mjs
