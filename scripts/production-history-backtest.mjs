@@ -132,8 +132,12 @@ function executeSignal(signal, bars, index) {
   const targetTouchedBeforeOrderWasActive = signal.side === 'BUY'
     ? signalBar.high >= signal.tp
     : signalBar.low <= signal.tp;
-  if (targetTouchedBeforeOrderWasActive) {
-    return { outcome: 'MISSED ENTRY (target already touched on signal candle)', r: null, triggered: false, exitTime: signalBar.time };
+  const entryTouchedBeforeOrderWasActive = signalBar.low <= signal.entry && signalBar.high >= signal.entry;
+  if (targetTouchedBeforeOrderWasActive || entryTouchedBeforeOrderWasActive) {
+    const reason = targetTouchedBeforeOrderWasActive
+      ? 'target already touched on signal candle'
+      : 'entry already touched on signal candle';
+    return { outcome: 'MISSED ENTRY (' + reason + ')', r: null, triggered: false, exitTime: signalBar.time };
   }
   let triggeredAt = -1;
   for (let i = index + 1; i < Math.min(bars.length, index + 1 + MAX_FORWARD_BARS); i++) {
