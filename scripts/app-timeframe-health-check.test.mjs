@@ -105,16 +105,20 @@ test('weekly/monthly/yearly views reuse sufficiently deep daily history during r
   assert.match(html, /dailyHistoryCache\.set\(sym,\{at:Date\.now\(\),bars:daily\}\)/);
 });
 
-test('QQQUSDT is wired to the Binance USDⓈ-M perpetual feed, including candles and quote timestamps', () => {
-  assert.match(html, /QQQUSDT:\{label:'QQQUSDT · Binance perpetual'/);
+test('QQQUSDT supports Bybit and Binance venue-specific quotes, candles, and cache isolation', () => {
+  assert.match(html, /QQQUSDT:\{label:'QQQUSDT · ETF perpetual'/);
   assert.match(html, /https:\/\/fapi\.binance\.com/);
-  assert.match(html, /qqqUrl\('\/fapi\/v1\/klines\?'\+q\)/);
+  assert.match(html, /https:\/\/api\.bybit\.com/);
+  assert.match(html, /v5\/market\/kline\?\+q/);
+  assert.match(html, /v5\/market\/tickers\?category=linear&symbol=QQQUSDT/);
+  assert.match(html, /id="qqqProvider"/);
+  assert.match(html, /function qqqCacheSymbol\(/);
+  assert.match(html, /qqqUrl\('\/fapi\/v1\/klines\? '\+q\)/);
   assert.match(html, /qqqUrl\('\/fapi\/v1\/ticker\/price\?symbol=QQQUSDT'\)/);
-  assert.match(html, /connect-src 'self' https:\/\/biquote\.io https:\/\/fapi\.binance\.com https:\/\/\*\.workers\.dev/);
+  assert.match(html, /connect-src 'self' https:\/\/biquote\.io https:\/\/fapi\.binance\.com https:\/\/api\.bybit\.com/);
   assert.match(html, /if\(sym==='QQQUSDT'\)/);
   assert.match(html, /if\(sym==='QQQUSDT'\)return fetchBarsRaw\(sym,tf/);
 });
-
 test('QQQUSDT risk sizing uses linear contract units instead of labelling the quantity as BTC', () => {
   assert.match(html, /QQQUSDT contract units \(linear USDT-margined estimate\)/);
 });
@@ -147,11 +151,12 @@ test('QQQUSDT long history target is clamped to its documented listing date', ()
 test('background scan iterates over every configured market except the active one', () => {
   assert.match(html, /Object\.keys\(symbolConfig\)\.filter\(market=>market!==sym\)/);
   assert.match(html, /otherPairNew\+=await scanBackgroundPair\(other\)/);
-  assert.match(html, /QQQUSDT:\{label:'QQQUSDT · Binance perpetual'/);
+  assert.match(html, /QQQUSDT:\{label:'QQQUSDT · ETF perpetual'/);
 });
 
 test('QQQUSDT chart clearly identifies the instrument as a perpetual rather than ETF shares', () => {
-  assert.match(html, /Binance USDT-M perpetual, not QQQ ETF shares/);
+  assert.match(html, /ETF-linked perpetual, not QQQ ETF shares/);
+  assert.match(html, /qqqVenueLabel\(\)/);
 });
 
 
