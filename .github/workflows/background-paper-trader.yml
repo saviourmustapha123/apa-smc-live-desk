@@ -1,6 +1,8 @@
 name: APA SMC background paper trader
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
   schedule:
     - cron: "*/5 * * * *"
