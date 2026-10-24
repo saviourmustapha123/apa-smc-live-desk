@@ -128,12 +128,26 @@ test('QQQUSDT risk sizing uses linear contract units instead of labelling the qu
   assert.match(html, /QQQUSDT contract units \(linear USDT-margined estimate\)/);
 });
 
-test('live chart only labels order blocks after displacement, FVG and close-confirmed structure break', () => {
+test('order block qualification requires displacement and a close-confirmed structure break, not a mandatory FVG', () => {
   assert.match(html, /function recentQualifiedZones\(/);
-  assert.match(html, /impulse\.low>b\[i-2\]\.high/);
-  assert.match(html, /impulse\.high<b\[i-2\]\.low/);
-  assert.match(html, /close-confirmed structure break/);
+  assert.match(html, /const bullish=impulse\.close>impulse\.open&&high&&prev\.close<=high\.p&&impulse\.close>high\.p/);
+  assert.match(html, /const bearish=impulse\.close<impulse\.open&&low&&prev\.close>=low\.p&&impulse\.close<low\.p/);
+  assert.match(html, /No qualified OB \(needs displacement \+ close-confirmed structure break\)/);
   assert.match(html, /qualifiedZones=recentQualifiedZones/);
+});
+
+test('signal scanner can create a pending, unmitigated order block setup before entry is touched', () => {
+  assert.match(html, /function pendingOrderBlockOpportunity\(symbol,tf,bars\)/);
+  assert.match(html, /order block remains unmitigated/);
+  assert.match(html, /Pending midpoint retest entry/);
+  assert.match(html, /status:'NOT RUNNING',outcome:'PENDING'/);
+  assert.match(html, /const pending=pendingOrderBlockOpportunity\(symbol,tf,b\)/);
+});
+
+test('structural targets select the nearest confirmed opposing swing that satisfies the minimum 3R', () => {
+  assert.match(html, /Choose the nearest confirmed opposing swing that actually permits 3R/);
+  assert.match(html, /\.filter\(p=>Number\.isFinite\(p\.rr\)&&p\.rr>=3\)/);
+  assert.match(html, /return \{tp:candidates\[0\]\.tp,rr:candidates\[0\]\.rr,targetSwingIndex:candidates\[0\]\.index\}/);
 });
 
 test('live chart distinguishes breaker blocks from order blocks and requires a retest', () => {
