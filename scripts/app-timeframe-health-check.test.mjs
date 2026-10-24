@@ -109,11 +109,11 @@ test('QQQUSDT supports Bybit and Binance venue-specific quotes, candles, and cac
   assert.match(html, /QQQUSDT:\{label:'QQQUSDT · ETF perpetual'/);
   assert.match(html, /https:\/\/fapi\.binance\.com/);
   assert.match(html, /https:\/\/api\.bybit\.com/);
-  assert.match(html, /v5\/market\/kline\?\+q/);
+  assert.match(html, /v5\/market\/kline\?'\+q/);
   assert.match(html, /v5\/market\/tickers\?category=linear&symbol=QQQUSDT/);
   assert.match(html, /id="qqqProvider"/);
   assert.match(html, /function qqqCacheSymbol\(/);
-  assert.match(html, /qqqUrl\('\/fapi\/v1\/klines\? '\+q\)/);
+  assert.match(html, /qqqUrl\('\/fapi\/v1\/klines\?'\+q\)/);
   assert.match(html, /qqqUrl\('\/fapi\/v1\/ticker\/price\?symbol=QQQUSDT'\)/);
   assert.match(html, /connect-src 'self' https:\/\/biquote\.io https:\/\/fapi\.binance\.com https:\/\/api\.bybit\.com/);
   assert.match(html, /if\(sym==='QQQUSDT'\)/);
