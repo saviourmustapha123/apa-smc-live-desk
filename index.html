@@ -551,12 +551,17 @@ function paint(set, levels=[], marks=[], trendDefs=[]){
   marks.sort((a,b)=>a.time-b.time);
   for(const line of s.lines){try{s.series.removePriceLine(line)}catch{}}s.lines=[];
   for(const ts of s.trendSeries){try{s.chart.removeSeries(ts)}catch{}}s.trendSeries=[];
-  // Add a marker for each logged signal at its original candle when that candle is on this chart.
-  for(const t of s.log.filter(t=>t.symbol===s.symbol&&t.tf===s.tf)){
-   if(s.bars.some(bar=>bar.time===t.time)){
-    const win=t.status==='TAKE PROFIT',loss=t.status==='STOP LOSS';
-    marks.push({time:t.time,position:t.side==='BUY'?'belowBar':'aboveBar',color:win?'#35d39a':loss?'#ff657a':t.side==='BUY'?'#35d39a':'#ff657a',shape:t.side==='BUY'?'arrowUp':'arrowDown',text:t.side+' · '+(t.status||'NOT RUNNING')});
-   }
+  // Plot every live/pending signal for this pair, even when it was detected on another timeframe.
+  // Lightweight Charts markers must align with a candle in the displayed series, so map the
+  // signal timestamp to its nearest visible candle instead of silently dropping cross-TF signals.
+  const chartSignals=s.log.filter(t=>t.symbol===s.symbol&&['NOT RUNNING','PENDING','RUNNING','TRIGGERED'].includes(String(t.status||'NOT RUNNING').toUpperCase()));
+  for(const t of chartSignals){
+   if(!s.bars.length)continue;
+   let nearest=s.bars[0],distance=Math.abs(nearest.time-Number(t.time));
+   for(const bar of s.bars){const d=Math.abs(bar.time-Number(t.time));if(d<distance){nearest=bar;distance=d}}
+   const running=['RUNNING','TRIGGERED'].includes(String(t.status||'').toUpperCase());
+   const progress=running&&Number.isFinite(t.movePct)?' · '+(t.movePct>=0?'TP ':'SL ')+Math.abs(t.movePct).toFixed(1)+'%':'';
+   marks.push({time:nearest.time,position:t.side==='BUY'?'belowBar':'aboveBar',color:t.side==='BUY'?'#35d39a':'#ff657a',shape:t.side==='BUY'?'arrowUp':'arrowDown',text:t.symbol+' '+t.tf.toUpperCase()+' '+t.side+' · '+(t.status||'NOT RUNNING')+progress});
   }
   // Explicit zone geometry is supplied by the structure/FVG/OB detectors below; no full-width price lines.
   if(set){
@@ -619,16 +624,21 @@ function renderOverlay(){
   if(x==null||y==null||x<0||x>w||y<0||y>h)continue;
   const tag=document.createElement('div');tag.className='chart-event-tag';tag.style.left=x+'px';tag.style.top=Math.max(8,Math.min(h-8,y+(mark.position==='aboveBar'?-9:9)))+'px';tag.style.color=mark.color||'#e7eef6';tag.textContent='['+mark.sourceTf.toUpperCase()+'] '+mark.text;s.overlay.appendChild(tag);
  }
- // Draw historical signal risk/reward rectangles for every timeframe of the active pair.
+ // Every pending/running signal for the selected pair must remain visible, regardless of timeframe or overlay density.
+ // Clean mode limits completed-history drawings only; it never hides a live or not-yet-triggered setup.
+ const terminalStates=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED','HISTORICAL']);
+ const validTrade=t=>t.symbol===s.symbol&&Number.isFinite(t.time)&&Number.isFinite(t.entry)&&Number.isFinite(t.sl)&&Number.isFinite(t.tp);
+ const activeTrades=s.log.filter(t=>validTrade(t)&&!terminalStates.has(String(t.status||'NOT RUNNING').toUpperCase()));
  const tradeLimit=mode==='clean'?4:mode==='balanced'?12:40;
- const visibleTrades=s.log.filter(t=>t.symbol===s.symbol&&String(t.status||'').toUpperCase()!=='HISTORICAL'&&Number.isFinite(t.time)&&Number.isFinite(t.entry)&&Number.isFinite(t.sl)&&Number.isFinite(t.tp)).sort((a,b)=>((a.status==='RUNNING'||a.status==='TRIGGERED')?0:1)-((b.status==='RUNNING'||b.status==='TRIGGERED')?0:1)||Number(b.time)-Number(a.time)).slice(0,tradeLimit);
+ const completedTrades=mode==='clean'?[]:s.log.filter(t=>validTrade(t)&&terminalStates.has(String(t.status||'').toUpperCase())&&t.status!=='HISTORICAL').sort((a,b)=>Number(b.time)-Number(a.time)).slice(0,tradeLimit);
+ const visibleTrades=[...activeTrades.sort((a,b)=>Number(b.time)-Number(a.time)),...completedTrades];
  for(const t of visibleTrades){
-  const x1=chartXForTime(t.time),terminal=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED','HISTORICAL'].includes(t.status),endTime=terminal&&Number.isFinite(t.closedAt)?Math.floor(t.closedAt/1000):null,x2=terminal?chartXForTime(endTime):plotRight;
+  const x1=chartXForTime(t.time),terminal=terminalStates.has(String(t.status||'').toUpperCase()),endTime=terminal&&Number.isFinite(t.closedAt)?Math.floor(t.closedAt/1000):null,x2=terminal?chartXForTime(endTime):plotRight;
   if(x1==null||x2==null)continue;
   const left=Math.max(0,Math.min(x1,x2)),right=Math.min(w,Math.max(x1,x2));if(right-left<2||right<0||left>w)continue;
   const closed=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED','HISTORICAL'].includes(t.status);
   const entryY=s.series.priceToCoordinate(t.entry);
-  if(entryY!=null&&entryY>=0&&entryY<=h){const line=document.createElement('div');line.style.position='absolute';line.style.left=left+'px';line.style.top=entryY+'px';line.style.width=Math.max(2,right-left)+'px';line.style.borderTop='1px dashed '+(t.side==='BUY'?'#35d39a':'#ff657a');line.style.pointerEvents='none';line.style.zIndex='4';s.overlay.appendChild(line);const tag=document.createElement('div');tag.className='chart-level-label';tag.style.left=Math.max(0,Math.min(w-190,left+4))+'px';tag.style.top=Math.max(2,Math.min(h-20,entryY-18))+'px';tag.style.color=t.side==='BUY'?'#35d39a':'#ff657a';tag.textContent=t.symbol+' '+t.tf.toUpperCase()+' '+t.side+' · '+tradeStateLabel(t)+(t.status==='RUNNING'&&Number.isFinite(t.movePct)?' · '+(t.movePct>0?'TP ': 'SL ')+Math.abs(t.movePct).toFixed(1)+'%':'');s.overlay.appendChild(tag)}
+  if(entryY!=null&&entryY>=0&&entryY<=h){const line=document.createElement('div');line.style.position='absolute';line.style.left=left+'px';line.style.top=entryY+'px';line.style.width=Math.max(2,right-left)+'px';line.style.borderTop='1px dashed '+(t.side==='BUY'?'#35d39a':'#ff657a');line.style.pointerEvents='none';line.style.zIndex='4';s.overlay.appendChild(line);const tag=document.createElement('div');tag.className='chart-level-label';tag.style.left=Math.max(0,Math.min(w-190,left+4))+'px';tag.style.top=Math.max(2,Math.min(h-20,entryY-18))+'px';tag.style.color=t.side==='BUY'?'#35d39a':'#ff657a';const current=Number(t.lastObservedPrice),hasCurrent=Number.isFinite(current)&&current>0,dir=t.side==='BUY'?1:-1,tpPct=hasCurrent&&Math.abs(t.tp-t.entry)>0?(current-t.entry)*dir/Math.abs(t.tp-t.entry)*100:null,slPct=hasCurrent&&Math.abs(t.entry-t.sl)>0?Math.max(0,Math.min(100,-((current-t.entry)*dir/Math.abs(t.entry-t.sl)*100))):null;const liveInfo=['RUNNING','TRIGGERED'].includes(String(t.status||'').toUpperCase())?(tpPct===null?' · waiting for quote':' · TP '+tpPct.toFixed(1)+'% · SL risk '+slPct.toFixed(1)+'% · '+(Number.isFinite(t.rNow)?t.rNow.toFixed(2)+'R':'R —')):(hasCurrent?' · '+Math.abs((current-t.entry)/t.entry*100).toFixed(2)+'% from entry':' · waiting for quote');tag.textContent=t.symbol+' '+t.tf.toUpperCase()+' '+t.side+' · '+tradeStateLabel(t)+liveInfo;s.overlay.appendChild(tag)}
   for(const z of [{high:Math.max(t.entry,t.tp),low:Math.min(t.entry,t.tp),label:(closed?'CLOSED ':'')+'TARGET',color:'#35d39a',fill:'#35d39a18'},{high:Math.max(t.entry,t.sl),low:Math.min(t.entry,t.sl),label:(closed?'CLOSED ':'')+'RISK · '+(t.status||'NOT RUNNING'),color:'#ff657a',fill:'#ff657a18'}]){
    const y1=s.series.priceToCoordinate(z.high),y2=s.series.priceToCoordinate(z.low);if(y1==null||y2==null)continue;
    const top=Math.max(0,Math.min(y1,y2)),bottom=Math.min(h,Math.max(y1,y2));if(bottom-top<1||bottom<0||top>h)continue;
