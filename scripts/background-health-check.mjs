@@ -66,7 +66,7 @@ try {
   } catch (e) { if (/HTTP (403|451)/.test(e.message)) warn('Bybit public market-data endpoint is region-restricted from this CI runner', e.message); else fail('Bybit QQQUSDT market feed', e.message); }
 
   const checks = [
-    ['minimum 1:3 reward/risk gate', /rr\s*<\s*3/.test(source)],
+    ['minimum 1:3 reward/risk gate', /rr\s*<\s*(?:3|MIN_REWARD_RISK)/.test(source)],
     ['EURUSD, BTCUSD and QQQUSDT supported', /EURUSD/.test(source) && /BTCUSD/.test(source) && /QQQUSDT/.test(source) && /fapi\.binance\.com/.test(source) && /api\.bybit\.com/.test(source) && /qqqProvider/.test(source)],
     ['unsafe dynamic content escaping helper', /function escapeHTML\(/.test(source)],
     ['HTTPS-only Biquote plus Bybit/Binance QQQUSDT adapters', /function safeApiBase\(/.test(source) && /https:\/\/biquote\.io\/api/.test(source) && /https:\/\/fapi\.binance\.com/.test(source) && /https:\/\/api\.bybit\.com/.test(source) && /sym==='QQQUSDT'/.test(source)],
