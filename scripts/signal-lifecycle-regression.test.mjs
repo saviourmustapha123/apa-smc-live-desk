@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { runInNewContext, Script } from 'node:vm';
+import { createContext, Script } from 'node:vm';
 
 // These tests execute the lifecycle function extracted from the production HTML,
 // not a parallel test-only implementation. If the function moves or disappears,
@@ -18,7 +18,7 @@ const context = {
   renderLog() {},
   realizedSignalR() { return 0; }
 };
-new Script(lifecycleSource).runInContext(runInNewContext(context));
+const vmContext = createContext(context);\nnew Script(lifecycleSource).runInContext(vmContext);
 
 function evaluate({ side = 'BUY', bar, status = 'PENDING' }) {
   const signal = {
@@ -29,7 +29,7 @@ function evaluate({ side = 'BUY', bar, status = 'PENDING' }) {
   };
   context.s.log = [signal];
   const candle = { time: 200, isOpen: false, ...bar };
-  context.resolveSignalOutcomes('BTCUSD', '5m', [candle]);
+  vmContext.resolveSignalOutcomes('BTCUSD', '5m', [candle]);
   return signal;
 }
 
