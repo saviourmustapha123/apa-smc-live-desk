@@ -139,15 +139,13 @@ function runBacktest(symbol, tf, bars, provider, exact) {
   const coreSize = 250;
   const overlap = 250;
   let diagnostic = null;
-  // The production scanner intentionally retains at most 2,000 bars. Replay overlapping
-  // windows so longer available history is not silently discarded; only count each
-  // signal inside the non-overlapping core of its window.
+  // Replay overlapping windows so scanner history retention does not truncate the dataset.
   for (let coreStart = 0; coreStart < bars.length - 1; coreStart += coreSize) {
     const coreEnd = Math.min(bars.length - 1, coreStart + coreSize);
     const windowStart = Math.max(0, coreStart - overlap);
     const windowEnd = Math.min(bars.length, coreEnd + overlap);
     const windowBars = bars.slice(windowStart, windowEnd);
-    const engine = createProductionScannerReplay({ now: Date.now() });
+    const engine = createProductionScannerReplay({ now: (bars[windowEnd - 1]?.time || 0) * 1000 + INTERVAL_SECONDS[tf] * 1000 });
     const result = engine.scan(symbol, tf, windowBars);
     diagnostic = result.diagnostic || diagnostic;
     const coreTimes = new Set(bars.slice(coreStart, coreEnd).map(b=>b.time));
@@ -157,27 +155,43 @@ function runBacktest(symbol, tf, bars, provider, exact) {
       if (!unique.has(key)) unique.set(key, signal);
     }
   }
-  const candidates = [...unique.values()].sort((a,b)=>a.time-b.time);
-  const outcomes = candidates.map(signal => ({ signal, ...executeSignal(signal, bars, byTime.get(signal.time)) }));
+  const candidates = [...unique.values()].sort((a,b)=>a.time-b.time || (Number(a.rr)||0)-(Number(b.rr)||0));
+  const outcomes = [];
+  let nextAvailableIndex = 0;
+  for (const signal of candidates) {
+    const index = byTime.get(signal.time);
+    if (index == null || index < nextAvailableIndex) continue;
+    const result = executeSignal(signal, bars, index);
+    outcomes.push({ signal, ...result });
+    // Enforce one pending/active trade at a time per symbol and timeframe. This prevents
+    // overlapping same-direction candidates from being counted as independent trades.
+    const endTime = result.exitTime ?? (result.entryTime && result.outcome.startsWith('UNRESOLVED') ? bars.at(-1).time : null);
+    if (endTime != null && byTime.has(endTime)) nextAvailableIndex = byTime.get(endTime) + 1;
+    else if (result.triggered || result.outcome.startsWith('UNRESOLVED')) nextAvailableIndex = bars.length;
+  }
   const executed = outcomes.filter(x=>x.triggered);
   const resolved = executed.filter(x=>Number.isFinite(x.r));
   const wins = resolved.filter(x=>x.r>0).length;
   const losses = resolved.filter(x=>x.r<0).length;
-  const grossR = resolved.reduce((sum,x)=>sum+x.r,0);
+  const grossWinR = resolved.filter(x=>x.r>0).reduce((sum,x)=>sum+x.r,0);
+  const grossLossR = -resolved.filter(x=>x.r<0).reduce((sum,x)=>sum+x.r,0);
+  const netR = grossWinR - grossLossR;
+  const equity = [0]; let running = 0, peak = 0, maxDrawdown = 0;
+  for (const x of resolved) { running += x.r; equity.push(running); peak = Math.max(peak,running); maxDrawdown = Math.max(maxDrawdown,peak-running); }
   const days = bars.length > 1 ? (bars.at(-1).time - bars[0].time) / 86400 : 0;
-  return { symbol, tf, bars: bars.length, days, provider, exact, diagnostic, candidates: outcomes.length, executed: executed.length, wins, losses, unresolved: executed.length-resolved.length, missed: outcomes.filter(x=>!x.triggered&&/MISSED/.test(x.outcome)).length, invalidated: outcomes.filter(x=>!x.triggered&&/INVALIDATED/.test(x.outcome)).length, grossR, winRate: resolved.length ? wins/resolved.length*100 : null, outcomes };
+  return { symbol, tf, bars: bars.length, days, provider, exact, diagnostic, candidates: candidates.length, evaluated: outcomes.length, executed: executed.length, wins, losses, unresolved: executed.length-resolved.length, missed: outcomes.filter(x=>!x.triggered&&/MISSED/.test(x.outcome)).length, invalidated: outcomes.filter(x=>!x.triggered&&/INVALIDATED/.test(x.outcome)).length, netR, grossWinR, grossLossR, profitFactor: grossLossR ? grossWinR/grossLossR : grossWinR ? Infinity : null, expectancyR: resolved.length ? netR/resolved.length : null, maxDrawdownR: maxDrawdown, winRate: resolved.length ? wins/resolved.length*100 : null, outcomes };
 }
 
 log('# APA SMC Live Desk — production-scanner historical replay');
 log('');
 log('- Generated: ' + new Date().toISOString());
 log('- Engine: actual production scanOpportunityHistory source extracted from index.html, not the simplified proxy strategy.');
-log('- Entry model: signal is evaluated after its candle closes; a limit/entry level must be touched on a later candle. Stops/targets are checked only after fill. If both are touched in one candle, stop-first is assumed.');
+log('- Entry model: signal is evaluated after its candle closes; a limit/entry level must be touched on a later candle. Stops/targets are checked only after fill. If both are touched in one candle, stop-first is assumed. Only one pending or active trade is allowed per pair/timeframe at a time.');
 log('- Minimum RR: 1:3. Maximum forward evaluation: ' + MAX_FORWARD_BARS + ' candles. No commission/spread/slippage is included; gross R only.');
-log('- This is historical candle replay, not live brokerage execution or proof of future profitability.');
+log('- Metrics are gross of spread, commission, funding and slippage. This is historical candle replay, not live brokerage execution or proof of future profitability. Results with missing symbol feeds are not complete.');
 log('');
-log('| Pair | TF | Provider | Exact symbol data? | Bars | Days | Candidates | Filled | Wins | Losses | Unresolved | Missed | Invalidated | Win rate | Gross R |');
-log('|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
+log('| Pair | TF | Provider | Exact symbol data? | Bars | Days | Candidates | Evaluated | Filled | Wins | Losses | Unresolved | Missed | Invalidated | Win rate | Net R | PF | Expectancy R | Max DD R |');
+log('|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
 
 for (const symbol of SYMBOLS) {
   for (const tf of TIMEFRAMES) {
@@ -188,7 +202,7 @@ for (const symbol of SYMBOLS) {
         .sort((a,b)=>a.time-b.time);
       const result = runBacktest(symbol, tf, bars, data.provider, data.exact);
       const rate = result.winRate == null ? 'n/a' : result.winRate.toFixed(1) + '%';
-      log('| ' + symbol + ' | ' + tf + ' | ' + data.provider + ' | ' + (data.exact ? 'yes' : 'NO, proxy') + ' | ' + result.bars + ' | ' + result.days.toFixed(1) + ' | ' + result.candidates + ' | ' + result.executed + ' | ' + result.wins + ' | ' + result.losses + ' | ' + result.unresolved + ' | ' + result.missed + ' | ' + result.invalidated + ' | ' + rate + ' | ' + result.grossR.toFixed(2) + 'R |');
+      log('| ' + symbol + ' | ' + tf + ' | ' + data.provider + ' | ' + (data.exact ? 'yes' : 'NO, proxy') + ' | ' + result.bars + ' | ' + result.days.toFixed(1) + ' | ' + result.candidates + ' | ' + result.evaluated + ' | ' + result.executed + ' | ' + result.wins + ' | ' + result.losses + ' | ' + result.unresolved + ' | ' + result.missed + ' | ' + result.invalidated + ' | ' + rate + ' | ' + result.netR.toFixed(2) + 'R | ' + (result.profitFactor === Infinity ? '∞' : result.profitFactor == null ? 'n/a' : result.profitFactor.toFixed(2)) + ' | ' + (result.expectancyR == null ? 'n/a' : result.expectancyR.toFixed(2) + 'R') + ' | ' + result.maxDrawdownR.toFixed(2) + 'R |');
       if (!data.exact) warnings.push(symbol + ' ' + tf + ' uses a symbol/venue proxy');
       if (result.days < 30) warnings.push(symbol + ' ' + tf + ' has less than 30 days of history');
       log('');
