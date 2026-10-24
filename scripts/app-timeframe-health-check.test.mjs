@@ -250,7 +250,7 @@ function runOutcomeResolver(signal, bars) {
     renderLog() {},
     Date
   };
-  const resolver = runInNewContext(html.slice(start, end) + '\\nresolveSignalOutcomes', context);
+  const resolver = runInNewContext(html.slice(start, end) + '\nresolveSignalOutcomes', context);
   resolver('QQQUSDT', '5m', bars);
   return context.s.log[0];
 }
