@@ -215,7 +215,7 @@ function summarizeTf(tf,bars){
 }
 function detectRecentBlockRetest(bars,k,dispMult){
  const b=(bars||[]).filter(x=>!x.isOpen),n=b.length;if(n<12)return null;
- const start=Math.max(4,n-55),current=b[n-1],events=[];
+ const start=Math.max(4,n-55),current=b[n-1],events=[],allPivots=pivots(b,k);
  for(let i=start;i<n-1;i++){
   const impulse=b[i],prev=b[i-1],base=atr(b.slice(0,i))||Math.max(impulse.high-impulse.low,1e-8),body=Math.abs(impulse.close-impulse.open);
   if(body<base*dispMult)continue;
@@ -237,8 +237,8 @@ function detectRecentBlockRetest(bars,k,dispMult){
   if(invalidAt>=0&&touched){
    const flipped=zone.side==='BUY'?'SELL':'BUY';let oppositeBreak=false;
    for(let j=invalidAt+1;j<n-1;j++){
-    const known=pivots(b.slice(0,j),k);
-    const swing=flipped==='SELL'?known.l.at(-1):known.h.at(-1);
+    const knownHigh=allPivots.h.filter(p=>p.i+k<j).at(-1),knownLow=allPivots.l.filter(p=>p.i+k<j).at(-1);
+    const swing=flipped==='SELL'?knownLow:knownHigh;
     if(swing&&(flipped==='SELL'?b[j-1].close>=swing.p&&b[j].close<swing.p:b[j-1].close<=swing.p&&b[j].close>swing.p)){oppositeBreak=true;break}
    }
    const reject=flipped==='SELL'?current.close<zone.low&&current.close<current.open:current.close>zone.high&&current.close>current.open;
