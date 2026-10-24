@@ -104,7 +104,8 @@ async function fetchBars(symbol, tf) {
 
   const providers = [
     ['Binance USD-M', 'https://fapi.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'],
-    ['Pipai third-party Binance USD-M mirror', 'https://api-dev.pipai.org/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000']
+    ['Binance API alternate', 'https://api.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'],
+    ['Binance GCP alternate', 'https://api-gcp.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000']
   ];
   for (const [provider, url] of providers) {
     try {
