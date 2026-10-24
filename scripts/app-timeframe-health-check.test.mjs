@@ -609,3 +609,9 @@ test('signal scanner remains async and has no artificial daily admission cap', (
   assert.doesNotMatch(html, /daily limit of [0-9]+ new candidates reached/);
   assert.match(html, /Pending entries need a finite, timeframe-specific validity window/);
 });
+
+test('expired untriggered setups are counted in missed performance, not unsuccessful trades', () => {
+  assert.match(html, /const missedPerformance=all\.filter\(t=>\['EXPIRED','MISSED ENTRY','MISSED'\]\.includes\(String\(t\.status\|\|'\)\.toUpperCase\(\)\)\)/);
+  assert.match(html, /const unsuccessful=all\.filter\(t=>t\.status==='STOP LOSS'\)/);
+  assert.match(html, /const invalidatedPerformance=all\.filter\(t=>String\(t\.status\|\|'\)\.toUpperCase\(\)==='INVALIDATED'\)/);
+});
