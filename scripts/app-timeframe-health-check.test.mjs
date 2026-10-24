@@ -370,6 +370,37 @@ test('full signal performance reports history-wide win rate, realised R, active 
   assert.match(html, /const netR=all\.reduce/);
 });
 
+test('realized R uses the actual recorded exit price, including adverse stop slippage', () => {
+  const start = html.indexOf('function realizedSignalR(t){');
+  const end = html.indexOf('function resolveSignalOutcomes', start);
+  assert.ok(start >= 0 && end > start, 'realized R helper must exist before outcome resolution');
+  const helper = html.slice(start, end);
+  const result = runInNewContext(helper + `
+    ({
+      longGapLoss: realizedSignalR({side:'BUY',entry:100,sl:95,exitPrice:93,status:'STOP LOSS'}),
+      shortGapLoss: realizedSignalR({side:'SELL',entry:100,sl:105,exitPrice:108,status:'STOP LOSS'}),
+      targetFallback: realizedSignalR({side:'BUY',entry:100,sl:95,rr:3,status:'TAKE PROFIT'}),
+      pending: realizedSignalR({side:'BUY',entry:100,sl:95,status:'PENDING'})
+    })
+  `);
+  assert.equal(result.longGapLoss, -1.4);
+  assert.equal(result.shortGapLoss, -1.6);
+  assert.equal(result.targetFallback, 3);
+  assert.equal(result.pending, null);
+  assert.match(html, /const netR=all\.reduce\(\(sum,t\)=>sum\+\(\['TAKE PROFIT','STOP LOSS'\]\.includes\(t\.status\)\?\(realizedSignalR\(t\)\|\|0\):0\),0\)/);
+});
+
+test('historical outcome resolution accounts for stop gaps at the candle open', () => {
+  assert.match(html, /const gapStop=t\.side==='BUY'\?bar\.open<=sl:bar\.open>=sl/);
+  assert.match(html, /if\(gapStop\)\{finalStatus='STOP LOSS';exitPrice=bar\.open/);
+  assert.match(html, /t\.rNow=realizedSignalR\(t\);t\.lastActivityAt=closedAt/);
+});
+
+test('last activity timestamp changes on state transitions, while quote refresh has its own timestamp', () => {
+  assert.match(html, /if\(t\.status!==previousStatus\)t\.lastActivityAt=now/);
+  assert.match(html, /if\(t\.lastObservedPrice!==p\)t\.lastPriceUpdateAt=now/);
+});
+
 test('a live pending signal is not marked historical merely because a later candle closes', () => {
   assert.match(html, /A valid setup stays pending until entry is touched/);
   assert.match(html, /t\.status=t\.status==='NOT RUNNING'\?'NOT RUNNING':'PENDING';t\.outcome='PENDING'/);
