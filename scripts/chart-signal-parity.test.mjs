@@ -9,7 +9,7 @@ const end = html.indexOf('\nfunction analyse(){', start);
 assert.ok(start >= 0 && end > start, 'production chart selector must exist before analyse()');
 const selectorSource = html.slice(start, end) +
   '\nthis.chartSignalFor = chartSignalFor;';
-const context = createContext({});
+const context = createContext({ MIN_REWARD_RISK: 3 });
 new Script(selectorSource).runInContext(context);
 
 const signal = (overrides = {}) => ({
