@@ -213,6 +213,29 @@ function summarizeTf(tf,bars){
  const ageMinutes=Math.max(0,Math.floor((Date.now()/1000-last.time)/60));
  return {tf,bias,score,detail:pd+' · '+b.length+' closed bars · last '+stamp(last.time)+' UTC ('+ageMinutes+'m old) · close '+priceFor(last.close,s.symbol),volume:volumeContext(b)};
 }
+function detectPatternRetest(bars,k){
+ const b=(bars||[]).filter(x=>!x.isOpen),n=b.length;if(n<Math.max(20,k*6))return null;
+ const prior=b.slice(0,-1),cur=b[n-1],pp=pivots(prior,k);
+ const raw=[...pp.h.map(p=>({...p,type:'H'})),...pp.l.map(p=>({...p,type:'L'}))].sort((a,b)=>a.i-b.i);
+ const swings=[];
+ for(const p of raw){const last=swings.at(-1);if(!last||last.type!==p.type)swings.push(p);else if((p.type==='H'&&p.p>last.p)||(p.type==='L'&&p.p<last.p))swings[swings.length-1]=p}
+ const z=swings.slice(-5);if(z.length!==5)return null;
+ const tolerance=(atr(prior)||Math.max(cur.high-cur.low,1e-8))*0.35;
+ if(z.every((p,i)=>p.type===['H','L','H','L','H'][i])){
+  const bearishQml=z[2].p>z[0].p&&z[2].p>z[4].p&&z[3].p<z[1].p;
+  const bearishHs=z[2].p>z[0].p&&z[2].p>z[4].p&&Math.abs(z[0].p-z[4].p)<=tolerance;
+  const neckline=z[3].p;
+  if(cur.high>=neckline&&cur.close<neckline&&cur.close<cur.open&&((bearishQml)||(bearishHs&&cur.close<neckline)))return {side:'SELL',type:bearishQml?'QML neckline retest':'Head-and-shoulders neckline retest',level:neckline};
+ }
+ if(z.every((p,i)=>p.type===['L','H','L','H','L'][i])){
+  const bullishQml=z[2].p<z[0].p&&z[2].p<z[4].p&&z[3].p>z[1].p;
+  const bullishHs=z[2].p<z[0].p&&z[2].p<z[4].p&&Math.abs(z[0].p-z[4].p)<=tolerance;
+  const neckline=z[3].p;
+  if(cur.low<=neckline&&cur.close>neckline&&cur.close>cur.open&&(bullishQml||bullishHs))return {side:'BUY',type:bullishQml?'Inverse QML neckline retest':'Inverse head-and-shoulders neckline retest',level:neckline};
+ }
+ return null;
+}
+
 function detectRecentBlockRetest(bars,k,dispMult){
  const b=(bars||[]).filter(x=>!x.isOpen),n=b.length;if(n<12)return null;
  const start=Math.max(4,n-55),current=b[n-1],events=[],allPivots=pivots(b,k);
@@ -311,6 +334,11 @@ function scanOpportunityHistory(symbol,tf,bars){
     for(let j=Math.max(pivot.i+1,hist.length-80);j<hist.length-1;j++){if(hist[j].close>level){broken=true;break}}
     if(broken&&(!side||side==='BUY')){side='BUY';reasons.push('RBS level break and retest');break}
    }
+  }
+  const patternRetest=detectPatternRetest(hist,+s.k);
+  if(patternRetest&&(!side||side===patternRetest.side)){
+   side=patternRetest.side;
+   reasons.push(patternRetest.type);
   }
   const blockRetest=detectRecentBlockRetest(hist,+s.k,s.disp);
   if(blockRetest&&(!side||side===blockRetest.side)&&((blockRetest.side==='BUY'&&up)||(blockRetest.side==='SELL'&&dn))){
