@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-24 — v0.4.2 (market-session and offline-safety guards)
+
+- Prevented fresh signal creation when the browser is offline, the conservative estimated EUR/USD weekly session is closed, a recent provider check reports closure/stale data, or the latest closed candle is too old for its timeframe.
+- Added explicit offline/reconnect behavior: cached chart/journal data remains local, new live signals pause offline, and automatic quote/candle/context refresh resumes after connectivity returns or the app returns to the foreground.
+- Improved the session badge so an estimated weekend closure cannot be labelled as live data.
+- Updated the service worker to cache the chart library after a successful online load, improving cold offline launches. Fresh market data and live trade monitoring still require a network connection.
+- This is a safety/availability patch, not a profitability validation or proof that every provider, symbol and timeframe is live in every browser.
+
 ## 2026-10-24 — v0.4.1 (QQQUSDT provider recovery)
 
 - Added Bybit V5 public market-data support for QQQUSDT as an alternative to the existing Binance USDⓈ-M Futures adapter.
@@ -7,7 +15,7 @@
 - Added separate IndexedDB candle namespaces per QQQUSDT venue to prevent mixing bars from different exchanges.
 - Updated the chart label to identify the selected venue and clarify that QQQUSDT is an ETF-linked perpetual, not QQQ ETF shares.
 - Extended the background health check to probe Bybit QQQUSDT quotes and 1m/1h/8h/12h candles, while treating region restrictions from CI as a warning.
-- This is a provider-recovery improvement, not proof of a working feed in every browser/network. Run Settings → Test feed on the live site and inspect the latest Actions run before relying on it.
+- This is a provider-recovery improvement, not proof of a working feed in every browser. Run Settings → Test feed on the live site and inspect the latest Actions run before relying on it.
 
 ## 2026-10-23 — v0.4.0 (audit-driven patch)
 
@@ -28,7 +36,7 @@ This is a first corrective patch, not completion of the entire 14-page framework
 
 ## Verification status
 
-- Repository file updates: committed, including regression tests for deterministic equal-pivot ties, forward-horizon boundaries, gap-through-stop precedence, and invalid minimum-RR input.
-- The repository's push-triggered GitHub Actions workflow runs the strategy-core, SMC detector, discovery, research-backtest, and app refresh test suites. The result of the latest run has not yet been independently confirmed here.
+- Added source-level regression checks for the live eligibility guard and offline reconnect flow.
+- The push-triggered GitHub Actions workflow runs strategy-core, SMC detector, discovery, research-backtest, and app refresh test suites. The result of the latest run must be checked before relying on this build.
 - Browser smoke test and real-feed self-test: not run in this environment.
 - Backtest validation: NOT VALIDATED. No profitability claim is made.
