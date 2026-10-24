@@ -292,7 +292,7 @@ test('live opportunity scanner is scheduled with the normal quote and candle ref
 
 test('invalidated setups are separate from missed trades in performance', () => {
   assert.ok(html.includes("const missedPerformance=all.filter(t=>['EXPIRED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));"));
-  assert.ok(html.includes("const missed=all.filter(t=>['EXPIRED','INVALIDATED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));"));
+  assert.ok(html.includes("const missed=all.filter(t=>['EXPIRED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));"));
   assert.ok(html.includes("const invalidatedPerformance=all.filter(t=>String(t.status||'').toUpperCase()==='INVALIDATED');"));
   assert.ok(html.includes("invalidated:'performanceInvalidatedCount'"));
   assert.match(html, /const activeCount=all\.filter\(active\)\.length,other=all\.filter\(t=>\['EXPIRED','INVALIDATED','CLOSED'\]\.includes\(t\.status\)\)\.length/);
@@ -627,7 +627,7 @@ test('expired pending setups are visibly labelled missed and never presented as 
 });
 
 test('expired and invalidated pending signals have explicit non-loss labels', () => {
-  assert.ok(html.includes("if(st==='EXPIRED')return 'MISSED · ENTRY NOT TRIGGERED'"));
+  assert.ok(html.includes("if(st==='EXPIRED'||st==='MISSED ENTRY'||st==='MISSED')return 'MISSED · ENTRY NOT TRIGGERED'"));
   assert.ok(html.includes("if(st==='INVALIDATED')return 'INVALIDATED BEFORE ENTRY'"));
   assert.ok(html.includes("if(['TAKE PROFIT','STOP LOSS','CLOSED'].includes(st))return 'CLOSED · '+st"));
 });
