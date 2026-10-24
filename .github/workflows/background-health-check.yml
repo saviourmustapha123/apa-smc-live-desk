@@ -60,5 +60,4 @@ jobs:
         run: node --test scripts/signal-lifecycle-regression.test.mjs
 
       - name: Run rolling historical proxy backtest
-        if: github.event_name != 'schedule'
         run: node scripts/proxy-backtest.mjs
