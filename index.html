@@ -357,6 +357,7 @@ function scanOpportunityHistory(symbol,tf,bars){
   if(side==='SELL'&&mid!=null&&cur.close>mid)reasons.push('Premium-half context');
 
   // Strict entry model: a zone or pattern label alone is never enough. Require a complete, repeatable sequence.
+  if(!side)continue;
   const hasSweep=shSweep||slSweep,hasStructure=upBreak||downBreak,hasZoneRetest=!!fvgRetest||!!blockRetest;
   const hasRoleReversal=reasons.some(r=>r.startsWith('SBR')||r.startsWith('RBS'));
   const validatedSequence=(hasStructure&&disp&&hasZoneRetest)||
