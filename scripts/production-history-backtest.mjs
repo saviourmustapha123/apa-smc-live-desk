@@ -31,7 +31,7 @@ function normalizeBiquoteRow(row) {
   const parsed = typeof raw === 'number' ? raw : (/^\d+(\.\d+)?$/.test(String(raw)) ? Number(raw) : Date.parse(raw));
   const time = Math.floor(parsed > 1e12 ? parsed / 1000 : parsed);
   const bar = { time, open: num(row.open), high: num(row.high), low: num(row.low), close: num(row.close) };
-  return Number.isFinite(time) && [bar.open, bar.high, bar.low, bar.close].every(Number.isFinite) ? bar : null;
+  return validOHLC(bar) ? bar : null;
 }
 function normalizeYahoo(json) {
   const result = json.chart?.result?.[0];
@@ -44,11 +44,11 @@ function normalizeYahoo(json) {
 }
 function normalizeBinance(rows) {
   return rows.map(r => ({ time: Math.floor(num(r[0]) / 1000), open: num(r[1]), high: num(r[2]), low: num(r[3]), close: num(r[4]), volume: num(r[5]) }))
-    .filter(b => Number.isFinite(b.time) && [b.open,b.high,b.low,b.close].every(Number.isFinite));
+    .filter(validOHLC);
 }
 function normalizeBybit(rows) {
   return rows.map(r => ({ time: Math.floor(num(r[0]) / 1000), open: num(r[1]), high: num(r[2]), low: num(r[3]), close: num(r[4]), volume: num(r[5]) }))
-    .filter(b => Number.isFinite(b.time) && [b.open,b.high,b.low,b.close].every(Number.isFinite)).sort((a,b)=>a.time-b.time);
+    .filter(validOHLC).sort((a,b)=>a.time-b.time);
 }
 function normalizeGate(rows) {
   // Gate futures candle shape: [timestamp, volume, close, high, low, open, ...]
