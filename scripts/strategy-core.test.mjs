@@ -106,3 +106,45 @@ test('simulator skips an entry if the next open is already beyond its stop', () 
   const result = simulate(bars, {index:0,side:'BUY',entry:100,sl:95,tp:115,rr:3});
   assert.equal(result.result, 'SKIPPED (next-open entry fails 1:3 gate)');
 });
+
+test('equal swing highs use deterministic earliest-pivot tie handling', () => {
+  const bars = [
+    bar(1, 5, 6, 4, 5),
+    bar(2, 6, 10, 5, 8),
+    bar(3, 7, 10, 6, 8),
+    bar(4, 8, 9, 7, 8),
+    bar(5, 8, 8, 7.5, 8),
+    bar(6, 8, 8, 7.5, 8)
+  ];
+  const found = pivots(bars, 1);
+  assert.equal(found.highs.filter(p => p.p === 10).length, 1);
+  assert.equal(found.highs.find(p => p.p === 10).i, 1);
+  assert.equal(found.highs.find(p => p.p === 10).known_at, 3);
+});
+
+test('simulator does not inspect candles beyond maxForwardBars', () => {
+  const bars = [
+    bar(1, 100, 101, 99, 100),
+    bar(2, 100, 110, 96, 105),
+    bar(3, 105, 116, 100, 114)
+  ];
+  const result = simulate(bars, {index:0,side:'BUY',sl:95,tp:115}, 1);
+  assert.equal(result.result, 'UNRESOLVED');
+});
+
+test('simulator processes a gap through the stop before the later candle range', () => {
+  const bars = [
+    bar(1, 100, 101, 99, 100),
+    bar(2, 100, 101, 99, 100),
+    bar(3, 94, 116, 90, 110)
+  ];
+  const result = simulate(bars, {index:0,side:'BUY',sl:95,tp:115}, 2);
+  assert.equal(result.result, 'LOSS (gap through stop)');
+  assert.equal(result.r, -6);
+});
+
+test('simulator rejects invalid inputs and minimum reward-to-risk below 3', () => {
+  assert.equal(simulate([], {index:0,side:'BUY',sl:95,tp:115}).result, 'UNRESOLVED');
+  assert.equal(simulate([bar(1,100,101,99,100)], {index:0,side:'BUY',sl:95,tp:115}, 100, 2).result, 'INVALID INPUT');
+});
+
