@@ -37,6 +37,15 @@ Append a dated entry for each material change. Include the commit, reason, check
 - CI follow-up reported: Pages deployment and background health-check workflows passed for that revision.
 - Not yet established by those workflow results: end-to-end visual confirmation that all monitor panes are correct on a real phone/browser; a full proprietary APA implementation; profitability; continuous cloud market scanning.
 
+
+### 2026-10-24 — Research simulator gap-handling correction
+
+- Commits: `be8ab0a8f8f857c00158072b7b095ed9d72e87d7` (simulator) and `7642f97244865e3eca546ff2bb18baf44d6c983b` (regression tests).
+- Defect found during engineering review: the research backtest inspected candle high/low and classified a candle touching both stop and target as a stop-first loss before checking whether the candle opened beyond the stop. This could understate losses on a gap through the stop.
+- Correction: opening gaps are now processed before intrabar high/low checks; stop gaps use the opening price and favorable target gaps are recorded as `TARGET_AT_OPEN` at the target price.
+- Added regression tests for adverse stop gaps and favorable target gaps.
+- Verification: GitHub Actions triggered for these commits; final workflow result is pending at the time of this entry. Do not mark the correction fully verified until the test workflow passes.
+
 ## Open work, in priority order
 
 1. Verify the live UI on the deployed site: Untriggered, Active and Missed must be separate, and performance must separate successful, unsuccessful and missed signals. Confirm that pending signals show no TP/SL progress.
