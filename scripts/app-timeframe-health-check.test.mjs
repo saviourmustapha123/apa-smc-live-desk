@@ -285,6 +285,11 @@ test('live opportunity scanner is scheduled with the normal quote and candle ref
   assert.match(html, /Date\.now\(\)-s\.lastOtherPairScan>=300000/);
 });
 
+test('invalidated setups are not counted as missed trades in performance', () => {
+  assert.match(html, /const missedPerformance=all\.filter\(t=>\['EXPIRED','MISSED ENTRY','MISSED'\]\.includes\(String\(t\.status\|\|'\)\.toUpperCase\(\)\)\)/);
+  assert.match(html, /const activeCount=all\.filter\(active\)\.length,other=all\.filter\(t=>\['EXPIRED','INVALIDATED','CLOSED'\]\.includes\(t\.status\)\)\.length/);
+});
+
 test('signal monitor displays completed R results, not only open-trade R values', () => {
   assert.match(html, /const rNow=Number\.isFinite\(t\.rNow\)\?t\.rNow\.toFixed\(2\)\+'R':'—'/);
   assert.match(html, /const outcome=t\.outcome\|\|\(t\.status==='TAKE PROFIT'\?'SUCCESS':t\.status==='STOP LOSS'\?'LOSS'/);
