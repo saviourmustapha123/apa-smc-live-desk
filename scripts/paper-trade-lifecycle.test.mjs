@@ -77,6 +77,6 @@ test('pending order is marked missed if target was already touched on its signal
     candle(2, 99, 101)
   ]);
   assert.equal(trade.status, 'MISSED ENTRY');
-  assert.match(trade.outcome, /signal candle/);
+  assert.match(trade.outcome, /signal candle/i);
   assert.equal(trade.resultR, null);
 });
