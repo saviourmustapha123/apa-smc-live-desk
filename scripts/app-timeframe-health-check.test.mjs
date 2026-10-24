@@ -251,7 +251,7 @@ test('signal monitor displays completed R results, not only open-trade R values'
 
 function runOutcomeResolver(signal, bars) {
   const start = html.indexOf('function realizedSignalR(t){');
-  const end = html.indexOf('async function scanBackgroundPair(symbol)', start);
+  const end = html.indexOf('async function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode)', start);
   assert.ok(start >= 0 && end > start, 'realized-R helper and outcome resolver source should be present');
   const context = {
     s: { log: [{ symbol: 'QQQUSDT', tf: '5m', side: 'BUY', entry: 100, sl: 95, tp: 115, rr: 3, time: 100, status: 'HISTORICAL', ...signal }] },
