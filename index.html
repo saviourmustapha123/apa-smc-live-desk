@@ -612,7 +612,7 @@ async function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode){
  // Chart analysis still covers across 11 timeframes; only actionable alerts are restricted below.
  // Higher/lower context frames remain available on the chart, but manual-entry alerts
  // are limited to practical execution frames to avoid eleven overlapping alerts per pair.
- const signalSets=sets.filter(([tf])=>['5m','15m','1h','4h','8h','12h','1d'].includes(tf));
+ const signalSets=sets.filter(([tf])=>['1m','5m','15m','1h','4h','8h','12h','1d'].includes(tf));
  const seen=new Set(s.log.map(t=>[t.symbol,t.tf,t.side,t.time].join('|'))),additions=[];
  const openStatuses=new Set(['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED','RUNNING','TRIGGERED','ACTIVE']);
  const alreadyOpen=s.log.filter(t=>t.symbol===symbol&&openStatuses.has(String(t.status||'').toUpperCase())&&Number(t.rr)>=3);
@@ -625,9 +625,9 @@ async function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode){
   // on the first quote because it was already stale at admission time.
   if(candidate.status!=='RUNNING'&&candidateAlreadyPastLevels(candidate,bars))continue;
   const key=[candidate.symbol,candidate.tf,candidate.side,candidate.time].join('|');
-  if(seen.has(key)||openTf.has(tf)||openCount>=2||dailySignalAdmission(candidate,additions))continue;
+  if(seen.has(key)||openTf.has(tf))continue;
   seen.add(key);openTf.add(tf);openCount++;
-  const verifiedAt=Date.now();additions.push({...candidate,verificationState:'RULE-VERIFIED',verifiedAt,identifiedAt:verifiedAt});
+  const verifiedAt=Date.now();additions.push({...candidate,verificationState:'PROVISIONAL-HEURISTIC',verifiedAt,identifiedAt:verifiedAt});
  }
  if(additions.length){additions.sort((a,b)=>b.time-a.time);s.log.unshift(...additions);s.log.sort((a,b)=>Number(b.time)-Number(a.time));save();await persistSignals(additions)}
  let resolved=0;for(const [tf,bars] of sets)resolved+=resolveSignalOutcomes(symbol,tf,bars).length;
@@ -655,7 +655,7 @@ async function refreshTopDown(force=false,freshOnly=s.signalFreshMode){
   const scanSets=[['1m',m1],['5m',m5],['15m',m15],['1h',h1],['4h',h4],['8h',h8],['12h',h12],['1d',d1],['1W',weekly],['1M',monthly],['1Y',yearly]];
   rebuildUnifiedAnnotations(scanSets);
   const additions=[],seen=new Set(s.log.map(t=>[t.symbol,t.tf,t.side,t.time].join('|')));
-  const signalSets=scanSets.filter(([tf])=>['5m','15m','1h','4h','8h','12h','1d'].includes(tf));
+  const signalSets=scanSets.filter(([tf])=>['1m','5m','15m','1h','4h','8h','12h','1d'].includes(tf));
   const openStatuses=new Set(['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED','RUNNING','TRIGGERED','ACTIVE']);
   const alreadyOpen=s.log.filter(t=>t.symbol===sym&&openStatuses.has(String(t.status||'').toUpperCase())&&Number(t.rr)>=3);
   const openTf=new Set(alreadyOpen.map(t=>t.tf));let openCount=alreadyOpen.length;
@@ -663,7 +663,7 @@ async function refreshTopDown(force=false,freshOnly=s.signalFreshMode){
    if(candidate.status==='HISTORICAL')continue;
    if(candidate.status!=='RUNNING'&&candidateAlreadyPastLevels(candidate,bars))continue;
    const key=[candidate.symbol,candidate.tf,candidate.side,candidate.time].join('|');
-   if(seen.has(key)||openTf.has(tf)||openCount>=2||dailySignalAdmission(candidate,additions))continue;
+   if(seen.has(key)||openTf.has(tf))continue;
    seen.add(key);openTf.add(tf);openCount++;additions.push(candidate);
   }
   if(additions.length){
@@ -1284,7 +1284,7 @@ function log(set){
  if(s.lastKey===key)return;
  s.lastKey=key;
  const verifiedAt=Number(set.verifiedAt)||Date.now();
- const item={...set,status:set.status||'NOT TRIGGERED',verificationState:'RULE-VERIFIED',verifiedAt,identifiedAt:Number(set.identifiedAt)||verifiedAt,loggedAt:Date.now()};
+ const item={...set,status:set.status||'NOT TRIGGERED',verificationState:'PROVISIONAL-HEURISTIC',verifiedAt,identifiedAt:Number(set.identifiedAt)||verifiedAt,loggedAt:Date.now()};
  s.log.unshift(item);
  save();persistSignals([item]);
  renderLog();renderSignalMonitor();
