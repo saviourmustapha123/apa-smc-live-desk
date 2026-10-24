@@ -240,9 +240,9 @@ test('signal monitor displays completed R results, not only open-trade R values'
 
 
 function runOutcomeResolver(signal, bars) {
-  const start = html.indexOf('function resolveSignalOutcomes(symbol,tf,bars)');
+  const start = html.indexOf('function realizedSignalR(t){');
   const end = html.indexOf('async function scanBackgroundPair(symbol)', start);
-  assert.ok(start >= 0 && end > start, 'resolver source should be present');
+  assert.ok(start >= 0 && end > start, 'realized-R helper and outcome resolver source should be present');
   const context = {
     s: { log: [{ symbol: 'QQQUSDT', tf: '5m', side: 'BUY', entry: 100, sl: 95, tp: 115, rr: 3, time: 100, status: 'HISTORICAL', ...signal }] },
     save() {},
@@ -293,6 +293,17 @@ test('historical signal is marked missed when target trades beyond entry without
   ]);
   assert.equal(result.status, 'MISSED ENTRY');
   assert.equal(result.outcome, 'MISSED ENTRY');
+});
+
+test('historical signal records a worse-than-planned R when the market gaps through the stop', () => {
+  const result = runOutcomeResolver({}, [
+    { time: 100, open: 100, high: 101, low: 99, close: 100 },
+    { time: 200, open: 100, high: 102, low: 99, close: 101 },
+    { time: 300, open: 92, high: 101, low: 91, close: 96 }
+  ]);
+  assert.equal(result.status, 'STOP LOSS');
+  assert.equal(result.exitPrice, 92);
+  assert.equal(result.rNow, -1.6);
 });
 
 
