@@ -1126,7 +1126,7 @@ function renderSignalMonitor(){
  $('perfActive').textContent=String(activeCount);
  $('perfOther').textContent=other+' expired, invalidated or otherwise closed';
  const successful=all.filter(t=>t.status==='TAKE PROFIT'),unsuccessful=all.filter(t=>t.status==='STOP LOSS');
- const missedPerformance=all.filter(t=>['EXPIRED','INVALIDATED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));
+ const missedPerformance=all.filter(t=>['EXPIRED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));
  const perfCounts={successful:successful.length,unsuccessful:unsuccessful.length,missed:missedPerformance.length};
  for(const [key,id] of Object.entries({successful:'performanceSuccessCount',unsuccessful:'performanceLossCount',missed:'performanceMissedCount'})){const el=$(id);if(el)el.textContent=String(perfCounts[key])}
  document.querySelectorAll('[data-performance-filter]').forEach(btn=>{const selected=btn.dataset.performanceFilter===performanceFilter;btn.classList.toggle('active',selected);btn.setAttribute('aria-selected',String(selected));btn.onclick=()=>{performanceFilter=btn.dataset.performanceFilter;renderSignalMonitor()}});
@@ -1136,7 +1136,7 @@ function renderSignalMonitor(){
   const realized=realizedSignalR(t);
   const r=Number.isFinite(realized)?(realized>=0?'+':'')+realized.toFixed(2)+'R':Number.isFinite(t.rNow)?t.rNow.toFixed(2)+'R':'—';
   return '<tr><td>'+stamp(t.time)+'</td><td>'+escapeHTML(t.symbol)+' / '+escapeHTML(t.tf)+'</td><td style="color:'+(t.side==='BUY'?'var(--g)':'var(--r)')+'">'+escapeHTML(t.side)+'</td><td>'+escapeHTML(tradeStateLabel(t))+'</td><td>'+escapeHTML(priceFor(t.entry,t.symbol))+'</td><td>'+escapeHTML(priceFor(t.sl,t.symbol))+'</td><td>'+escapeHTML(priceFor(t.tp,t.symbol))+'</td><td>1:'+Number(t.rr||0).toFixed(2)+'</td><td>'+r+'</td><td>'+escapeHTML(outcome)+'</td><td>'+escapeHTML(Array.isArray(t.reason)?t.reason.join(' · '):(t.closedReason||t.reason||t.scanEngine||'Provisional structural trigger'))+'</td></tr>';
- }).join('') :'<tr><td colspan="11" class="muted">No '+(performanceFilter==='successful'?'successful':performanceFilter==='missed'?'missed or invalidated':'unsuccessful')+' signals recorded yet.</td></tr>';
+ }).join('') :'<tr><td colspan="11" class="muted">No '+(performanceFilter==='successful'?'successful':performanceFilter==='missed'?'missed':'unsuccessful')+' signals recorded yet.</td></tr>';
 }
 
 function recentQualifiedZones(b,k,dispMult){
