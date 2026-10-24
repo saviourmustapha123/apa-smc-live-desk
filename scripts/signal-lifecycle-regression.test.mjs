@@ -81,3 +81,31 @@ test('an untouched setup never accrues TP/SL progress or trade R', () => {
   assert.equal(signal.movePct, null);
   assert.equal(signal.rNow, null);
 });
+
+
+test('a persisted active trade stays active after reload even when retained candles no longer touch entry', () => {
+  const signal = evaluate({ status: 'RUNNING', bar: { time: 300, open: 103, high: 110, low: 101, close: 108 } });
+  signal.triggeredAt = 350000;
+  context.s.log = [signal];
+  vmContext.resolveSignalOutcomes('BTCUSD', '5m', [{ time: 300, isOpen: false, open: 103, high: 110, low: 101, close: 108 }]);
+  assert.equal(signal.status, 'RUNNING');
+  assert.equal(signal.outcome, 'OPEN');
+  assert.equal(signal.triggeredAt, 350000);
+  assert.equal(signal.rNow, 1.6);
+});
+
+test('a persisted trigger skips candles fully before entry time instead of replaying earlier outcomes', () => {
+  const signal = {
+    symbol: 'BTCUSD', tf: '5m', side: 'BUY', time: 100, entry: 100, sl: 95, tp: 115,
+    status: 'RUNNING', outcome: 'OPEN', triggeredAt: 700000, movePct: null, rNow: null
+  };
+  context.s.log = [signal];
+  vmContext.resolveSignalOutcomes('BTCUSD', '5m', [
+    { time: 200, isOpen: false, open: 100, high: 116, low: 99, close: 114 },
+    { time: 600, isOpen: false, open: 114, high: 116, low: 110, close: 115 },
+    { time: 900, isOpen: false, open: 115, high: 116, low: 114, close: 115 }
+  ]);
+  assert.equal(signal.status, 'RUNNING');
+  assert.equal(signal.outcome, 'OPEN');
+  assert.equal(signal.triggeredAt, 700000);
+});
