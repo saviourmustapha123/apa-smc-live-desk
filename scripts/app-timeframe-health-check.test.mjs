@@ -604,3 +604,13 @@ test('verified signal pane renders complete entry, stop, target and live progres
   assert.ok(html.includes('Keep verified trade levels visible even if the signal timestamp is outside the currently loaded chart window.'));
   assert.ok(html.includes("const activeTrades=s.log.filter(t=>validTrade(t)&&!terminalStates.has"));
 });
+
+
+test('untriggered signals are labelled NOT TRIGGERED and do not display TP or SL progress', () => {
+  assert.match(html, /function tradeStateLabel\(t\)[\s\S]*?return 'NOT TRIGGERED';/);
+  assert.match(html, /const tpPct=running&&hasPrice&&reward>0/);
+  assert.match(html, /const slPct=running&&hasPrice&&risk>0/);
+  assert.match(html, /\(running\?'TRIGGERED \/ RUNNING':'NOT TRIGGERED'\)/);
+  assert.match(html, /const tpPct=running&&valid&&Math\.abs\(tp-entry\)>0/);
+  assert.match(html, /const slPct=running&&valid&&Math\.abs\(entry-sl\)>0/);
+});
