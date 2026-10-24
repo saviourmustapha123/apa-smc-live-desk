@@ -97,7 +97,10 @@ async function loadSignalStore(){
  const stored=await new Promise((res,rej)=>{const r=s.db.transaction(SIGNALS,'readonly').objectStore(SIGNALS).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)});
  const map=new Map(stored.map(t=>[t.key||signalKey(t),t]));
  const migrate=[];for(const t of legacy){const key=signalKey(t);if(!map.has(key)){map.set(key,{...t,key});migrate.push(t)}}
+ // Migrate old MISSED ENTRY records to an unfilled expiry. They are not trades and must carry no realized P&L.
+ const normalized=[];for(const [key,t] of map){if(t.status==='MISSED ENTRY'){const fixed={...t,status:'EXPIRED',outcome:'EXPIRED',exitPrice:null,rNow:null,movePct:null,key};map.set(key,fixed);normalized.push(fixed)}}
  if(migrate.length)await persistSignals(migrate);
+ if(normalized.length)await persistSignals(normalized);
  s.log=[...map.values()].sort((a,b)=>Number(b.time)-Number(a.time));
  try{localStorage.removeItem('apa-desk-log')}catch{}
 }
