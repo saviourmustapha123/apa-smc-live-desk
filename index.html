@@ -1158,7 +1158,11 @@ function monitorTrades(p,symbol=s.symbol){
    else if(targetTouched){t.status='TAKE PROFIT';t.exitPrice=t.tp;t.closedAt=now;t.movePct=null;t.rNow=t.rr;changed=true;changedSignals.push(t)}
   }else if(!terminal){
    const prior=Number.isFinite(t.lastObservedPrice)?t.lastObservedPrice:null;
-   const crossed=prior!==null&&(t.side==='BUY'?(prior<t.entry&&p>=t.entry):(prior>t.entry&&p<=t.entry));
+   // A BUY limit entry fills as price falls to the entry; a SELL limit entry fills as price rises to it.
+   // On the first observation, recognise an already-reached entry rather than waiting for a second crossing.
+   const crossed=prior===null
+    ? (t.side==='BUY'?p<=t.entry:p>=t.entry)
+    : (t.side==='BUY'?(prior>t.entry&&p<=t.entry):(prior<t.entry&&p>=t.entry));
    if(crossed&&!stopTouched&&!targetTouched){t.status='RUNNING';t.triggeredAt=t.triggeredAt||now;changed=true;changedSignals.push(t)}
    else if(stopTouched){t.status='INVALIDATED';t.closedAt=now;t.exitPrice=p;t.movePct=null;changed=true;changedSignals.push(t)}
    else if(targetTouched){t.status='MISSED ENTRY';t.closedAt=now;t.exitPrice=p;t.movePct=null;changed=true;changedSignals.push(t)}
