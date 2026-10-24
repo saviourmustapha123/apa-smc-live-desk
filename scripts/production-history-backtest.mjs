@@ -88,6 +88,8 @@ async function fetchBars(symbol, tf) {
     const binanceHosts = ['fapi.binance.com','fapi1.binance.com','fapi2.binance.com','fapi3.binance.com','fapi4.binance.com'];
     const providers = [
       ...binanceHosts.map(host => ['Binance USD-M ' + host, async () => normalizeBinance(await getJson('https://' + host + '/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))]),
+      ['Binance API alternate', async () => normalizeBinance(await getJson('https://api.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
+      ['Binance GCP alternate', async () => normalizeBinance(await getJson('https://api-gcp.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
       ['Pipai third-party Binance USD-M mirror', async () => normalizeBinance(await getJson('https://api-dev.pipai.org/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
       ['Bybit', async () => { const j = await getJson('https://api.bybit.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + ({'5m':'5','15m':'15','1h':'60'}[tf]) + '&limit=1000'); if (Number(j.retCode)!==0) throw new Error(j.retMsg || 'retCode ' + j.retCode); return normalizeBybit(j.result?.list || []); }],
       ['Bytick', async () => { const j = await getJson('https://api.bytick.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + ({'5m':'5','15m':'15','1h':'60'}[tf]) + '&limit=1000'); if (Number(j.retCode)!==0) throw new Error(j.retMsg || 'retCode ' + j.retCode); return normalizeBybit(j.result?.list || []); }],
