@@ -522,7 +522,7 @@ test('fresh live signals are blocked when offline, during FX closure, or when th
   assert.match(html, /function signalEligibilityReason\(/);
   assert.match(html, /navigator\.onLine===false/);
   assert.match(html, /latest closed candle is stale/);
-  assert.match(html, /if\(ageBars===0&&!liveEligible\)continue/);
+  assert.match(html, /if\(ageBars===0&&!liveEligible\)\{rejectLatest\(/);
   assert.match(html, /if\(latest&&liveEligible&&!found\.some/);
 });
 
@@ -544,7 +544,7 @@ test('untriggered EURUSD setups remain pending across weekly market closure', ()
 test('live setup generation fails closed while offline or when a market session is closed', () => {
   assert.match(html, /if\(typeof navigator!=='undefined'&&navigator\.onLine===false\)return 'offline: cached data only'/);
   assert.match(html, /if\(!marketSessionOpen\(symbol,new Date\(now\)\)\)return 'market session closed'/);
-  assert.match(html, /if\(ageBars===0&&!liveEligible\)continue/);
+  assert.match(html, /if\(ageBars===0&&!liveEligible\)\{rejectLatest\(/);
 });
 
 test('signal candidates expose scalp, intraday, swing, or position horizon with a rough ATR target window', () => {
