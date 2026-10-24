@@ -506,3 +506,12 @@ test('clear-and-rescan mode excludes historical candidates so old signal history
   assert.match(html, /signalFreshMode:s\.signalFreshMode/);
   assert.match(html, /s\.signalFreshMode=true/);
 });
+
+test('chart renders every pending and running signal for the selected pair across timeframes', () => {
+  assert.match(html, /const chartSignals=s\.log\.filter\(t=>t\.symbol===s\.symbol&&\['NOT RUNNING','PENDING','RUNNING','TRIGGERED'\]/);
+  assert.match(html, /map the[\s\S]{0,100}nearest visible candle/);
+  assert.match(html, /const activeTrades=s\.log\.filter\(t=>validTrade\(t\)&&!terminalStates\.has/);
+  assert.match(html, /const visibleTrades=\[\.\.\.activeTrades\.sort/);
+  assert.match(html, /Clean mode limits completed-history drawings only; it never hides a live or not-yet-triggered setup/);
+  assert.match(html, /TP '\+tpPct\.toFixed\(1\)\+'% · SL risk '\+slPct\.toFixed\(1\)\+'%/);
+});
