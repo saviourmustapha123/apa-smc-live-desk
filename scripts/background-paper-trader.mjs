@@ -77,6 +77,14 @@ function normalizeBinance(rows) {
     open: num(row[1]), high: num(row[2]), low: num(row[3]), close: num(row[4])
   })).filter(validOHLC).sort((a, b) => a.time - b.time);
 }
+function configuredQqqProxy() {
+  try {
+    const url = new URL(String(process.env.QQQ_PROXY_URL || ''));
+    if (url.protocol !== 'https:' || !url.hostname.endsWith('.workers.dev') ||
+        url.username || url.password || url.search || url.hash) return '';
+    return url.origin + url.pathname.replace(/\/$/, '');
+  } catch { return ''; }
+}
 async function fetchBars(symbol, tf) {
   const interval = SECONDS[tf];
   const range = tf === '5m' ? '14d' : '60d';
@@ -102,7 +110,9 @@ async function fetchBars(symbol, tf) {
     };
   }
 
+  const proxyBase = configuredQqqProxy();
   const providers = [
+    ...(proxyBase ? [['Configured Cloudflare Worker', proxyBase + '/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000']] : []),
     ['Binance USD-M', 'https://fapi.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'],
     ['Binance API alternate', 'https://api.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'],
     ['Binance GCP alternate', 'https://api-gcp.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000']
