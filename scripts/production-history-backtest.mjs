@@ -53,8 +53,8 @@ function normalizeGate(rows) {
 }
 async function fetchBars(symbol, tf) {
   const errors = [];
+  let best = null;
   if (symbol === 'EURUSD' || symbol === 'BTCUSD') {
-    let best = null;
     const consider = (bars, provider, exact) => {
       if (bars.length >= 100 && (!best || bars.length > best.bars.length)) best = { bars, provider, exact };
     };
