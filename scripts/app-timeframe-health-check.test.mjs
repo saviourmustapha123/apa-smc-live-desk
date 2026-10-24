@@ -287,6 +287,7 @@ test('live opportunity scanner is scheduled with the normal quote and candle ref
 
 test('invalidated setups are separate from missed trades in performance', () => {
   assert.ok(html.includes("const missedPerformance=all.filter(t=>['EXPIRED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));"));
+  assert.ok(html.includes("const missed=all.filter(t=>['EXPIRED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));"));
   assert.ok(html.includes("const invalidatedPerformance=all.filter(t=>String(t.status||'').toUpperCase()==='INVALIDATED');"));
   assert.ok(html.includes("invalidated:'performanceInvalidatedCount'"));
   assert.match(html, /const activeCount=all\.filter\(active\)\.length,other=all\.filter\(t=>\['EXPIRED','INVALIDATED','CLOSED'\]\.includes\(t\.status\)\)\.length/);
