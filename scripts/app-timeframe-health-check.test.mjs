@@ -321,3 +321,19 @@ test('multi-trigger signal reasons are retained as structured explanations', () 
   assert.match(html, /reason:uniqueReasons/);
   assert.match(html, /APA-SMC multi-trigger heuristic proxy/);
 });
+
+
+test('order blocks and breaker blocks use separate, causally ordered detection rules in the signal scanner', () => {
+  assert.match(html, /function detectRecentBlockRetest\(bars,k,dispMult\)/);
+  assert.match(html, /type:'ORDER BLOCK RETEST'/);
+  assert.match(html, /type:'BREAKER BLOCK RETEST'/);
+  assert.match(html, /const reject=flipped==='SELL'\?current\.close<zone\.low&&current\.close<current\.open:current\.close>zone\.high&&current\.close>current\.open/);
+  assert.match(html, /const blockRetest=detectRecentBlockRetest\(hist,\+s\.k,s\.disp\)/);
+});
+
+test('equal highs/lows and premium/discount contribute context without acting as standalone entries', () => {
+  assert.match(html, /EQL \/ sell-side liquidity confluence/);
+  assert.match(html, /EQH \/ buy-side liquidity confluence/);
+  assert.match(html, /Discount-half context/);
+  assert.match(html, /Premium-half context/);
+});
