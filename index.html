@@ -1046,8 +1046,8 @@ function renderVerifiedSignalCards(){
   const tpPct=running&&hasPrice&&reward>0?(p-entry)*dir/reward*100:null;
   const slPct=running&&hasPrice&&risk>0?Math.max(0,Math.min(100,-((p-entry)*dir/risk*100))):null;
   const distance=hasPrice&&entry>0?Math.abs(p-entry)/entry*100:null;
-  const status=running?'ACTIVE':terminal.has(String(t.status||'').toUpperCase())?'CLOSED':'NOT TRIGGERED';
-  const progress=running?(tpPct===null?'Awaiting fresh quote':'TP progress '+tpPct.toFixed(1)+'% · SL risk used '+slPct.toFixed(1)+'%'):(distance===null?'Awaiting fresh quote':'Entry '+distance.toFixed(2)+'% away');
+  const status=running?'ACTIVE':missed.includes(t)?'MISSED':closed.includes(t)?'CLOSED':'NOT TRIGGERED';
+  const progress=running?(tpPct===null?'Awaiting fresh quote':'TP progress '+tpPct.toFixed(1)+'% · SL risk used '+slPct.toFixed(1)+'%'):missed.includes(t)?'Entry was not triggered before expiry or invalidation':(distance===null?'Awaiting fresh quote':'Entry '+distance.toFixed(2)+'% away');
   const reasons=Array.isArray(t.reason)?t.reason.join(' · '):(t.reason||t.scanEngine||'Provisional structural trigger; exact owner rules still require confirmation');
   const progressMarkup=running?'<div class="verified-progress"><small>Target progress · '+(tpPct===null?'—':tpPct.toFixed(1)+'%')+'</small><div class="bar"><div style="width:'+Math.max(0,Math.min(100,tpPct||0)).toFixed(1)+'%;background:var(--g)"></div></div><small>Stop loss risk consumed · '+(slPct===null?'—':slPct.toFixed(1)+'%')+'</small><div class="bar"><div style="width:'+(slPct||0).toFixed(1)+'%;background:var(--r)"></div></div><div class="fine">Current R: '+(Number.isFinite(t.rNow)?t.rNow.toFixed(2)+'R':'Waiting for quote')+'</div></div>':'';
   const timingLabel=(t.horizon||signalHorizonForTf(t.tf))+' · estimated TP window '+(t.durationEstimate||'not available')+' (rough ATR estimate, not a promise)';
