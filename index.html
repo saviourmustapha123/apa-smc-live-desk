@@ -529,6 +529,13 @@ function resolveSignalOutcomes(symbol,tf,bars){
    const stopTouched=t.side==='BUY'?bar.low<=sl:bar.high>=sl;
    const targetTouched=t.side==='BUY'?bar.high>=tp:bar.low<=tp;
    if(!entered){
+    // Resolve pending setup gaps before testing the full candle range for entry.
+    // A later retrace must not turn a setup already invalidated/missed at the
+    // open into a trade with a fabricated entry fill.
+    const pendingGapStop=t.side==='BUY'?bar.open<=sl:bar.open>=sl;
+    const pendingGapTarget=t.side==='BUY'?bar.open>=tp:bar.open<=tp;
+    if(pendingGapStop){finalStatus='INVALIDATED';exitPrice=bar.close;closedAt=bar.time*1000;break}
+    if(pendingGapTarget){finalStatus='EXPIRED';exitPrice=null;closedAt=bar.time*1000;break}
     if(entryTouched){entered=true;triggeredAt=triggeredAt||bar.time*1000}
     else{
      const targetPassed=t.side==='BUY'?bar.low>entry&&bar.high>=tp:bar.high<entry&&bar.low<=tp;
