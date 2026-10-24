@@ -356,16 +356,29 @@ function scanOpportunityHistory(symbol,tf,bars){
   if(side==='BUY'&&mid!=null&&cur.close<mid)reasons.push('Discount-half context');
   if(side==='SELL'&&mid!=null&&cur.close>mid)reasons.push('Premium-half context');
 
+  // Strict entry model: a zone or pattern label alone is never enough. Require a complete, repeatable sequence.
+  const hasSweep=shSweep||slSweep,hasStructure=upBreak||downBreak,hasZoneRetest=!!fvgRetest||!!blockRetest;
+  const hasRoleReversal=reasons.some(r=>r.startsWith('SBR')||r.startsWith('RBS'));
+  const validatedSequence=(hasStructure&&disp&&hasZoneRetest)||
+    (!!patternRetest&&(hasSweep||(hasStructure&&disp)||hasZoneRetest))||
+    (hasRoleReversal&&disp&&(hasSweep||hasStructure));
+  if(!validatedSequence)continue;
+  if(disp)reasons.push('Displacement confirmed (ATR filter)');
+  reasons.push('Entry sequence passed: structure + displacement + retest/confluence');
+
   // The final trigger candle must confirm direction. A liquidity sweep may qualify
   // without ATR displacement; a plain structure break must show displacement or a
   // directional close, while all candidates still pass the hard 1:3 target gate.
   if(side==='BUY'&&!(up&&(slSweep||upBreak||fvgRetest||patternRetest?.side==='BUY'||blockRetest?.side==='BUY'||reasons.some(r=>r.startsWith('RBS')))))continue;
   if(side==='SELL'&&!(dn&&(shSweep||downBreak||fvgRetest||patternRetest?.side==='SELL'||blockRetest?.side==='SELL'||reasons.some(r=>r.startsWith('SBR')))))continue;
-  const entry=cur.close,stop=side==='SELL'?Math.max(cur.high,hh?hh.p:cur.high):Math.min(cur.low,ll?ll.p:cur.low);
+  const rawEntry=fvgRetest?(fvgRetest.lo+fvgRetest.hi)/2:blockRetest?(blockRetest.low+blockRetest.high)/2:patternRetest?patternRetest.level:cur.close;
+  const buffer=aa*0.1,stop=side==='SELL'?Math.max(cur.high,hh?hh.p:cur.high)+buffer:Math.min(cur.low,ll?ll.p:cur.low)-buffer;
+  const entry=rawEntry;
+  if(!(Number.isFinite(entry)&&Number.isFinite(stop)&&(side==='BUY'?stop<entry:stop>entry)))continue;
   const target=structuralTarget(side,entry,stop,hh,ll,hist);if(!target||!Number.isFinite(target.rr)||target.rr<3)continue;
   const ageBars=b.length-1-i;
   const uniqueReasons=[...new Set(reasons)];
-  found.push({symbol,tf,side,entry,sl:stop,tp:target.tp,rr:target.rr,reason:uniqueReasons,time:cur.time,confidence:'unscored',status:ageBars===0?'NOT RUNNING':'HISTORICAL',movePct:0,rNow:0,ageBars,scanEngine:'APA-SMC multi-trigger heuristic proxy'});
+  found.push({symbol,tf,side,entry,sl:stop,tp:target.tp,rr:target.rr,reason:uniqueReasons,time:cur.time,confidence:'provisional-sequence-filtered',setupType:patternRetest?.type||blockRetest?.type||(fvgRetest?'FVG retest':hasRoleReversal?'SBR/RBS retest':'BOS/CHoCH retest'),status:ageBars===0?'NOT RUNNING':'HISTORICAL',movePct:0,rNow:0,ageBars,scanEngine:'APA-SMC strict sequence heuristic; unvalidated'});
  }
  return found;
 }
