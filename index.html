@@ -226,14 +226,20 @@ function detectPatternRetest(bars,k){
  if(z.every((p,i)=>p.type===['H','L','H','L','H'][i])){
   const bearishQml=z[2].p>z[0].p&&z[2].p>z[4].p&&z[3].p<z[1].p;
   const bearishHs=z[2].p>z[0].p&&z[2].p>z[4].p&&Math.abs(z[0].p-z[4].p)<=tolerance;
-  const neckline=z[3].p;
-  if(cur.high>=neckline&&cur.close<neckline&&cur.close<cur.open&&((bearishQml)||(bearishHs&&cur.close<neckline)))return {side:'SELL',type:bearishQml?'QML neckline retest':'Head-and-shoulders neckline retest',level:neckline};
+  const neckline=z[1].p+((z[3].p-z[1].p)/(z[3].i-z[1].i||1))*(prior.length-z[1].i);
+  // QML retests the prior protected swing level (z[1]), not the newly formed
+  // break extreme at z[3]. Head-and-shoulders uses its projected neckline.
+  const level=bearishQml?z[1].p:neckline;
+  if(cur.high>=level&&cur.close<level&&cur.close<cur.open&&(bearishQml||bearishHs))return {side:'SELL',type:bearishQml?'QML level retest':'Head-and-shoulders neckline retest',level};
  }
  if(z.every((p,i)=>p.type===['L','H','L','H','L'][i])){
   const bullishQml=z[2].p<z[0].p&&z[2].p<z[4].p&&z[3].p>z[1].p;
   const bullishHs=z[2].p<z[0].p&&z[2].p<z[4].p&&Math.abs(z[0].p-z[4].p)<=tolerance;
-  const neckline=z[3].p;
-  if(cur.low<=neckline&&cur.close>neckline&&cur.close>cur.open&&(bullishQml||bullishHs))return {side:'BUY',type:bullishQml?'Inverse QML neckline retest':'Inverse head-and-shoulders neckline retest',level:neckline};
+  const neckline=z[1].p+((z[3].p-z[1].p)/(z[3].i-z[1].i||1))*(prior.length-z[1].i);
+  // Inverse QML retests its prior protected swing high (z[1]); the inverse
+  // head-and-shoulders model retests the projected neckline.
+  const level=bullishQml?z[1].p:neckline;
+  if(cur.low<=level&&cur.close>level&&cur.close>cur.open&&(bullishQml||bullishHs))return {side:'BUY',type:bullishQml?'Inverse QML level retest':'Inverse head-and-shoulders neckline retest',level};
  }
  return null;
 }
