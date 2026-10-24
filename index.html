@@ -522,9 +522,15 @@ function resolveSignalOutcomes(symbol,tf,bars){
   const entry=Number(t.entry),sl=Number(t.sl),tp=Number(t.tp);
   if(!(Number.isFinite(entry)&&Number.isFinite(sl)&&Number.isFinite(tp)&&sl!==entry&&tp!==entry))continue;
   const risk=Math.abs(entry-sl),dir=t.side==='BUY'?1:-1;
-  let entered=false,finalStatus=null,exitPrice=null,closedAt=null,triggeredAt=t.triggeredAt||null;
+  const triggeredAt=t.triggeredAt||null;
+  // Persisted active trades must remain active across reloads and shortened
+  // candle history. Reconstruct entry state from the stored trigger timestamp,
+  // then evaluate only the candle that contains that trigger and later candles.
+  const timeframeMs={'1m':60000,'3m':180000,'5m':300000,'15m':900000,'30m':1800000,'1h':3600000,'2h':7200000,'4h':14400000,'6h':21600000,'8h':28800000,'12h':43200000,'1d':86400000}[tf]||3600000;
+  let entered=Boolean(triggeredAt)||t.status==='RUNNING',finalStatus=null,exitPrice=null,closedAt=null;
   for(const bar of closedBars){
    if(bar.time<=Number(t.time))continue;
+   if(entered&&triggeredAt&&bar.time*1000+timeframeMs<=Number(triggeredAt))continue;
    const entryTouched=bar.low<=entry&&bar.high>=entry;
    const stopTouched=t.side==='BUY'?bar.low<=sl:bar.high>=sl;
    const targetTouched=t.side==='BUY'?bar.high>=tp:bar.low<=tp;
