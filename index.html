@@ -306,13 +306,14 @@ function scanOpportunityHistory(symbol,tf,bars){
   const gapStart=Math.max(2,hist.length-24);
   for(let j=hist.length-2;j>=gapStart;j--){
    const first=hist[j-2],third=hist[j];
+   const gapHistory=hist.slice(0,j),gapPivots=pivots(gapHistory,+s.k),gapAtr=atr(hist.slice(0,j+1))||Math.max(third.high-third.low,1e-8),gapDisplacement=Math.abs(third.close-third.open)>=gapAtr*s.disp;
    if(third.low>first.high){
-    const lo=first.high,hi=third.low,touch=cur.low<=hi&&cur.high>=lo;
-    if(touch&&up&&cur.close>=(lo+hi)/2){fvgRetest={side:'BUY',lo,hi};break}
+    const lo=first.high,hi=third.low,touch=cur.low<=hi&&cur.high>=lo,broken=gapPivots.h.at(-1)&&third.close>gapPivots.h.at(-1).p&&third.close>third.open;
+    if(touch&&up&&cur.close>=(lo+hi)/2&&gapDisplacement&&broken){fvgRetest={side:'BUY',lo,hi,formedAt:third.time};break}
    }
    if(third.high<first.low){
-    const lo=third.high,hi=first.low,touch=cur.low<=hi&&cur.high>=lo;
-    if(touch&&dn&&cur.close<=(lo+hi)/2){fvgRetest={side:'SELL',lo,hi};break}
+    const lo=third.high,hi=first.low,touch=cur.low<=hi&&cur.high>=lo,broken=gapPivots.l.at(-1)&&third.close<gapPivots.l.at(-1).p&&third.close<third.open;
+    if(touch&&dn&&cur.close<=(lo+hi)/2&&gapDisplacement&&broken){fvgRetest={side:'SELL',lo,hi,formedAt:third.time};break}
    }
   }
   if(fvgRetest){
@@ -360,8 +361,8 @@ function scanOpportunityHistory(symbol,tf,bars){
   if(!side)continue;
   const hasSweep=shSweep||slSweep,hasStructure=upBreak||downBreak,hasZoneRetest=!!fvgRetest||!!blockRetest;
   const hasRoleReversal=reasons.some(r=>r.startsWith('SBR')||r.startsWith('RBS'));
-  const validatedSequence=(hasStructure&&disp&&hasZoneRetest)||
-    (!!patternRetest&&(hasSweep||(hasStructure&&disp)||hasZoneRetest))||
+  const validatedSequence=!!blockRetest||!!fvgRetest||
+    (!!patternRetest&&(hasSweep||disp||hasStructure))||
     (hasRoleReversal&&disp&&(hasSweep||hasStructure));
   if(!validatedSequence)continue;
   if(disp)reasons.push('Displacement confirmed (ATR filter)');
