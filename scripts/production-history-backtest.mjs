@@ -11,7 +11,11 @@ const report = [];
 const failures = [];
 const warnings = [];
 const iso = seconds => new Date(seconds * 1000).toISOString();
-const num = x => Number(x);
+const num = x => x == null || x === '' ? NaN : Number(x);
+function validOHLC(b) {
+  return Number.isFinite(b.time) && [b.open,b.high,b.low,b.close].every(v => Number.isFinite(v) && v > 0) &&
+    b.high >= Math.max(b.open,b.close,b.low) && b.low <= Math.min(b.open,b.close,b.high) && b.high >= b.low;
+}
 const log = line => { report.push(line); console.log(line); };
 
 async function getJson(url) {
@@ -36,7 +40,7 @@ function normalizeYahoo(json) {
   return (result.timestamp || []).map((time, i) => ({
     time,
     open: num(q?.open?.[i]), high: num(q?.high?.[i]), low: num(q?.low?.[i]), close: num(q?.close?.[i])
-  })).filter(b => Number.isFinite(b.time) && [b.open,b.high,b.low,b.close].every(Number.isFinite));
+  })).filter(validOHLC);
 }
 function normalizeBinance(rows) {
   return rows.map(r => ({ time: Math.floor(num(r[0]) / 1000), open: num(r[1]), high: num(r[2]), low: num(r[3]), close: num(r[4]), volume: num(r[5]) }))
@@ -108,6 +112,7 @@ function executeSignal(signal, bars, index) {
     const entryTouched = b.low <= signal.entry && b.high >= signal.entry;
     const stopTouched = signal.side === 'BUY' ? b.low <= signal.sl : b.high >= signal.sl;
     const targetTouched = signal.side === 'BUY' ? b.high >= signal.tp : b.low <= signal.tp;
+    if (entryTouched && targetTouched && !stopTouched) return { outcome: 'MISSED / AMBIGUOUS ENTRY-TP ORDER IN SAME CANDLE', r: null, triggered: false, exitTime: b.time };
     if (stopTouched && !entryTouched) return { outcome: 'INVALIDATED BEFORE ENTRY', r: null, triggered: false, exitTime: b.time };
     if (targetTouched && !entryTouched) return { outcome: 'MISSED ENTRY (target reached first)', r: null, triggered: false, exitTime: b.time };
     if (entryTouched) { triggeredAt = i; break; }
@@ -188,7 +193,7 @@ log('');
 log('- Generated: ' + new Date().toISOString());
 log('- Engine: actual production scanOpportunityHistory source extracted from index.html, not the simplified proxy strategy.');
 log('- Entry model: signal is evaluated after its candle closes; a limit/entry level must be touched on a later candle. Stops/targets are checked only after fill. If both are touched in one candle, stop-first is assumed. Only one pending or active trade is allowed per pair/timeframe at a time.');
-log('- Minimum RR: 1:3. Maximum forward evaluation: ' + MAX_FORWARD_BARS + ' candles. No commission/spread/slippage is included; gross R only.');
+log('- Minimum RR: 1:3. Maximum forward evaluation: ' + MAX_FORWARD_BARS + ' candles. No commission, spread, funding or slippage is included; R results are before costs.');
 log('- Metrics are gross of spread, commission, funding and slippage. This is historical candle replay, not live brokerage execution or proof of future profitability. Results with missing symbol feeds are not complete.');
 log('');
 log('| Pair | TF | Provider | Exact symbol data? | Bars | Days | Candidates | Evaluated | Filled | Wins | Losses | Unresolved | Missed | Invalidated | Win rate | Net R | PF | Expectancy R | Max DD R |');
@@ -199,7 +204,7 @@ for (const symbol of SYMBOLS) {
     try {
       const data = await fetchBars(symbol, tf);
       const nowSeconds = Math.floor(Date.now() / 1000);
-      const bars = data.bars.filter(b => Number.isFinite(b.time) && [b.open,b.high,b.low,b.close].every(Number.isFinite) && b.time + INTERVAL_SECONDS[tf] <= nowSeconds)
+      const bars = data.bars.filter(b => validOHLC(b) && b.time + INTERVAL_SECONDS[tf] <= nowSeconds)
         .sort((a,b)=>a.time-b.time);
       const result = runBacktest(symbol, tf, bars, data.provider, data.exact);
       const rate = result.winRate == null ? 'n/a' : result.winRate.toFixed(1) + '%';
