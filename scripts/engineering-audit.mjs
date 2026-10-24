@@ -30,6 +30,7 @@ for (const path of [
   'scripts/app-timeframe-health-check.test.mjs',
   'scripts/signal-lifecycle-regression.test.mjs',
   'scripts/proxy-backtest.mjs',
+  'scripts/production-strategy-source-audit.mjs',
   '.github/workflows/background-health-check.yml',
   '.github/workflows/strategy-validation.yml'
 ]) {
