@@ -1046,7 +1046,7 @@ function renderVerifiedSignalCards(){
  const untriggered=all.filter(t=>['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED'].includes(String(t.status||'NOT TRIGGERED').toUpperCase()));
  const active=all.filter(t=>['RUNNING','TRIGGERED'].includes(String(t.status||'').toUpperCase()));
  const closed=all.filter(t=>['TAKE PROFIT','STOP LOSS'].includes(String(t.status||'').toUpperCase()));
- const missed=all.filter(t=>['EXPIRED','INVALIDATED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));
+ const missed=all.filter(t=>['EXPIRED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));
  const counts={untriggered:untriggered.length,active:active.length,closed:closed.length,missed:missed.length};
  for(const [key,id] of Object.entries({untriggered:'untriggeredCount',active:'verifiedActiveCount',closed:'verifiedClosedCount',missed:'verifiedMissedCount'})){const el=$(id);if(el)el.textContent=String(counts[key])}
  pane.querySelectorAll('[data-verified-filter]').forEach(btn=>{const selected=btn.dataset.verifiedFilter===verifiedSignalFilter;btn.classList.toggle('active',selected);btn.setAttribute('aria-selected',String(selected));});
