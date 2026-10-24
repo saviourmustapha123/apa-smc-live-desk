@@ -12,7 +12,7 @@ catch (error) { fail('Main application source readable', error.message); }
 
 if (app) {
   const requireText = (name, regex, detail) => regex.test(app) ? pass(name, detail) : fail(name, detail || 'Required guard or UI marker was not found');
-  requireText('Minimum 1:3 reward-to-risk guard', /(?:rr\s*<\s*3|MIN_REWARD_RISK\s*[:=]\s*3)/i, 'Rejects candidates below 3R');
+  requireText('Minimum 1:3 reward-to-risk guard', /rr\s*<\s*(?:3|MIN_REWARD_RISK)\b/i, 'Rejects candidates below 3R using the centralized threshold');
   requireText('Provisional strategy status is explicit', /PROVISIONAL-HEURISTIC/, 'Does not label the current engine as fully verified');
   requireText('Signal monitor renderer exists', /function\s+renderSignalMonitor\s*\(/, 'Lifecycle monitor is present');
   requireText('Untriggered lifecycle is represented', /Untriggered/i, 'Pending signals have a distinct state');
