@@ -582,9 +582,10 @@ test('signal admission has no artificial daily quota and scans eight execution t
   assert.match(html, /t\.verificationState='PROVISIONAL-HEURISTIC'/);
 });
 
-test('daily candidate counter uses identification time rather than the historical candle timestamp', () => {
-  assert.match(html, /queued\.map\(t=>\(\{\.\.\.t,identifiedAt:Number\(t\.identifiedAt\)\|\|Date\.now\(\)\}\)\)/);
-  assert.match(html, /const createdToday=all\.filter\(t=>signalDayStamp\(t\)===today/);
+test('daily candidate display counts by identification time rather than historical candle time', () => {
+  assert.match(html, /function signalDayStamp\(t\)/);
+  assert.match(html, /const d=new Date\(Number\(t\.identifiedAt\)\|\|Number\(t\.time\)\*1000\)/);
+  assert.match(html, /const today=s\.log\.filter\(t=>\{if\(!Number\.isFinite\(Number\(t\.time\)\)\|\|Number\(t\.rr\)<3\)return false/);
 });
 
 test('untriggered setups expire only after a documented timeframe-specific entry window', () => {
@@ -594,9 +595,9 @@ test('untriggered setups expire only after a documented timeframe-specific entry
   assert.match(html, /t\.closedReason\|\|t\.reason\|\|t\.scanEngine/);
 });
 
-test('signal scanner remains async after admission helpers are declared', () => {
+test('signal scanner remains async and has no artificial daily admission cap', () => {
   assert.match(html, /function signalDayStamp\(t\)/);
   assert.match(html, /async function scanBackgroundPair\(symbol,freshOnly=s\.signalFreshMode\)/);
-  assert.match(html, /daily limit of 6 new candidates reached/);
+  assert.doesNotMatch(html, /daily limit of [0-9]+ new candidates reached/);
   assert.match(html, /Pending entries need a finite, timeframe-specific validity window/);
 });
