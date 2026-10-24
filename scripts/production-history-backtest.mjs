@@ -128,6 +128,13 @@ function executeSignal(signal, bars, index) {
   const riskAtPlannedEntry = signal.side === 'BUY' ? signal.entry - signal.sl : signal.sl - signal.entry;
   const plannedReward = signal.side === 'BUY' ? signal.tp - signal.entry : signal.entry - signal.tp;
   if (!(riskAtPlannedEntry > 0 && plannedReward > 0 && plannedReward / riskAtPlannedEntry >= MIN_RR)) return { outcome: 'REJECTED INVALID LEVELS/RR', r: null, triggered: false };
+  const signalBar = bars[index];
+  const targetTouchedBeforeOrderWasActive = signal.side === 'BUY'
+    ? signalBar.high >= signal.tp
+    : signalBar.low <= signal.tp;
+  if (targetTouchedBeforeOrderWasActive) {
+    return { outcome: 'MISSED ENTRY (target already touched on signal candle)', r: null, triggered: false, exitTime: signalBar.time };
+  }
   let triggeredAt = -1;
   for (let i = index + 1; i < Math.min(bars.length, index + 1 + MAX_FORWARD_BARS); i++) {
     const b = bars[i];
