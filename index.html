@@ -279,6 +279,61 @@ function detectRecentBlockRetest(bars,k,dispMult){
  return events.at(-1)||null;
 }
 
+function pendingOrderBlockOpportunity(symbol,tf,bars){
+ const b=(bars||[]).filter(x=>!x.isOpen).slice(-1000);
+ const minimum=tf==='1Y'?10:tf==='1M'?20:35;
+ if(b.length<minimum)return null;
+ const current=b.at(-1),k=Math.max(2,+s.k||3),dispMult=Math.max(.1,Number(s.disp)||1.2);
+ const start=Math.max(k+4,b.length-80);
+ // Work backwards from the newest candle and use only structure confirmed before each impulse.
+ for(let i=b.length-2;i>=start;i--){
+  const impulse=b[i],prev=b[i-1],base=atr(b.slice(0,i))||Math.max(impulse.high-impulse.low,1e-8);
+  if(Math.abs(impulse.close-impulse.open)<base*dispMult)continue;
+  const known=pivots(b.slice(0,i),k),high=known.h.at(-1),low=known.l.at(-1);
+  const bullish=impulse.close>impulse.open&&!!high&&prev.close<=high.p&&impulse.close>high.p;
+  const bearish=impulse.close<impulse.open&&!!low&&prev.close>=low.p&&impulse.close<low.p;
+  if(!bullish&&!bearish)continue;
+  const side=bullish?'BUY':'SELL';
+  let origin=-1;
+  for(let j=i-1;j>=Math.max(0,i-4);j--){
+   if(bullish?b[j].close<b[j].open:b[j].close>b[j].open){origin=j;break}
+  }
+  if(origin<0)continue;
+  const ob=b[origin],zone={low:ob.low,high:ob.high};
+  let invalidated=false,mitigated=false;
+  for(let j=i+1;j<b.length;j++){
+   const candle=b[j];
+   if(bullish?candle.close<zone.low:candle.close>zone.high){invalidated=true;break}
+   if(candle.low<=zone.high&&candle.high>=zone.low)mitigated=true;
+  }
+  if(invalidated||mitigated)continue;
+  // A pending limit idea is valid only while price remains on the expected side of the untouched OB.
+  if(bullish?current.close<=zone.high:current.close>=zone.low)continue;
+  const entry=(zone.low+zone.high)/2;
+  const buffer=Math.max(base*.08,Math.abs(entry)*.00001);
+  const stop=bullish?zone.low-buffer:zone.high+buffer;
+  if(!(bullish?stop<entry:stop>entry))continue;
+  const target=structuralTarget(side,entry,stop,high,low,b);
+  if(!target||target.rr<3)continue;
+  const reasons=[
+   (bullish?'Bullish':'Bearish')+' close-confirmed BOS',
+   'ATR-qualified displacement',
+   (bullish?'Demand':'Supply')+' order block remains unmitigated',
+   'Pending midpoint retest entry',
+   'Structural target supports 1:'+target.rr.toFixed(2)
+  ];
+  return {
+   symbol,tf,side,entry,sl:stop,tp:target.tp,rr:target.rr,reason:reasons,
+   time:current.time,confidence:'provisional-confluence-pending',
+   setupType:(bullish?'Bullish':'Bearish')+' order block retest',
+   status:'NOT RUNNING',outcome:'PENDING',movePct:null,rNow:null,ageBars:0,
+   orderBlock:{low:zone.low,high:zone.high,formedAt:impulse.time,originTime:ob.time},
+   scanEngine:'APA-SMC pending structural setup; provisional and not yet performance-validated'
+  };
+ }
+ return null;
+}
+
 function scanOpportunityHistory(symbol,tf,bars){
  const b=(bars||[]).filter(x=>!x.isOpen).slice(-1000),minimum=tf==='1Y'?10:tf==='1M'?20:35;
  if(b.length<minimum)return [];
@@ -401,6 +456,13 @@ function scanOpportunityHistory(symbol,tf,bars){
   const uniqueReasons=[...new Set(reasons)];
   found.push({symbol,tf,side,entry,sl:stop,tp:target.tp,rr:target.rr,reason:uniqueReasons,time:cur.time,confidence:'provisional-sequence-filtered',setupType:patternRetest?.type||blockRetest?.type||(fvgRetest?'FVG retest':hasRoleReversal?'SBR/RBS retest':'BOS/CHoCH retest'),status:ageBars===0?'NOT RUNNING':'HISTORICAL',movePct:0,rNow:0,ageBars,scanEngine:'APA-SMC strict sequence heuristic; unvalidated'});
  }
+ // Create an actionable pending setup after a confirmed BOS even before price returns to the order block.
+ // This is the missing lifecycle stage between detecting structure and waiting for an entry fill.
+ const latest=b.at(-1);
+ if(latest&&!found.some(candidate=>candidate.time===latest.time&&candidate.status==='NOT RUNNING')){
+  const pending=pendingOrderBlockOpportunity(symbol,tf,b);
+  if(pending)found.push(pending);
+ }
  return found;
 }
 
@@ -487,6 +549,8 @@ async function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode){
  if(additions.length){additions.sort((a,b)=>b.time-a.time);s.log.unshift(...additions);s.log.sort((a,b)=>Number(b.time)-Number(a.time));save();await persistSignals(additions)}
  let resolved=0;for(const [tf,bars] of sets)resolved+=resolveSignalOutcomes(symbol,tf,bars).length;
  renderLog();
+ if(symbol===s.symbol&&additions.length){draw();renderLog()}
+ else if(additions.length)renderOverlay();
  return additions.length;
 }
 
@@ -519,6 +583,7 @@ async function refreshTopDown(force=false,freshOnly=s.signalFreshMode){
   }
   let resolvedSelected=0;for(const [tf,bars] of scanSets)resolvedSelected+=resolveSignalOutcomes(sym,tf,bars).length;
   renderLog();
+  if(additions.length){if(sym===s.symbol)draw();else renderOverlay()}
   const votes=rows.slice(0,5).filter(x=>x.score!==0),net=votes.reduce((a,x)=>a+x.score,0);
   const agreement=net>0?'Higher-timeframe tilt bullish':net<0?'Higher-timeframe tilt bearish':'Higher-timeframe context mixed';
   host.innerHTML=rows.map(x=>'<div style="padding:8px 0;border-bottom:1px solid #1e2b38"><div class="row"><span><b>'+x.tf+'</b></span><b style="color:'+(x.score>0?'var(--g)':x.score<0?'var(--r)':'var(--m)')+'">'+x.bias+'</b></div><div class="fine">'+x.detail+'</div><div class="fine">'+x.volume+'</div></div>').join('')+'<div class="note" style="margin-top:9px"><b>'+agreement+'</b><br>Directional votes: '+net+' across '+votes.length+' timeframes with readable structure. This is context, not an entry signal.</div>';
@@ -828,17 +893,18 @@ function rebuildUnifiedAnnotations(scanSets){
 function structuralTarget(side,entry,stop,highPivot,lowPivot,bars){
  const confirmed=pivots(bars,Math.max(2,+s.k||3));
  const lastIndex=bars.length-1,confirmBefore=lastIndex-Math.max(2,+s.k||3);
- const candidates=side==='BUY'
-  ? confirmed.h.filter(p=>p.i<=confirmBefore&&p.p>entry).map(p=>p.p)
-  : confirmed.l.filter(p=>p.i<=confirmBefore&&p.p<entry).map(p=>p.p);
+ const risk=Math.abs(entry-stop);
+ if(!(Number.isFinite(risk)&&risk>0))return null;
+ // Choose the nearest confirmed opposing swing that actually permits 3R.
+ // Do not reject a valid setup just because a nearer swing cannot meet the minimum.
+ const candidates=(side==='BUY'
+  ? confirmed.h.filter(p=>p.i<=confirmBefore&&p.p>entry)
+  : confirmed.l.filter(p=>p.i<=confirmBefore&&p.p<entry))
+  .map(p=>({tp:p.p,rr:Math.abs(p.p-entry)/risk,index:p.i}))
+  .filter(p=>Number.isFinite(p.rr)&&p.rr>=3)
+  .sort((a,b)=>side==='BUY'?a.tp-b.tp:b.tp-a.tp);
  if(!candidates.length)return null;
- const target=side==='BUY'?Math.min(...candidates):Math.max(...candidates);
- const risk=Math.abs(entry-stop),reward=Math.abs(target-entry);
- if(!(risk>0&&reward>0))return null;
- const rr=reward/risk;
- // Hard minimum: never publish or log a candidate below 3R.
- if(!Number.isFinite(rr)||rr<3)return null;
- return {tp:target,rr};
+ return {tp:candidates[0].tp,rr:candidates[0].rr,targetSwingIndex:candidates[0].index};
 }
 function tradeStateLabel(t){
  const st=t.status||'NOT RUNNING';
