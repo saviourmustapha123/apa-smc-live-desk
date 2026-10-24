@@ -1111,3 +1111,15 @@ test('daily signal monitor does not calculate TP progress or SL risk before a si
   assert.match(html, /const slPct=running&&hasPrice&&riskDistance>0/);
   assert.match(html, /const progress=running\?[\s\S]*?active\(t\)\?[\s\S]*?Entry '[\s\S]*?away/);
 });
+
+
+test('signal desk separates not triggered, active and missed signals into uncluttered panes', () => {
+  for (const label of ['data-verified-filter="untriggered"','data-verified-filter="active"','data-verified-filter="missed"','id="verifiedSignalList"']) assert.ok(html.includes(label));
+  assert.match(html, /const tpPct=running&&hasPrice/);
+  assert.match(html, /const slPct=running&&hasPrice/);
+  assert.match(html, /const progressMarkup=running\?/);
+});
+
+test('performance separates successful, unsuccessful and missed signals', () => {
+  for (const label of ['data-performance-filter="successful"','data-performance-filter="unsuccessful"','data-performance-filter="missed"','id="performanceSuccessCount"','id="performanceLossCount"','id="performanceMissedCount"']) assert.ok(html.includes(label));
+});
