@@ -401,3 +401,17 @@ test('active progress is rendered for pending signals and historical candle mark
   assert.match(html, /const last=closedBars\.at\(-1\),mark=last\.close/);
   assert.match(html, /const last=closedBars\.at\(-1\),p=last\.close/);
 });
+
+
+test('visible SMC signals require a confirmed entry sequence rather than any single pattern label', () => {
+  assert.match(html, /const validatedSequence=\(hasStructure&&disp&&hasZoneRetest\)/);
+  assert.match(html, /if\(!validatedSequence\)continue/);
+  assert.match(html, /Entry sequence passed: structure \+ displacement \+ retest\/confluence/);
+});
+
+test('signal entry prefers the validated zone midpoint and stop includes a structural ATR buffer', () => {
+  assert.match(html, /const rawEntry=fvgRetest\?/);
+  assert.match(html, /blockRetest\?\(blockRetest\.low\+blockRetest\.high\)\/2/);
+  assert.match(html, /const buffer=aa\*0\.1/);
+  assert.match(html, /target\.rr<3/);
+});
