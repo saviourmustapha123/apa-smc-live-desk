@@ -57,6 +57,17 @@ Append a dated entry for each material change. Include the commit, reason, check
 - Deployment of this exact revision was still running at the time of this ledger update; verify the Pages workflow before describing it as live.
 - Limitation: these deterministic lifecycle tests cover the identified gap/trigger cases but are not a complete real-browser UI acceptance test or proof of strategy profitability.
 
+### 2026-10-24 — Preserve active trade lifecycle across refresh
+
+- Production fix: `ff0b772002fd2f1b862930ad0fb316d79a300f12`; follow-up correction: `e69d548e22f79c060c7875323f43682f770ee128`.
+- Regression coverage added in `6584e902314de0d4836b58405789af353287a53b` and refined in `e0bf75fe376eee0d3b77b9dbf5c91c3b094fd940`.
+- Defect: lifecycle resolution initialized every signal as not entered on each refresh. If a previously active signal's retained candle window no longer contained the original entry touch, the resolver could replay old bars or revert an active trade to pending.
+- Correction: restore entered state from persisted `triggeredAt` / `RUNNING`, and skip bars that ended before the stored trigger time using the selected timeframe duration.
+- Added tests that verify active state survives reload/history truncation and old pre-entry target touches are not replayed as outcomes.
+- Verification at `e69d548e22f79c060c7875323f43682f770ee128`: background health check passed, engineering audit passed 18/18 controls, and all eight production lifecycle regression tests passed. The Pages deployment for this exact revision was still in progress at the time of this update.
+- A test run exposed a follow-up defect during implementation: the trigger timestamp was declared constant while the resolver may set it on a new entry. Changed it to a mutable binding; the complete background check then passed.
+- Limitation: tests verify deterministic lifecycle behavior, not the full rendered UI on every phone/browser or strategy profitability.
+
 ## Open work, in priority order
 
 1. Verify the live UI on the deployed site: Untriggered, Active and Missed must be separate, and performance must separate successful, unsuccessful and missed signals. Confirm that pending signals show no TP/SL progress.
