@@ -116,10 +116,8 @@ async function loadSignalStore(){
  const stored=await new Promise((res,rej)=>{const r=s.db.transaction(SIGNALS,'readonly').objectStore(SIGNALS).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)});
  const map=new Map(stored.map(t=>[t.key||signalKey(t),t]));
  const migrate=[];for(const t of legacy){const key=signalKey(t);if(!map.has(key)){map.set(key,{...t,key});migrate.push(t)}}
- // Migrate old MISSED ENTRY records to an unfilled expiry. They are not trades and must carry no realized P&L.
- const normalized=[];for(const [key,t] of map){if(t.status==='MISSED ENTRY'){const fixed={...t,status:'EXPIRED',outcome:'EXPIRED',exitPrice:null,rNow:null,movePct:null,key};map.set(key,fixed);normalized.push(fixed)}}
+ // Preserve MISSED ENTRY as its own lifecycle outcome. It is not an expired signal or a completed trade.
  if(migrate.length)await persistSignals(migrate);
- if(normalized.length)await persistSignals(normalized);
  s.log=[...map.values()].sort((a,b)=>Number(b.time)-Number(a.time));
  try{localStorage.removeItem('apa-desk-log')}catch{}
 }
@@ -536,7 +534,7 @@ function resolveSignalOutcomes(symbol,tf,bars){
  const closedBars=(bars||[]).filter(b=>!b.isOpen&&Number.isFinite(b.time)&&Number.isFinite(b.high)&&Number.isFinite(b.low)).sort((a,b)=>a.time-b.time);
  if(!closedBars.length)return [];
  const changed=[],now=Date.now();
- const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED']);
+ const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','MISSED ENTRY','MISSED','CLOSED']);
  for(const t of s.log){
   if(t.symbol!==symbol||t.tf!==tf||terminal.has(t.status))continue;
   const entry=Number(t.entry),sl=Number(t.sl),tp=Number(t.tp);
@@ -1049,7 +1047,7 @@ function structuralTarget(side,entry,stop,highPivot,lowPivot,bars){
 function tradeStateLabel(t){
  const st=t.status||'NOT TRIGGERED';
  if(st==='HISTORICAL')return 'HISTORICAL CANDIDATE';
- if(st==='EXPIRED')return 'MISSED · ENTRY NOT TRIGGERED';
+ if(st==='EXPIRED'||st==='MISSED ENTRY'||st==='MISSED')return 'MISSED · ENTRY NOT TRIGGERED';
  if(st==='INVALIDATED')return 'INVALIDATED BEFORE ENTRY';
  if(['TAKE PROFIT','STOP LOSS','CLOSED'].includes(st))return 'CLOSED · '+st;
  if(st==='TRIGGERED'||st==='RUNNING')return 'RUNNING';
@@ -1063,7 +1061,7 @@ function renderDailyTarget(){
  if($('dailyTargetBar'))$('dailyTargetBar').style.width=pct+'%';
  if($('dailyTargetText'))$('dailyTargetText').textContent=count>=target?'Daily target reached · '+count+' qualifying 1:3+ candidates logged.':'Target: '+target+' qualifying 1:3+ setups in today’s candles · '+(target-count)+' more needed. Only detected setups count; the scanner will not fabricate trades.';
 }
-function allActiveSignals(){const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED','HISTORICAL']);return s.log.filter(t=>!terminal.has(String(t.status||'NOT RUNNING').toUpperCase())&&Number(t.rr)>=MIN_REWARD_RISK).sort((a,b)=>Number(b.identifiedAt||b.time*1000)-Number(a.identifiedAt||a.time*1000))}
+function allActiveSignals(){const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','MISSED ENTRY','MISSED','CLOSED','HISTORICAL']);return s.log.filter(t=>!terminal.has(String(t.status||'NOT RUNNING').toUpperCase())&&Number(t.rr)>=MIN_REWARD_RISK).sort((a,b)=>Number(b.identifiedAt||b.time*1000)-Number(a.identifiedAt||a.time*1000))}
 
 let verifiedSignalFilter='untriggered';
 function renderVerifiedSignalCards(){
@@ -1116,7 +1114,7 @@ async function runAutomaticPairScan(){
 }
 function renderSignalMonitor(){
  renderVerifiedSignalCards();
- const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED','HISTORICAL']);
+ const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','MISSED ENTRY','MISSED','CLOSED','HISTORICAL']);
  const isToday=t=>{const d=new Date(Number(t.identifiedAt)||Number(t.time)*1000),n=new Date();return Number.isFinite(Number(t.time))&&d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()};
  const active=t=>!terminal.has(String(t.status||'NOT TRIGGERED').toUpperCase());
  // Only actionable setups and live trades belong in the live queue. Terminal outcomes
