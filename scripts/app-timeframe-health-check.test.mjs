@@ -517,4 +517,6 @@ test('chart renders every pending and running signal for the selected pair acros
   assert.match(html, /marks\.sort\(\(a,b\)=>a\.time-b\.time\);[\s\S]{0,100}Explicit zone geometry/);
   assert.match(html, /Clean mode limits completed-history drawings only; it never hides a live or not-yet-triggered setup/);
   assert.match(html, /TP '\+tpPct\.toFixed\(1\)\+'% · SL risk '\+slPct\.toFixed\(1\)\+'%/);
+  assert.match(html, /Keep distant TP\/SL levels represented at the chart edge when the candle autoscale puts them off-screen/);
+  assert.match(html, /edge\.textContent=t\.symbol\+' '\+t\.tf\.toUpperCase\(\)\+' '\+t\.side\+' '\+z\.label/);
 });
