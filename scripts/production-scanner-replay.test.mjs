@@ -69,3 +69,11 @@ test('production target-level guard rejects opposing swings already crossed afte
   assert.equal(engine.targetLevelUnreached('SELL', 95, bars, 0), false);
   assert.equal(engine.targetLevelUnreached('SELL', 90, bars, 0), true);
 });
+
+
+test('the replay VM exposes the same explicit minimum reward-risk configuration used by production', () => {
+  const engine = createProductionScannerReplay({ now: NOW });
+  const result = engine.scan('BTCUSD', '5m', candles(120));
+  assert.ok(result.diagnostic);
+  for (const signal of result.signals) assert.ok(signal.rr >= 3);
+});
