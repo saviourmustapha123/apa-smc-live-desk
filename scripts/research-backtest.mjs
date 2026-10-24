@@ -55,18 +55,20 @@ export function runResearchBacktest({ bars, signals, costs, minimumRiskReward = 
     let exitIndex = -1, exitPrice = null, exitReason = null, grossR = null;
     for (let i = entryIndex; i < bars.length; i++) {
       const bar = bars[i];
-      const stopHit = signal.side === 'LONG' ? bar.low <= signal.stop : bar.high >= signal.stop;
-      const targetHit = signal.side === 'LONG' ? bar.high >= signal.target : bar.low <= signal.target;
-      if (stopHit && targetHit) {
-        exitIndex = i; exitPrice = signal.stop; exitReason = 'STOP_AND_TARGET_SAME_BAR_STOP_FIRST'; grossR = -1; break;
-      }
+      // Resolve opening gaps before using the candle's later high/low. Otherwise
+      // a gap through the stop can be incorrectly reported as a normal -1R loss.
       if (signal.side === 'LONG' && bar.open <= signal.stop || signal.side === 'SHORT' && bar.open >= signal.stop) {
         exitIndex = i; exitPrice = bar.open; exitReason = 'GAP_THROUGH_STOP';
         grossR = signal.side === 'LONG' ? (exitPrice - entry) / risk : (entry - exitPrice) / risk; break;
       }
       if (signal.side === 'LONG' && bar.open >= signal.target || signal.side === 'SHORT' && bar.open <= signal.target) {
-        exitIndex = i; exitPrice = signal.target; exitReason = 'TARGET';
+        exitIndex = i; exitPrice = signal.target; exitReason = 'TARGET_AT_OPEN';
         grossR = rr; break;
+      }
+      const stopHit = signal.side === 'LONG' ? bar.low <= signal.stop : bar.high >= signal.stop;
+      const targetHit = signal.side === 'LONG' ? bar.high >= signal.target : bar.low <= signal.target;
+      if (stopHit && targetHit) {
+        exitIndex = i; exitPrice = signal.stop; exitReason = 'STOP_AND_TARGET_SAME_BAR_STOP_FIRST'; grossR = -1; break;
       }
       if (stopHit) { exitIndex = i; exitPrice = signal.stop; exitReason = 'STOP'; grossR = -1; break; }
       if (targetHit) { exitIndex = i; exitPrice = signal.target; exitReason = 'TARGET'; grossR = rr; break; }
