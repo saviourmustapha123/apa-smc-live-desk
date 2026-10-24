@@ -407,7 +407,7 @@ test('daily signal pane keeps today\'s signals plus older non-terminal pending a
   assert.match(html, /data-signal-tab="today"/);
   assert.match(html, /data-signal-view="today"/);
   assert.match(html, /Today’s signals/);
-  assert.match(html, /const daily=s\.log\.filter\(t=>isToday\(t\)\|\|active\(t\)\)/);
+  assert.match(html, /const daily=allActiveSignals\(\)/);
   assert.match(html, /Market closure alone does not expire it/);
 });
 
@@ -468,7 +468,9 @@ test('a live pending signal is not marked historical merely because a later cand
 
 
 
-test('signal desk separates untriggered, active and closed signals into uncluttered panes', () => {
+test('signal desk and Today table use a consistent qualifying signal pool', () => {
+  assert.match(html, /const all=s\.log\.filter\(t=>Number\(t\.rr\)>=3&&String\(t\.status\|\|'\)\.toUpperCase\(\)!=='HISTORICAL'\)/);
+  assert.match(html, /const daily=allActiveSignals\(\)/);
   for (const label of ['data-verified-filter="untriggered"','data-verified-filter="active"','data-verified-filter="closed"','id="verifiedSignalList"']) assert.ok(html.includes(label));
   assert.match(html, /const tpPct=running&&hasPrice/);
   assert.match(html, /const slPct=running&&hasPrice/);
@@ -540,4 +542,12 @@ test('signal scan analyses up to 2,000 retained closed candles per timeframe ins
 });
 test('trade horizon maps minute scalps separately from hourly intraday and higher-timeframe swing setups', () => {
   assert.match(html, /const short=\['1m','5m'\]\.includes\(tf\),intraday=\['15m','30m','1h'\]\.includes\(tf\),extended=\['4h','8h','12h','1d'\]\.includes\(tf\)/);
+});
+
+
+test('live admission rejects setups whose latest confirmed close already crossed stop or target', () => {
+  assert.match(html, /Do not publish a pending limit setup if the latest confirmed candle has/);
+  assert.match(html, /const preEntryStop=candidate\.side==='BUY'\?mark<=sl:mark>=sl/);
+  assert.match(html, /const preEntryTarget=candidate\.side==='BUY'\?mark>=tp:mark<=tp/);
+  assert.match(html, /if\(preEntryStop\|\|preEntryTarget\)continue/);
 });
