@@ -353,3 +353,24 @@ test('confirmed block and pattern retests are allowed through the final directio
   assert.match(html, /patternRetest\?\.side==='BUY'\|\|blockRetest\?\.side==='BUY'/);
   assert.match(html, /patternRetest\?\.side==='SELL'\|\|blockRetest\?\.side==='SELL'/);
 });
+
+
+test('daily signal pane keeps today\'s signals plus older non-terminal pending and running trades', () => {
+  assert.match(html, /Today’s signal pane/);
+  assert.match(html, /const daily=s\.log\.filter\(t=>isToday\(t\)\|\|active\(t\)\)/);
+  assert.match(html, /Market closure alone does not expire it/);
+});
+
+test('full signal performance reports history-wide win rate, realised R, active count and every signal', () => {
+  assert.match(html, /Full signal performance/);
+  assert.match(html, /id="perfWinRate"/);
+  assert.match(html, /id="perfNetR"/);
+  assert.match(html, /id="perfActive"/);
+  assert.match(html, /id="performanceHistory"/);
+  assert.match(html, /const netR=all\.reduce/);
+});
+
+test('a live pending signal is not marked historical merely because a later candle closes', () => {
+  assert.match(html, /A valid setup stays pending until entry is touched/);
+  assert.match(html, /t\.status=t\.status==='NOT RUNNING'\?'NOT RUNNING':'PENDING';t\.outcome='PENDING'/);
+});
