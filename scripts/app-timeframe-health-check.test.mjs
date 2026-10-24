@@ -171,7 +171,7 @@ test('signal scanner can create a pending, unmitigated order block setup before 
 
 test('structural targets select the nearest confirmed opposing swing that satisfies the minimum 3R', () => {
   assert.match(html, /Choose the nearest confirmed opposing swing that actually permits 3R/);
-  assert.match(html, /\.filter\(p=>Number\.isFinite\(p\.rr\)&&p\.rr>=3\)/);
+  assert.match(html, /\.filter\(p=>Number\.isFinite\(p\.rr\)&&p\.rr>=(?:3|MIN_REWARD_RISK)\)/);
   assert.match(html, /return \{tp:candidates\[0\]\.tp,rr:candidates\[0\]\.rr,targetSwingIndex:candidates\[0\]\.index\}/);
 });
 
@@ -386,7 +386,7 @@ test('signal generation includes multiple setup families rather than only sweep 
   assert.match(scanner, /Recent FVG retest with directional close/);
   assert.match(scanner, /SBR level break and retest/);
   assert.match(scanner, /RBS level break and retest/);
-  assert.match(scanner, /target\.rr<3/);
+  assert.match(scanner, /target\.rr<(?:3|MIN_REWARD_RISK)/);
 });
 
 test('BOS and CHoCH are classified from the preceding swing trend, not treated as interchangeable labels', () => {
@@ -502,7 +502,7 @@ test('a live pending signal is not marked historical merely because a later cand
 
 
 test('signal desk and Today table use a consistent qualifying signal pool with a distinct missed pane', () => {
-  assert.match(html, /function allActiveSignals\(\).*?Number\(t\.rr\)>=3/);
+  assert.match(html, /function allActiveSignals\(\).*?Number\(t\.rr\)>=(?:3|MIN_REWARD_RISK)/);
   assert.match(html, /const daily=allActiveSignals\(\)/);
   for (const label of ['data-verified-filter="untriggered"','data-verified-filter="active"','data-verified-filter="closed"','data-verified-filter="missed"','id="verifiedMissedCount"','id="verifiedSignalList"']) assert.ok(html.includes(label));
   assert.match(html, /const tpPct=running&&hasPrice/);
@@ -598,7 +598,7 @@ test('signal admission has no artificial daily quota and scans eight execution t
 test('daily candidate display counts by identification time rather than historical candle time', () => {
   assert.match(html, /function signalDayStamp\(t\)/);
   assert.match(html, /const d=new Date\(Number\(t\.identifiedAt\)\|\|Number\(t\.time\)\*1000\)/);
-  assert.match(html, /const today=s\.log\.filter\(t=>\{if\(!Number\.isFinite\(Number\(t\.time\)\)\|\|Number\(t\.rr\)<3\)return false/);
+  assert.match(html, /const today=s\.log\.filter\(t=>\{if\(!Number\.isFinite\(Number\(t\.time\)\)\|\|Number\(t\.rr\)<(?:3|MIN_REWARD_RISK)\)return false/);
 });
 
 test('untriggered setups expire only after a documented timeframe-specific entry window', () => {
