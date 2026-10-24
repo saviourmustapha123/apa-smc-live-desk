@@ -319,7 +319,7 @@ test('BOS and CHoCH are classified from the preceding swing trend, not treated a
 test('multi-trigger signal reasons are retained as structured explanations', () => {
   assert.match(html, /const uniqueReasons=\[\.\.\.new Set\(reasons\)\]/);
   assert.match(html, /reason:uniqueReasons/);
-  assert.match(html, /APA-SMC multi-trigger heuristic proxy/);
+  assert.match(html, /APA-SMC strict sequence heuristic; unvalidated/);
 });
 
 
