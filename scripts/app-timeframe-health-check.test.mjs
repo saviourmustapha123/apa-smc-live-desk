@@ -574,3 +574,10 @@ test('untriggered setups expire only after a documented timeframe-specific entry
   assert.match(html, /Entry window expired after '\+maxPendingBars\+' closed '\+tf\+' candles without an entry fill/);
   assert.match(html, /t\.closedReason\|\|t\.reason\|\|t\.scanEngine/);
 });
+
+test('signal scanner remains async after admission helpers are declared', () => {
+  assert.match(html, /function signalDayStamp\(t\)/);
+  assert.match(html, /async function scanBackgroundPair\(symbol,freshOnly=s\.signalFreshMode\)/);
+  assert.match(html, /daily limit of 6 new candidates reached/);
+  assert.match(html, /Pending entries need a finite, timeframe-specific validity window/);
+});
