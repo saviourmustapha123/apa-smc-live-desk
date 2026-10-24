@@ -88,6 +88,16 @@ Append a dated entry for each material change. Include the commit, reason, check
 - Pages deployment for the app/cache revision `90abe50d54fe7b1c57084cb708c692948959fcd3` completed successfully. The latest commit only updates tests; its Pages workflow is running separately.
 - Remaining limitation: public feed warnings can occur due market-session/region/provider restrictions. Passing tests do not prove strategy profitability or full manual mobile UI acceptance.
 
+### 2026-10-24 — Lifecycle persistence and missed-signal presentation
+
+- Production lifecycle correction: `index.html` now reconstructs an already-triggered trade from persisted `triggeredAt`/RUNNING state and skips candles fully before the trigger. This prevents reload or limited candle history from replaying a pre-entry target/stop as if it happened after entry.
+- Production signal admission guards now have regression coverage for duplicate candidates in both persisted and queued signals, plus stale long/short entries whose latest closed price has already crossed stop or target.
+- Performance presentation: expired pending setups remain in the Missed category and are explicitly labelled `MISSED · ENTRY NOT TRIGGERED`; pre-entry invalidations are labelled `INVALIDATED BEFORE ENTRY`. They are not counted as stop-loss trades. The missed and unsuccessful categories remain separate.
+- Release marker: `2026.10.24.21`; service-worker shell cache bumped to `apa-smc-shell-2026-10-24-18`.
+- Regression suites now execute the production lifecycle/admission functions and assert the UI category labels. GitHub Actions run `40120880672` passed: engineering audit, strategy core, SMC detectors, strategy discovery, research backtest, timeframe/candle tests, production lifecycle tests, and rolling proxy backtest.
+- Pages deployment for the same source revision was still running when this record was prepared; confirm its result before claiming the revision is live.
+- Known limitation: source-level tests and GitHub Actions do not replace a real-device browser acceptance test. The strategy remains provisional and not profitability-validated.
+
 ## Open work, in priority order
 
 1. Verify the live UI on the deployed site: Untriggered, Active and Missed must be separate, and performance must separate successful, unsuccessful and missed signals. Confirm that pending signals show no TP/SL progress.
