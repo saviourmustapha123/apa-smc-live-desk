@@ -1,7 +1,10 @@
 import { assessAt, simulate } from './strategy-core.mjs';
 const API = 'https://biquote.io/api';
-const SYMBOLS = ['EURUSD', 'BTCUSD'];
-const TIMEFRAMES = ['5m', '15m'];
+const BYBIT_API = 'https://api.bybit.com/v5/market/kline?category=linear&symbol=QQQUSDT';
+const SYMBOLS = ['EURUSD', 'BTCUSD', 'QQQUSDT'];
+const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '8h', '12h', '1d'];
+const TIMEFRAME_SECONDS = { '1m':60, '5m':300, '15m':900, '1h':3600, '4h':14400, '8h':28800, '12h':43200, '1d':86400 };
+const BYBIT_INTERVAL = { '1m':'1', '5m':'5', '15m':'15', '1h':'60', '4h':'240', '8h':'480', '12h':'720', '1d':'D' };
 const K = 3;
 const ATR_PERIOD = 14;
 const DISPLACEMENT_ATR = 1;
@@ -13,16 +16,32 @@ const failures = [];
 const reports = [];
 
 async function fetchBars(symbol, interval) {
-  const url = `${API}/${symbol}/ohlc?interval=${interval}&limit=1000`;
-  const response = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const json = await response.json();
-  const rows = Array.isArray(json) ? json : json.bars ?? json.data ?? json.candles ?? [];
-  const bars = rows.map(b => {
-    const raw = b.openTime ?? b.time ?? b.timestamp;
-    const parsed = typeof raw === 'number' ? raw : (/^\d+(\.\d+)?$/.test(String(raw)) ? Number(raw) : Date.parse(raw));
-    return { time: Math.floor(parsed > 1e12 ? parsed / 1000 : parsed), open: Number(b.open), high: Number(b.high), low: Number(b.low), close: Number(b.close), isOpen: Boolean(b.isOpen) };
-  }).filter(b => !b.isOpen && Number.isFinite(b.time) && b.time > 0 && [b.open,b.high,b.low,b.close].every(Number.isFinite) && b.high >= Math.max(b.open,b.close,b.low) && b.low <= Math.min(b.open,b.close,b.high))
+  let rows;
+  let normalise;
+  if (symbol === 'QQQUSDT') {
+    const url = BYBIT_API + '&interval=' + BYBIT_INTERVAL[interval] + '&limit=1000';
+    const response = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
+    if (!response.ok) throw new Error('Bybit HTTP ' + response.status);
+    const json = await response.json();
+    if (Number(json.retCode) !== 0) throw new Error('Bybit API: ' + (json.retMsg || json.retCode));
+    rows = json.result && json.result.list || [];
+    normalise = b => ({ time: Number(b[0]) / 1000, open: Number(b[1]), high: Number(b[2]), low: Number(b[3]), close: Number(b[4]) });
+  } else {
+    const url = API + '/' + symbol + '/ohlc?interval=' + interval + '&limit=1000';
+    const response = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const json = await response.json();
+    rows = Array.isArray(json) ? json : json.bars || json.data || json.candles || [];
+    normalise = b => {
+      const raw = b.openTime || b.time || b.timestamp;
+      const parsed = typeof raw === 'number' ? raw : (/^\\d+(\\.\\d+)?$/.test(String(raw)) ? Number(raw) : Date.parse(raw));
+      return { time: Math.floor(parsed > 1e12 ? parsed / 1000 : parsed), open: Number(b.open), high: Number(b.high), low: Number(b.low), close: Number(b.close), isOpen: Boolean(b.isOpen) };
+    };
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const seconds = TIMEFRAME_SECONDS[interval];
+  const bars = rows.map(normalise).map(b => Object.assign({}, b, { isOpen: Boolean(b.isOpen) || b.time + seconds > now }))
+    .filter(b => !b.isOpen && Number.isFinite(b.time) && b.time > 0 && [b.open,b.high,b.low,b.close].every(Number.isFinite) && b.high >= Math.max(b.open,b.close,b.low) && b.low <= Math.min(b.open,b.close,b.high))
     .sort((a,b) => a.time-b.time);
   const unique = new Map(bars.map(b => [b.time,b]));
   return [...unique.values()];
@@ -53,7 +72,7 @@ for (const symbol of SYMBOLS) for (const timeframe of TIMEFRAMES) {
     let equity=0,peak=0,maxDrawdown=0,lossStreak=0,maxLossStreak=0;
     for(const trade of tested){if(trade.result.startsWith('SKIPPED')||trade.result==='UNRESOLVED')continue;equity+=trade.r??0;peak=Math.max(peak,equity);maxDrawdown=Math.max(maxDrawdown,peak-equity);if((trade.r??0)<0){lossStreak++;maxLossStreak=Math.max(maxLossStreak,lossStreak)}else lossStreak=0}
     const spanDays=Math.max(0,(bars.at(-1).time-bars[0].time)/86400);
-    const expectedSeconds=timeframe==='5m'?300:900;
+    const expectedSeconds=TIMEFRAME_SECONDS[timeframe];
     const largeGaps=bars.slice(1).filter((b,i)=>b.time-bars[i].time>expectedSeconds*2).length;
     const report={symbol,timeframe,bars:bars.length,candidates:tested.length,wins,losses,skipped,unresolved,winRate:resolved?Math.round(wins/resolved*1000)/10:null,netR:Math.round(netR*100)/100,netR05:Math.round((netR-COST_SCENARIOS_R[1]*resolved)*100)/100,netR10:Math.round((netR-COST_SCENARIOS_R[2]*resolved)*100)/100,netR20:Math.round((netR-COST_SCENARIOS_R[3]*resolved)*100)/100,expectancyR:resolved?Math.round(netR/resolved*1000)/1000:null,profitFactor:grossLossR?Math.round(grossWinsR/grossLossR*100)/100:grossWinsR?'infinite':'n/a',maxDrawdownR:Math.round(maxDrawdown*100)/100,maxLosingStreak:maxLossStreak,historyDays:Math.round(spanDays),oneYearCoverage:spanDays>=365,largeGaps,firstBar:new Date(bars[0].time*1000).toISOString(),latestBar:new Date(bars.at(-1).time*1000).toISOString()};
     reports.push(report);
@@ -68,11 +87,12 @@ const summaryLines=[
   '# APA · SMC proxy strategy backtest',
   '',
   `- Run time (UTC): ${new Date().toISOString()}`,
-  '- Market data: Biquote public OHLC endpoint; only closed candles included.',
+  '- Market data: Biquote public OHLC for EURUSD/BTCUSD and Bybit linear perpetual OHLC for QQQUSDT; only closed candles included.',
   `- Rules: current website proxy trigger, swing sensitivity ${K}, displacement ${DISPLACEMENT_ATR}×ATR, minimum target ratio ${MIN_RR}:1.`,
   '- Execution: enter at the next candle open; skip the entry if the open invalidates the stop or leaves less than 3R; same-candle stop/target ambiguity is a stop-first loss; gap-through-stop losses use the next open.',
   '- Gross proxy only, **not** validation of the complete proprietary LOWKEY FX APA strategy. Cost sensitivity subtracts explicit illustrative assumptions of 0.05R, 0.10R and 0.20R per resolved trade; these are not measured historical spread, commission, slippage, latency or financing. A true net backtest requires venue-specific historical cost data.',
-  `- One-year history gate: ${reports.length===SYMBOLS.length*TIMEFRAMES.length&&reports.every(r=>r.oneYearCoverage)?'PASSED for all requested pair/timeframe combinations':'NOT PASSED for one or more pair/timeframe combinations; do not interpret the metrics as a full historical backtest.'}`,
+  `- Coverage: ${reports.length}/${SYMBOLS.length*TIMEFRAMES.length} pair/timeframe combinations returned valid data. One-year gate: ${reports.length===SYMBOLS.length*TIMEFRAMES.length&&reports.every(r=>r.oneYearCoverage)?'PASSED for all combinations':'NOT PASSED for one or more combinations; do not interpret metrics as a full historical backtest.'}`, 
+  '- Scope warning: quick proxy entry/exit model only; it does not replay the production scanOpportunityHistory implementation or every deployed SMC confluence, live-chat admission rule, and pair-specific session guard.',
   '',
   '| Pair | TF | Closed bars | History days | 1-year coverage | Candidates | Skipped | TP | SL | Unresolved | Win rate* | Expectancy R* | Profit factor* | Max DD R* | Max losing streak | Large gaps | Gross R* | Net @0.05R cost* | Net @0.10R cost* | Net @0.20R cost* |',
   '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|',
