@@ -583,3 +583,12 @@ test('live chart annotations include QML, swing references, liquidity, inducemen
   assert.match(html, /const markerLimit=mode==='clean'\?14:mode==='balanced'\?140:500/);
   assert.match(html, /overlayDensity:'balanced'/);
 });
+
+
+test('rule-verified qualifying signals are visibly labelled in chart markers and live overlays', () => {
+  assert.match(html, /verificationState:'RULE-VERIFIED'/);
+  assert.match(html, /'VERIFIED · '\)\+\(t\.status\|\|'NOT RUNNING'\)/);
+  assert.match(html, /'RULE-VERIFIED · '\)\+tradeStateLabel\(t\)/);
+  assert.match(html, /const activeTrades=s\.log\.filter\(t=>validTrade\(t\)&&!terminalStates\.has/);
+  assert.match(html, /for\(const t of chartSignals\)/);
+});
