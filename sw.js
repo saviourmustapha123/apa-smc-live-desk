@@ -1,6 +1,6 @@
 /* APA SMC Live Desk service worker. Bump SHELL_VERSION whenever changing offline-shell behavior. */
 'use strict';
-const SHELL_VERSION = 'apa-smc-shell-2026-10-24-8';
+const SHELL_VERSION = 'apa-smc-shell-2026-10-24-9';
 const SHELL_CACHE = SHELL_VERSION;
 const SHELL_FILES = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 const EXTERNAL_ASSETS = [
