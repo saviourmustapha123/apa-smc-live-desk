@@ -211,3 +211,5 @@ test('signal monitor exposes entry, stop, target, planned R:R, and setup trigger
   assert.match(html, /Number\(t\.rr\|\|0\)\.toFixed\(2\)/);
   assert.match(html, /t\.reason\|\|t\.scanEngine\|\|'Provisional structural trigger'/);
 });
+
+test('closed forex markets request the last known quote instead of forcing a stale-data 404',()=>{assert.match(html,/async function fetchQuote\(sym\)/);assert.match(html,/else q=await fetchQuote\(s\.symbol\)/);assert.doesNotMatch(html,/allowStale=false/);assert.match(html,/endpoint\('\/latest\?symbols='/\+encodeURIComponent\(sym\)\)/)});
