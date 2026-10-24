@@ -318,13 +318,15 @@ test('historical signal stays explicitly unresolved when price never reaches ent
   assert.equal(result.rNow, null);
 });
 
-test('historical signal is marked missed when target trades beyond entry without filling entry', () => {
+test('historical signal expires without P&L when target passes before entry fills', () => {
   const result = runOutcomeResolver({}, [
     { time: 100, open: 100, high: 101, low: 99, close: 100 },
     { time: 200, open: 116, high: 118, low: 116, close: 117 }
   ]);
-  assert.equal(result.status, 'MISSED ENTRY');
-  assert.equal(result.outcome, 'MISSED ENTRY');
+  assert.equal(result.status, 'EXPIRED');
+  assert.equal(result.outcome, 'EXPIRED');
+  assert.equal(result.exitPrice, null);
+  assert.equal(result.rNow, null);
 });
 
 test('historical signal records a worse-than-planned R when the market gaps through the stop', () => {
@@ -466,13 +468,15 @@ test('a live pending signal is not marked historical merely because a later cand
 
 
 
-test('signal desk separates not triggered, active and missed signals into uncluttered panes', () => {
-  for (const label of ['data-verified-filter="untriggered"','data-verified-filter="active"','data-verified-filter="missed"','id="verifiedSignalList"']) assert.ok(html.includes(label));
+test('signal desk separates untriggered, active and closed signals into uncluttered panes', () => {
+  for (const label of ['data-verified-filter="untriggered"','data-verified-filter="active"','data-verified-filter="closed"','id="verifiedSignalList"']) assert.ok(html.includes(label));
   assert.match(html, /const tpPct=running&&hasPrice/);
   assert.match(html, /const slPct=running&&hasPrice/);
   assert.match(html, /const progressMarkup=running\?/);
 });
 
-test('performance separates successful, unsuccessful and missed signals', () => {
-  for (const label of ['data-performance-filter="successful"','data-performance-filter="unsuccessful"','data-performance-filter="missed"','id="performanceSuccessCount"','id="performanceLossCount"','id="performanceMissedCount"']) assert.ok(html.includes(label));
+test('performance separates successful and unsuccessful trades without a missed-entry pane', () => {
+  for (const label of ['data-performance-filter="successful"','data-performance-filter="unsuccessful"','id="performanceSuccessCount"','id="performanceLossCount"']) assert.ok(html.includes(label));
+  assert.ok(!html.includes('data-performance-filter="missed"'));
+  assert.ok(!html.includes('data-verified-filter="missed"'));
 });
