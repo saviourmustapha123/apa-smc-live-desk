@@ -979,6 +979,14 @@ function analyse(){
 }
 function log(set){
   if(!set||!Number.isFinite(Number(set.rr))||Number(set.rr)<3)return;
+  // Chart-only APA-style heuristics may display a provisional idea, but the journal only
+  // accepts a matching latest-candle setup that also passes the stricter SMC sequence scanner.
+  // This prevents a lone sweep/BOS candle from becoming an actionable logged signal.
+  const validated=scanOpportunityHistory(set.symbol,set.tf,s.bars).find(candidate=>
+   candidate.time===set.time&&candidate.side===set.side&&candidate.status==='NOT RUNNING'&&Number(candidate.rr)>=3
+  );
+  if(!validated){console.info('Signal not journaled: strict sequence validation did not confirm '+[set.symbol,set.tf,set.side,set.time].join('|'));return}
+  set={...validated,identifiedAt:Number(set.identifiedAt)||Date.now()};
  const key=[set.symbol,set.tf,set.side,set.time].join('|');
  const existing=s.log.find(t=>[t.symbol,t.tf,t.side,t.time].join('|')===key);
  // A candle's signal is immutable once recorded: refreshing or changing markets must not duplicate it or reset its lifecycle.
