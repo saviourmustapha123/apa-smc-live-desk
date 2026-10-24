@@ -12,9 +12,12 @@ export function applyCandlesToTrade(trade, bars, { maxForwardBars = 100 } = {}) 
     const targetTouchedOnSignal = next.side === 'BUY'
       ? signalBar.high >= next.tp
       : signalBar.low <= next.tp;
-    if (targetTouchedOnSignal) {
+    const entryTouchedOnSignal = signalBar.low <= next.entry && signalBar.high >= next.entry;
+    if (targetTouchedOnSignal || entryTouchedOnSignal) {
       next.status = 'MISSED ENTRY';
-      next.outcome = 'TARGET ALREADY REACHED ON SIGNAL CANDLE BEFORE ORDER WAS ACTIVE';
+      next.outcome = targetTouchedOnSignal
+        ? 'TARGET ALREADY REACHED ON SIGNAL CANDLE BEFORE ORDER WAS ACTIVE'
+        : 'ENTRY LEVEL ALREADY TOUCHED ON SIGNAL CANDLE BEFORE ORDER WAS ACTIVE';
       next.exitTime = signalBar.time;
       next.lastProcessedBarTime = signalBar.time;
       next.resultR = null;
