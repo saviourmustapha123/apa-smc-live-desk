@@ -19,6 +19,11 @@ test('both automatic signal scanners include the one-minute scalp timeframe', ()
   assert.match(html, /signalSets=scanSets\.filter\(\(\[tf\]\)=>\['1m','5m','15m','1h','4h','8h','12h','1d'\]\.includes\(tf\)\)/);
 });
 
+test('live signal cards visibly disclose provisional strategy status', () => {
+  assert.match(html, /PROVISIONAL STRATEGY/);
+  assert.match(html, /exact owner rules still require confirmation/);
+});
+
 test('candidate labels do not claim strategy verification while the live engine remains heuristic', () => {
   assert.match(html, /verificationState:'PROVISIONAL-HEURISTIC'/);
   assert.doesNotMatch(html, /verificationState:'RULE-VERIFIED'/);
