@@ -57,6 +57,14 @@ function normalizeGate(rows) {
   return rows.map(r => ({ time: num(r[0]), open: num(r[5]), high: num(r[3]), low: num(r[4]), close: num(r[2]), volume: num(r[1]) }))
     .filter(b => Number.isFinite(b.time) && [b.open,b.high,b.low,b.close].every(Number.isFinite)).sort((a,b)=>a.time-b.time);
 }
+function configuredQqqProxy() {
+  try {
+    const url = new URL(String(process.env.QQQ_PROXY_URL || ''));
+    if (url.protocol !== 'https:' || !url.hostname.endsWith('.workers.dev') ||
+        url.username || url.password || url.search || url.hash) return '';
+    return url.origin + url.pathname.replace(/\/$/, '');
+  } catch { return ''; }
+}
 async function fetchBars(symbol, tf) {
   const errors = [];
   let best = null;
@@ -85,12 +93,12 @@ async function fetchBars(symbol, tf) {
     }
     if (best) return best;
   } else {
-    const binanceHosts = ['fapi.binance.com','fapi1.binance.com','fapi2.binance.com','fapi3.binance.com','fapi4.binance.com'];
+    const proxyBase = configuredQqqProxy();
     const providers = [
-      ...binanceHosts.map(host => ['Binance USD-M ' + host, async () => normalizeBinance(await getJson('https://' + host + '/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))]),
+      ...(proxyBase ? [['Configured Cloudflare Worker', async () => normalizeBinance(await getJson(proxyBase + '/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))]] : []),
+      ['Binance USD-M', async () => normalizeBinance(await getJson('https://fapi.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
       ['Binance API alternate', async () => normalizeBinance(await getJson('https://api.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
       ['Binance GCP alternate', async () => normalizeBinance(await getJson('https://api-gcp.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
-      ['Pipai third-party Binance USD-M mirror', async () => normalizeBinance(await getJson('https://api-dev.pipai.org/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
       ['Bybit', async () => { const j = await getJson('https://api.bybit.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + ({'5m':'5','15m':'15','1h':'60'}[tf]) + '&limit=1000'); if (Number(j.retCode)!==0) throw new Error(j.retMsg || 'retCode ' + j.retCode); return normalizeBybit(j.result?.list || []); }],
       ['Bytick', async () => { const j = await getJson('https://api.bytick.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + ({'5m':'5','15m':'15','1h':'60'}[tf]) + '&limit=1000'); if (Number(j.retCode)!==0) throw new Error(j.retMsg || 'retCode ' + j.retCode); return normalizeBybit(j.result?.list || []); }],
       ['Gate USDT futures', async () => normalizeGate(await getJson('https://api.gateio.ws/api/v4/futures/usdt/candlesticks?contract=QQQ_USDT&interval=' + tf + '&limit=1000'))]
@@ -98,7 +106,7 @@ async function fetchBars(symbol, tf) {
     for (const [provider, fetcher] of providers) {
       try {
         const bars = (await fetcher()).sort((a,b)=>a.time-b.time);
-        if (bars.length >= 100) { best = { bars, provider, exact: true }; if (provider.includes('third-party mirror')) warnings.push(symbol + ' ' + tf + ' uses a third-party mirror of the exact symbol; verify provider parity before production use'); break; }
+        if (bars.length >= 100) { best = { bars, provider, exact: true }; break; }
         errors.push(provider + ' returned only ' + bars.length + ' valid bars');
       } catch (e) { errors.push(provider + ': ' + e.message); }
     }
