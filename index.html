@@ -938,6 +938,7 @@ function renderVerifiedSignalCards(){
  pane.querySelectorAll('[data-verified-filter]').forEach(btn=>{const selected=btn.dataset.verifiedFilter===verifiedSignalFilter;btn.classList.toggle('active',selected);btn.setAttribute('aria-selected',String(selected));});
  const list=$('verifiedSignalList');if(!list)return;
  const source=verifiedSignalFilter==='active'?active:verifiedSignalFilter==='missed'?missed:untriggered;
+ pane.querySelectorAll('[data-verified-filter]').forEach(btn=>btn.onclick=()=>{verifiedSignalFilter=btn.dataset.verifiedFilter;renderVerifiedSignalCards()});
  if(!source.length){list.innerHTML='<div class="fine">'+(verifiedSignalFilter==='active'?'No triggered trades are running. Pending entries are kept in Not triggered.':verifiedSignalFilter==='missed'?'No missed or invalidated signals are recorded.':'No qualified signal is waiting for entry on the current scan.')+'</div>';return}
  list.innerHTML=source.slice(0,5).map(t=>{
   const entry=Number(t.entry),sl=Number(t.sl),tp=Number(t.tp),p=Number(t.lastObservedPrice),hasPrice=Number.isFinite(p)&&p>0,running=['RUNNING','TRIGGERED'].includes(String(t.status||'').toUpperCase()),risk=Math.abs(entry-sl),reward=Math.abs(tp-entry),dir=t.side==='BUY'?1:-1;
@@ -950,7 +951,6 @@ function renderVerifiedSignalCards(){
   const progressMarkup=running?'<div class="verified-progress"><small>Target progress · '+(tpPct===null?'—':tpPct.toFixed(1)+'%')+'</small><div class="bar"><div style="width:'+Math.max(0,Math.min(100,tpPct||0)).toFixed(1)+'%;background:var(--g)"></div></div><small>Stop loss risk consumed · '+(slPct===null?'—':slPct.toFixed(1)+'%')+'</small><div class="bar"><div style="width:'+(slPct||0).toFixed(1)+'%;background:var(--r)"></div></div><div class="fine">Current R: '+(Number.isFinite(t.rNow)?t.rNow.toFixed(2)+'R':'Waiting for quote')+'</div></div>':'';
   return '<article class="verified-signal-card"><div class="verified-signal-title"><span>'+escapeHTML(t.symbol)+' · '+escapeHTML(t.side)+' · '+escapeHTML(t.tf.toUpperCase())+'</span><span class="pill">'+status+'</span></div><div class="verified-levels"><div class="verified-level"><small>ENTRY</small><b>'+escapeHTML(priceFor(entry,t.symbol))+'</b></div><div class="verified-level"><small>STOP LOSS</small><b style="color:var(--r)">'+escapeHTML(priceFor(sl,t.symbol))+'</b></div><div class="verified-level"><small>TAKE PROFIT</small><b style="color:var(--g)">'+escapeHTML(priceFor(tp,t.symbol))+'</b></div></div><div class="verified-status">Latest price: '+(hasPrice?escapeHTML(priceFor(p,t.symbol)):'Not available')+' · '+escapeHTML(progress)+'</div>'+progressMarkup+'<details class="signal-details"><summary>Setup details</summary><div class="fine">'+escapeHTML(reasons)+'</div></details></article>';
  }).join('');
- pane.querySelectorAll('[data-verified-filter]').forEach(btn=>btn.onclick=()=>{verifiedSignalFilter=btn.dataset.verifiedFilter;renderVerifiedSignalCards()});
 }
 
 let performanceFilter='successful';
