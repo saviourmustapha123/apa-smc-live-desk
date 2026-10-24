@@ -6,9 +6,11 @@ const app = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 function extractFunction(name) {
   const start = app.indexOf('function ' + name + '(');
   if (start < 0) throw new Error('Production function not found: ' + name);
-  const next = app.indexOf('\nfunction ', start + 10);
-  if (next < 0) throw new Error('Could not find the end boundary for production function: ' + name);
-  return app.slice(start, next);
+  const nextFunction = app.indexOf('\nfunction ', start + 10);
+  const nextDiagnosticMap = app.indexOf('\nconst strategyScanDiagnostics', start + 10);
+  const candidates = [nextFunction, nextDiagnosticMap].filter(index => index >= 0);
+  if (!candidates.length) throw new Error('Could not find the end boundary for production function: ' + name);
+  return app.slice(start, Math.min(...candidates));
 }
 
 const functionNames = [
