@@ -1045,7 +1045,7 @@ async function refreshAllSignals({clearFirst=false}={}) {
   const others=Object.keys(symbolConfig).filter(market=>market!==s.symbol);
   const results=await Promise.all(others.map(async market=>({market,count:await scanBackgroundPair(market,s.signalFreshMode)})));
   renderLog();const newCount=results.reduce((sum,item)=>sum+item.count,0);
-  setMessage((clearFirst?'Signal journal reset. ':'Refresh complete. ')+newCount+' new candidates found across '+Object.keys(symbolConfig).length+' markets. '+(s.signalFreshMode?'Only current/latest-bar candidates are admitted after reset.':'Historical scan mode remains enabled.'));
+  setMessage((clearFirst?'Signal journal reset. ':'Refresh complete. ')+newCount+' additional candidates found on the other markets; the selected market was refreshed separately. '+(s.signalFreshMode?'Only current/latest-bar candidates are admitted after reset.':'Historical scan mode remains enabled.'));
   if(modeEl)modeEl.textContent=s.signalFreshMode?'Fresh signals only':'Normal scan';
  }catch(e){setMessage('Refresh incomplete: '+(e?.message||String(e))+' · existing chart data was retained where available.');console.error('Signal refresh failed',e)}
  finally{s.signalRefreshBusy=false;if(refreshBtn)refreshBtn.disabled=false;if(resetBtn)resetBtn.disabled=false}
