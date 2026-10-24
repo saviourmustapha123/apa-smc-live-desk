@@ -85,7 +85,7 @@ try {
 
 for (const symbol of ['EURUSD', 'BTCUSD']) {
   try {
-    const quote = await (await get(`${API}/${symbol}?allowStale=false`)).json();
+    const quote = await (await get(`${API}/${symbol}`)).json();
     const mid = Number(quote.mid ?? ((Number(quote.bid) + Number(quote.ask)) / 2));
     if (!Number.isFinite(mid) || mid <= 0) fail(`${symbol} live quote shape`, 'Missing positive mid/bid-ask price');
     else {
@@ -93,8 +93,7 @@ for (const symbol of ['EURUSD', 'BTCUSD']) {
       else pass(`${symbol} live quote`, `mid=${mid}, source=${quote.source ?? 'not specified'}`);
     }
   } catch (e) {
-    if (symbol === 'EURUSD' && /HTTP 404/.test(e.message)) warn('EURUSD quote freshness', 'Forex market may be closed or quote older than five minutes');
-    else fail(`${symbol} live quote endpoint`, e.message);
+    fail(`${symbol} live quote endpoint`, e.message);
   }
 
   try {
