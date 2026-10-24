@@ -10,7 +10,12 @@ const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const start = html.indexOf('function resolveSignalOutcomes(');
 const end = html.indexOf('\nfunction signalDayStamp(', start);
 assert.ok(start >= 0 && end > start, 'production signal lifecycle function must exist');
-const lifecycleSource = html.slice(start, end) + '\nthis.resolveSignalOutcomes = resolveSignalOutcomes;';
+const admissionStart = html.indexOf('function dailySignalAdmission(');
+const admissionEnd = html.indexOf('\nasync function scanBackgroundPair(', admissionStart);
+assert.ok(admissionStart >= 0 && admissionEnd > admissionStart, 'production signal admission guards must exist');
+const lifecycleSource = html.slice(start, end) + '\n' +
+  html.slice(admissionStart, admissionEnd) + '\n' +
+  'this.resolveSignalOutcomes = resolveSignalOutcomes; this.dailySignalAdmission = dailySignalAdmission; this.candidateAlreadyPastLevels = candidateAlreadyPastLevels;';
 const context = {
   s: { log: [] },
   save() {},
@@ -108,4 +113,32 @@ test('a persisted trigger skips candles fully before entry time instead of repla
   assert.equal(signal.status, 'RUNNING');
   assert.equal(signal.outcome, 'OPEN');
   assert.equal(signal.triggeredAt, 700000);
+});
+
+
+test('duplicate signal admission is blocked across persisted and queued signals', () => {
+  const candidate = { symbol: 'BTCUSD', tf: '5m', side: 'BUY', time: 123, entry: 100, sl: 95, tp: 115 };
+  context.s.log = [{ ...candidate }];
+  assert.equal(vmContext.dailySignalAdmission(candidate, []), 'duplicate candidate');
+  context.s.log = [];
+  assert.equal(vmContext.dailySignalAdmission(candidate, [{ ...candidate }]), 'duplicate candidate');
+});
+
+test('a genuinely new signal is not rejected by duplicate guard', () => {
+  context.s.log = [{ symbol: 'BTCUSD', tf: '5m', side: 'BUY', time: 123 }];
+  assert.equal(vmContext.dailySignalAdmission({ symbol: 'BTCUSD', tf: '15m', side: 'BUY', time: 123 }, []), '');
+});
+
+test('stale long candidate beyond stop or target is rejected before admission', () => {
+  const candidate = { side: 'BUY', entry: 100, sl: 95, tp: 115 };
+  assert.equal(vmContext.candidateAlreadyPastLevels(candidate, [{ isOpen: false, close: 94 }]), true);
+  assert.equal(vmContext.candidateAlreadyPastLevels(candidate, [{ isOpen: false, close: 116 }]), true);
+  assert.equal(vmContext.candidateAlreadyPastLevels(candidate, [{ isOpen: false, close: 105 }]), false);
+});
+
+test('stale short candidate beyond stop or target is rejected before admission', () => {
+  const candidate = { side: 'SELL', entry: 100, sl: 105, tp: 85 };
+  assert.equal(vmContext.candidateAlreadyPastLevels(candidate, [{ isOpen: false, close: 106 }]), true);
+  assert.equal(vmContext.candidateAlreadyPastLevels(candidate, [{ isOpen: false, close: 84 }]), true);
+  assert.equal(vmContext.candidateAlreadyPastLevels(candidate, [{ isOpen: false, close: 95 }]), false);
 });
