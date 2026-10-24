@@ -134,8 +134,9 @@ function activeFor(symbol, tf) {
     trade.symbol === symbol && trade.tf === tf && ['NOT RUNNING', 'ACTIVE'].includes(trade.status)
   );
 }
-function validSignal(signal) {
+function validSignal(signal, signalBar) {
   if (!signal || signal.status !== 'NOT RUNNING' || !Number.isFinite(signal.rr) || signal.rr < 3) return false;
+  if (!signalBar || (signal.side === 'BUY' ? signalBar.high >= signal.tp : signal.side === 'SELL' ? signalBar.low <= signal.tp : true)) return false;
   const risk = signal.side === 'BUY' ? signal.entry - signal.sl : signal.sl - signal.entry;
   const reward = signal.side === 'BUY' ? signal.tp - signal.entry : signal.entry - signal.tp;
   return Number.isFinite(risk) && Number.isFinite(reward) && risk > 0 && reward / risk >= 3;
@@ -236,7 +237,7 @@ for (const symbol of SYMBOLS) {
           const engine = createProductionScannerReplay({ now: nowMs });
           const result = engine.scan(symbol, tf, bars);
           const candidates = result.signals
-            .filter(signal => signal.time === latest.time && validSignal(signal))
+            .filter(signal => signal.time === latest.time && validSignal(signal, latest))
             .sort((a, b) => Number(a.rr) - Number(b.rr));
           candidateCount = candidates.length;
           if (candidates.length) {
