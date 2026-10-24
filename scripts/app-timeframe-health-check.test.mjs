@@ -592,3 +592,15 @@ test('rule-verified qualifying signals are visibly labelled in chart markers and
   assert.ok(html.includes('const activeTrades=s.log.filter(t=>validTrade(t)&&!terminalStates.has'));
   assert.ok(html.includes('for(const t of chartSignals)'));
 });
+
+
+test('verified signal pane renders complete entry, stop, target and live progress for pending and running setups', () => {
+  assert.ok(html.includes('id="verifiedSignalCards"'));
+  assert.ok(html.includes('function renderVerifiedSignalCards()'));
+  for (const label of ['ENTRY','STOP LOSS','TAKE PROFIT','NOT TRIGGERED','TRIGGERED / RUNNING','Target progress','Stop loss risk consumed']) {
+    assert.ok(html.includes(label), 'expected verified signal pane field: ' + label);
+  }
+  assert.ok(html.includes("renderVerifiedSignalCards();"));
+  assert.ok(html.includes('Keep verified trade levels visible even if the signal timestamp is outside the currently loaded chart window.'));
+  assert.ok(html.includes("const activeTrades=s.log.filter(t=>validTrade(t)&&!terminalStates.has"));
+});
