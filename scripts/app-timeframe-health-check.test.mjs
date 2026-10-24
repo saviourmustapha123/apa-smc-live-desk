@@ -404,7 +404,7 @@ test('active progress is rendered for pending signals and historical candle mark
 
 
 test('visible SMC signals require a confirmed entry sequence rather than any single pattern label', () => {
-  assert.match(html, /const validatedSequence=\(hasStructure&&disp&&hasZoneRetest\)/);
+  assert.match(html, /const validatedSequence=!!blockRetest\|\|!!fvgRetest/);
   assert.match(html, /if\(!validatedSequence\)continue/);
   assert.match(html, /Entry sequence passed: structure \+ displacement \+ retest\/confluence/);
 });
@@ -414,4 +414,11 @@ test('signal entry prefers the validated zone midpoint and stop includes a struc
   assert.match(html, /blockRetest\?\(blockRetest\.low\+blockRetest\.high\)\/2/);
   assert.match(html, /const buffer=aa\*0\.1/);
   assert.match(html, /target\.rr<3/);
+});
+
+
+test('FVG entry retests require displacement and a prior close-confirmed structure break', () => {
+  assert.match(html, /gapDisplacement=Math\.abs\(third\.close-third\.open\)>=gapAtr\*s\.disp/);
+  assert.match(html, /broken=gapPivots\.h\.at\(-1\)&&third\.close>gapPivots\.h\.at\(-1\)\.p/);
+  assert.match(html, /broken=gapPivots\.l\.at\(-1\)&&third\.close<gapPivots\.l\.at\(-1\)\.p/);
 });
