@@ -1203,6 +1203,19 @@ function latestInducementProxy(b,k){
  return null
 }
 
+
+function chartSignalFor(log,symbol,tf){
+ // One source of truth: the visible chart never promotes its own proxy trigger
+ // into an actionable signal independent of production scanner admission.
+ const openStatuses=new Set(['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED','RUNNING','TRIGGERED','ACTIVE']);
+ const terminalStatuses=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','MISSED ENTRY','MISSED','CLOSED','HISTORICAL']);
+ return (Array.isArray(log)?log:[])
+  .filter(t=>t&&t.symbol===symbol&&t.tf===tf&&Number(t.rr)>=3&&
+    openStatuses.has(String(t.status||'').toUpperCase())&&
+    !terminalStatuses.has(String(t.status||'').toUpperCase()))
+  .sort((a,b)=>Number(b.time)-Number(a.time))[0]||null;
+}
+
 function analyse(){
  const b=s.bars.filter(c=>!c.isOpen);s.zoneDefs=[];s.overlaySignal=null;const minimumBars=s.tf==='1Y'?10:s.tf==='1M'?20:35;if(b.length<minimumBars){$('bias').textContent='Need more candles';$('analysisTime').textContent='At least '+minimumBars+' candles are required';$('signal').innerHTML='<h3>Insufficient candles</h3><div class="muted">Load more real OHLC bars before analysis. Existing overlays are cleared to avoid showing stale levels.</div>';paint(null,[],[],[]);renderOverlay();return}
  const {h,l}=pivots(b,+s.k),sh=h.at(-1),sh2=h.at(-2),sl=l.at(-1),sl2=l.at(-2),x=b.at(-1),p=b.at(-2),a=atr(b)||Math.max(x.high-x.low,1e-8),body=Math.abs(x.close-x.open),bull=x.close>x.open,bear=x.close<x.open,dis=body>=a*s.disp;
@@ -1284,14 +1297,8 @@ function analyse(){
   for(const z of rbsMatches.slice(-3)){s.zoneDefs.push({start:z.start,end:z.end,high:z.level+a*.08,low:z.level-a*.08,label:'RBS · HISTORICAL RETEST',color:'#facc15',fill:'#facc1528',extendRight:false});marks.push({time:z.end,position:'belowBar',color:'#facc15',shape:'circle',text:'RBS'})}
   if(inducementMatch){const im=inducementMatch;marks.push({time:im.time,position:im.side==='BEARISH'?'aboveBar':'belowBar',color:'#a3e635',shape:'diamond',text:'IDM '+im.status});s.zoneDefs.push({start:im.time,end:im.eventIndex!=null?b[im.eventIndex].time:x.time,high:im.level+a*.03,low:im.level-a*.03,label:'IDM '+im.status+' · proxy',color:'#a3e635',fill:'#a3e63520',extendRight:false})}if(swH)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:'BSL sweep'});if(swL)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:'SSL sweep'});if(bearBreak)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:bias==='Bullish structure'?'CHoCH?':'BOS↓'});if(bullBreak)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:bias==='Bearish structure'?'CHoCH?':'BOS↑'});if(fvgBear)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'square',text:'FVG'});if(fvgBull)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'square',text:'FVG'});if(sbr)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'circle',text:'SBR'});if(rbs)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'circle',text:'RBS'});
  addAdvancedAnnotations(b,marks);
- // Actionable levels on the chart must come from the production signal journal.
- // Do not create a separate chart-only proxy signal: that can disagree with the
- // stricter live-chat scanner and mislead the user into trading a non-admitted setup.
- const openStatuses=new Set(['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED','RUNNING','TRIGGERED','ACTIVE']);
- const terminalStatuses=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','MISSED ENTRY','MISSED','CLOSED','HISTORICAL']);
- const chartSignal=(s.log||[])
-  .filter(t=>t.symbol===s.symbol&&t.tf===s.tf&&Number(t.rr)>=3&&openStatuses.has(String(t.status||'').toUpperCase())&&!terminalStatuses.has(String(t.status||'').toUpperCase()))
-  .sort((a,b)=>Number(b.time)-Number(a.time))[0]||null;
+ // Actionable levels on the chart come from the same production signal journal as the live desk.
+ const chartSignal=chartSignalFor(s.log,s.symbol,s.tf);
  if(chartSignal){
   s.overlaySignal=chartSignal;
   levelLines.push(['SIGNAL ENTRY',chartSignal.entry,chartSignal.side==='BUY'?'#35d39a':'#ff657a'],['SIGNAL STOP',chartSignal.sl,'#ff657a'],['SIGNAL TARGET · 1:'+Number(chartSignal.rr).toFixed(2),chartSignal.tp,'#35d39a']);
