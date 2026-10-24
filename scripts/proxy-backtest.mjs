@@ -57,7 +57,7 @@ async function fetchBars(symbol, interval) {
   const unique = new Map(bars.map(b => [b.time,b]));
   bars = [...unique.values()];
   if (aggregateHours > 1) {
-    const width = aggregateHours * 3600;
+    const width = TIMEFRAME_SECONDS[interval];
     const groups = new Map();
     for (const bar of bars) {
       const bucket = Math.floor(bar.time / width) * width;
