@@ -10,6 +10,8 @@ const INTERVAL_SECONDS = { '5m': 300, '15m': 900, '1h': 3600 };
 const report = [];
 const failures = [];
 const warnings = [];
+let exactCoverage = 0;
+let proxyCoverage = 0;
 const iso = seconds => new Date(seconds * 1000).toISOString();
 const num = x => x == null || x === '' ? NaN : Number(x);
 function validOHLC(b) {
@@ -216,6 +218,7 @@ for (const symbol of SYMBOLS) {
       const bars = data.bars.filter(b => validOHLC(b) && b.time + INTERVAL_SECONDS[tf] <= nowSeconds)
         .sort((a,b)=>a.time-b.time);
       const result = runBacktest(symbol, tf, bars, data.provider, data.exact);
+      if (data.exact) exactCoverage++; else proxyCoverage++;
       const rate = result.winRate == null ? 'n/a' : result.winRate.toFixed(1) + '%';
       log('| ' + symbol + ' | ' + tf + ' | ' + data.provider + ' | ' + (data.exact ? 'yes' : 'NO, proxy') + ' | ' + result.bars + ' | ' + result.days.toFixed(1) + ' | ' + result.candidates + ' | ' + result.evaluated + ' | ' + result.executed + ' | ' + result.wins + ' | ' + result.losses + ' | ' + result.unresolved + ' | ' + result.missed + ' | ' + result.invalidated + ' | ' + rate + ' | ' + result.netR.toFixed(2) + 'R | ' + (result.profitFactor === Infinity ? '∞' : result.profitFactor == null ? 'n/a' : result.profitFactor.toFixed(2)) + ' | ' + (result.expectancyR == null ? 'n/a' : result.expectancyR.toFixed(2) + 'R') + ' | ' + result.maxDrawdownR.toFixed(2) + 'R |');
       if (!data.exact) warnings.push(symbol + ' ' + tf + ' uses a symbol/venue proxy');
@@ -239,6 +242,8 @@ for (const symbol of SYMBOLS) {
   }
 }
 log('## Validation summary');
+log('- Exact pair/timeframe data coverage: ' + exactCoverage + '/9');
+log('- Proxy pair/timeframe coverage: ' + proxyCoverage + '/9 (not valid as exact-contract proof)');
 log('- Data failures: ' + failures.length);
 log('- Warnings: ' + warnings.length);
 for (const x of warnings) log('- WARNING: ' + x);
@@ -246,4 +251,4 @@ for (const x of failures) log('- FAILURE: ' + x);
 await mkdir(new URL('../artifacts/', import.meta.url), { recursive: true });
 await writeFile(OUT, report.join('\n') + '\n', 'utf8');
 console.log('Wrote artifacts/production-history-backtest.md');
-if (failures.length) process.exitCode = 1;
+if (failures.length || proxyCoverage > 0) process.exitCode = 1;
