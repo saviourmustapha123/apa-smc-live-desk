@@ -621,3 +621,9 @@ test('expired pending setups are visibly labelled missed and never presented as 
   assert.ok(html.includes("const unsuccessful=all.filter(t=>t.status==='STOP LOSS')"));
   assert.ok(html.includes("const missedPerformance=all.filter(t=>['EXPIRED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()))"));
 });
+
+test('expired and invalidated pending signals have explicit non-loss labels', () => {
+  assert.ok(html.includes("if(st==='EXPIRED')return 'MISSED · ENTRY NOT TRIGGERED'"));
+  assert.ok(html.includes("if(st==='INVALIDATED')return 'INVALIDATED BEFORE ENTRY'"));
+  assert.ok(html.includes("if(['TAKE PROFIT','STOP LOSS','CLOSED'].includes(st))return 'CLOSED · '+st"));
+});
