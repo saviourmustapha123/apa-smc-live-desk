@@ -5,6 +5,23 @@ export function applyCandlesToTrade(trade, bars, { maxForwardBars = 100 } = {}) 
     ? next.lastProcessedBarTime
     : next.signalTime;
 
+  // A target already touched on the signal candle was reached before a paper order
+  // could be placed after candle close. Migrate older pending records safely.
+  const signalBar = ordered.find(bar => bar.time === next.signalTime);
+  if (next.status === 'NOT RUNNING' && signalBar) {
+    const targetTouchedOnSignal = next.side === 'BUY'
+      ? signalBar.high >= next.tp
+      : signalBar.low <= next.tp;
+    if (targetTouchedOnSignal) {
+      next.status = 'MISSED ENTRY';
+      next.outcome = 'TARGET ALREADY REACHED ON SIGNAL CANDLE BEFORE ORDER WAS ACTIVE';
+      next.exitTime = signalBar.time;
+      next.lastProcessedBarTime = signalBar.time;
+      next.resultR = null;
+      return next;
+    }
+  }
+
   for (const bar of ordered) {
     if (bar.time <= lastProcessed) continue;
     if (!['NOT RUNNING', 'ACTIVE'].includes(next.status)) break;
