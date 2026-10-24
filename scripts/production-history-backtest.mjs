@@ -88,6 +88,7 @@ async function fetchBars(symbol, tf) {
     const binanceHosts = ['fapi.binance.com','fapi1.binance.com','fapi2.binance.com','fapi3.binance.com','fapi4.binance.com'];
     const providers = [
       ...binanceHosts.map(host => ['Binance USD-M ' + host, async () => normalizeBinance(await getJson('https://' + host + '/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))]),
+      ['Pipai third-party Binance USD-M mirror', async () => normalizeBinance(await getJson('https://api-dev.pipai.org/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
       ['Bybit', async () => { const j = await getJson('https://api.bybit.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + ({'5m':'5','15m':'15','1h':'60'}[tf]) + '&limit=1000'); if (Number(j.retCode)!==0) throw new Error(j.retMsg || 'retCode ' + j.retCode); return normalizeBybit(j.result?.list || []); }],
       ['Bytick', async () => { const j = await getJson('https://api.bytick.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + ({'5m':'5','15m':'15','1h':'60'}[tf]) + '&limit=1000'); if (Number(j.retCode)!==0) throw new Error(j.retMsg || 'retCode ' + j.retCode); return normalizeBybit(j.result?.list || []); }],
       ['Gate USDT futures', async () => normalizeGate(await getJson('https://api.gateio.ws/api/v4/futures/usdt/candlesticks?contract=QQQ_USDT&interval=' + tf + '&limit=1000'))]
@@ -95,7 +96,7 @@ async function fetchBars(symbol, tf) {
     for (const [provider, fetcher] of providers) {
       try {
         const bars = (await fetcher()).sort((a,b)=>a.time-b.time);
-        if (bars.length >= 100) { best = { bars, provider, exact: true }; break; }
+        if (bars.length >= 100) { best = { bars, provider, exact: true }; if (provider.includes('third-party mirror')) warnings.push(symbol + ' ' + tf + ' uses a third-party mirror of the exact symbol; verify provider parity before production use'); break; }
         errors.push(provider + ' returned only ' + bars.length + ' valid bars');
       } catch (e) { errors.push(provider + ': ' + e.message); }
     }
@@ -218,6 +219,7 @@ for (const symbol of SYMBOLS) {
       const bars = data.bars.filter(b => validOHLC(b) && b.time + INTERVAL_SECONDS[tf] <= nowSeconds)
         .sort((a,b)=>a.time-b.time);
       const result = runBacktest(symbol, tf, bars, data.provider, data.exact);
+      log('- Last closed candle: ' + iso(bars.at(-1).time) + '; close ' + bars.at(-1).close);
       if (data.exact) exactCoverage++; else proxyCoverage++;
       const rate = result.winRate == null ? 'n/a' : result.winRate.toFixed(1) + '%';
       log('| ' + symbol + ' | ' + tf + ' | ' + data.provider + ' | ' + (data.exact ? 'yes' : 'NO, proxy') + ' | ' + result.bars + ' | ' + result.days.toFixed(1) + ' | ' + result.candidates + ' | ' + result.evaluated + ' | ' + result.executed + ' | ' + result.wins + ' | ' + result.losses + ' | ' + result.unresolved + ' | ' + result.missed + ' | ' + result.invalidated + ' | ' + rate + ' | ' + result.netR.toFixed(2) + 'R | ' + (result.profitFactor === Infinity ? '∞' : result.profitFactor == null ? 'n/a' : result.profitFactor.toFixed(2)) + ' | ' + (result.expectancyR == null ? 'n/a' : result.expectancyR.toFixed(2) + 'R') + ' | ' + result.maxDrawdownR.toFixed(2) + 'R |');
