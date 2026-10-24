@@ -421,8 +421,8 @@ test('historical outcome resolution accounts for stop gaps at the candle open', 
 });
 
 test('last activity timestamp changes on state transitions, while quote refresh has its own timestamp', () => {
-  assert.match(html, /if\(t\.status!==previousStatus\)t\.lastActivityAt=now/);
-  assert.match(html, /if\(t\.lastObservedPrice!==p\)t\.lastPriceUpdateAt=now/);
+  assert.match(html, /if\(t\.status!==previousStatus\)\{t\.lastActivityAt=now;changed=true/);
+  assert.match(html, /if\(t\.lastObservedPrice!==p\)\{[\s\S]*?t\.lastPriceUpdateAt=now;[\s\S]*?persistSignals\(changedSignals\)/);
 });
 
 test('a live pending signal is not marked historical merely because a later candle closes', () => {
@@ -490,8 +490,8 @@ test('signal pane exposes explicit refresh-all and clear-and-rescan controls wit
 });
 
 test('clear-and-rescan mode excludes historical candidates so old signal history is not immediately re-imported', () => {
-  assert.match(html, /signalFreshMode:false/);
+  assert.match(html, /signalFreshMode:true/);
   assert.match(html, /if\(freshOnly&&candidate\.status==='HISTORICAL'\)continue/);
   assert.match(html, /signalFreshMode:s\.signalFreshMode/);
-  assert.match(html, /if\(typeof p\.signalFreshMode==='boolean'\)s\.signalFreshMode=p\.signalFreshMode/);
+  assert.match(html, /s\.signalFreshMode=true/);
 });
