@@ -1060,7 +1060,7 @@ function renderVerifiedSignalCards(){
 
 let performanceFilter='successful';
 let automaticScanBusy=false,automaticScanCursor=0,automaticScanLastAt=0;
-async function runAutomaticPairScan(){
+async async function runAutomaticPairScan(){
  if(automaticScanBusy||Date.now()-automaticScanLastAt<12000)return;
  const markets=Object.keys(symbolConfig||{});if(!markets.length)return;
  automaticScanBusy=true;automaticScanLastAt=Date.now();
