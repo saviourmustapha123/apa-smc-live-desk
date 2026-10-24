@@ -533,3 +533,11 @@ test('BTCUSD and QQQUSDT perpetual use 24/7 market-session logic while EURUSD fo
   assert.match(html, /QQQUSDT:\{label:'QQQUSDT · ETF perpetual'/);
   assert.match(html, /else if\(String\(providerState\)\.toLowerCase\(\)==='closed'\)/);
 });
+
+test('signal scan analyses up to 2,000 retained closed candles per timeframe instead of truncating at 1,000', () => {
+  assert.match(html, /Analyse the full retained candle history supplied by the timeframe loader, not only the last 1,000 bars/);
+  assert.match(html, /const b=\(bars\|\|\[\]\)\.filter\(x=>!x\.isOpen\)\.slice\(-2000\),minimum=tf==='1Y'\?10:tf==='1M'\?20:35/);
+});
+test('trade horizon maps minute scalps separately from hourly intraday and higher-timeframe swing setups', () => {
+  assert.match(html, /const short=\['1m','5m'\]\.includes\(tf\),intraday=\['15m','30m','1h'\]\.includes\(tf\),extended=\['4h','8h','12h','1d'\]\.includes\(tf\)/);
+});
