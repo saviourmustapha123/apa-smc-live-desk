@@ -547,6 +547,16 @@ function resolveSignalOutcomes(symbol,tf,bars){
    if(stopTouched){finalStatus='STOP LOSS';exitPrice=sl;closedAt=bar.time*1000;break}
    if(targetTouched){finalStatus='TAKE PROFIT';exitPrice=tp;closedAt=bar.time*1000;break}
   }
+  // Pending entries need a finite, timeframe-specific validity window.
+  // Without this rule, untouched ideas can remain open indefinitely and clutter the queue.
+  if(!finalStatus&&!entered){
+   const maxPendingBars={'5m':18,'15m':16,'1h':24,'4h':18,'8h':12,'12h':10,'1d':7}[tf]||24;
+   const laterBars=closedBars.filter(bar=>bar.time>Number(t.time));
+   if(laterBars.length>=maxPendingBars){
+    finalStatus='EXPIRED';exitPrice=null;closedAt=laterBars.at(-1).time*1000;
+    t.closedReason='Entry window expired after '+maxPendingBars+' closed '+tf+' candles without an entry fill';
+   }
+  }
   const oldStatus=t.status,oldOutcome=t.outcome,oldR=t.rNow,oldExit=t.exitPrice,oldClosed=t.closedAt;
   if(finalStatus){
    t.status=finalStatus;t.outcome=finalStatus==='TAKE PROFIT'?'SUCCESS':finalStatus==='STOP LOSS'?'LOSS':finalStatus==='EXPIRED'?'EXPIRED':'INVALIDATED';
