@@ -20,3 +20,15 @@ The app routes Bybit requests through the Worker when a proxy URL is configured 
 - The app and Worker still require internet access.
 - Do not enter passwords, API keys or trading credentials into the Worker or website.
 - Deploying the Worker is separate from GitHub because it requires access to your Cloudflare account. The repository cannot deploy into that account automatically.
+
+
+## Enable the same QQQUSDT feed in background GitHub Actions
+
+The browser's saved proxy setting is local to that browser and is not visible to GitHub Actions. To let the background paper trader and historical backtest use the same exact QQQUSDT futures feed:
+
+1. Deploy the latest `proxy/qqqusdt-worker.js` in Cloudflare Workers and copy its HTTPS `.workers.dev` URL.
+2. In this GitHub repository, open **Settings → Secrets and variables → Actions → Variables**.
+3. Create a repository variable named `QQQ_PROXY_URL` with the Worker URL as its value. Do not include query parameters or credentials.
+4. Run **APA SMC background paper trader** and **APA SMC production history backtest** from the Actions tab. Their reports will show whether the exact QQQUSDT feed is reachable.
+
+The Worker proxies public market data only. It does not place orders. If the variable is absent or the Worker cannot reach the exchange, the background report marks QQQUSDT unavailable instead of substituting QQQ ETF prices.
