@@ -28,6 +28,7 @@ for (const path of [
   'scripts/strategy-discovery.test.mjs',
   'scripts/research-backtest.test.mjs',
   'scripts/app-timeframe-health-check.test.mjs',
+  'scripts/signal-lifecycle-regression.test.mjs',
   'scripts/proxy-backtest.mjs',
   '.github/workflows/background-health-check.yml',
   '.github/workflows/strategy-validation.yml'
