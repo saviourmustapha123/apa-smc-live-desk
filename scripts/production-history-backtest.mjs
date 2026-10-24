@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createProductionScannerReplay } from './production-scanner-replay.mjs';
+import { executeSignal } from './trade-entry-replay.mjs';
 
 const OUT = new URL('../artifacts/production-history-backtest.md', import.meta.url);
 const TIMEFRAMES = ['1m', '5m', '15m', '1h'];
@@ -122,54 +123,6 @@ async function fetchBars(symbol, tf) {
     } catch (e) { errors.push('Yahoo QQQ ETF proxy: ' + e.message); }
   }
   throw new Error(errors.join('; '));
-}
-
-function executeSignal(signal, bars, index) {
-  const riskAtPlannedEntry = signal.side === 'BUY' ? signal.entry - signal.sl : signal.sl - signal.entry;
-  const plannedReward = signal.side === 'BUY' ? signal.tp - signal.entry : signal.entry - signal.tp;
-  if (!(riskAtPlannedEntry > 0 && plannedReward > 0 && plannedReward / riskAtPlannedEntry >= MIN_RR)) return { outcome: 'REJECTED INVALID LEVELS/RR', r: null, triggered: false };
-  const signalBar = bars[index];
-  const targetTouchedBeforeOrderWasActive = signal.side === 'BUY'
-    ? signalBar.high >= signal.tp
-    : signalBar.low <= signal.tp;
-  const entryTouchedBeforeOrderWasActive = signalBar.low <= signal.entry && signalBar.high >= signal.entry;
-  if (targetTouchedBeforeOrderWasActive || entryTouchedBeforeOrderWasActive) {
-    const reason = targetTouchedBeforeOrderWasActive
-      ? 'target already touched on signal candle'
-      : 'entry already touched on signal candle';
-    return { outcome: 'MISSED ENTRY (' + reason + ')', r: null, triggered: false, exitTime: signalBar.time };
-  }
-  let triggeredAt = -1;
-  for (let i = index + 1; i < Math.min(bars.length, index + 1 + MAX_FORWARD_BARS); i++) {
-    const b = bars[i];
-    const entryTouched = b.low <= signal.entry && b.high >= signal.entry;
-    const stopTouched = signal.side === 'BUY' ? b.low <= signal.sl : b.high >= signal.sl;
-    const targetTouched = signal.side === 'BUY' ? b.high >= signal.tp : b.low <= signal.tp;
-    if (entryTouched && targetTouched && !stopTouched) return { outcome: 'MISSED / AMBIGUOUS ENTRY-TP ORDER IN SAME CANDLE', r: null, triggered: false, exitTime: b.time };
-    if (stopTouched && !entryTouched) return { outcome: 'INVALIDATED BEFORE ENTRY', r: null, triggered: false, exitTime: b.time };
-    if (targetTouched && !entryTouched) return { outcome: 'MISSED ENTRY (target reached first)', r: null, triggered: false, exitTime: b.time };
-    if (entryTouched) { triggeredAt = i; break; }
-  }
-  if (triggeredAt < 0) {
-    const horizon = Math.min(bars.length, index + 1 + MAX_FORWARD_BARS);
-    if (horizon >= bars.length) return { outcome: 'UNRESOLVED (data ended)', r: null, triggered: false };
-    return { outcome: 'MISSED ENTRY / NOT FILLED', r: null, triggered: false };
-  }
-  const entry = signal.entry;
-  const risk = signal.side === 'BUY' ? entry - signal.sl : signal.sl - entry;
-  const rr = Math.abs(signal.tp - entry) / risk;
-  for (let i = triggeredAt; i < Math.min(bars.length, triggeredAt + MAX_FORWARD_BARS); i++) {
-    const b = bars[i];
-    const stop = signal.side === 'BUY' ? b.low <= signal.sl : b.high >= signal.sl;
-    const target = signal.side === 'BUY' ? b.high >= signal.tp : b.low <= signal.tp;
-    if (stop && target) return { outcome: 'LOSS (same-candle ambiguity; stop-first)', r: -1, triggered: true, entry, entryTime: bars[triggeredAt].time, exitTime: b.time };
-    if (stop) {
-      const exit = signal.side === 'BUY' && b.open < signal.sl ? b.open : signal.side === 'SELL' && b.open > signal.sl ? b.open : signal.sl;
-      return { outcome: 'LOSS', r: ((exit-entry) * (signal.side === 'BUY' ? 1 : -1)) / risk, triggered: true, entry, entryTime: bars[triggeredAt].time, exitTime: b.time };
-    }
-    if (target) return { outcome: 'WIN', r: rr, triggered: true, entry, entryTime: bars[triggeredAt].time, exitTime: b.time };
-  }
-  return { outcome: 'UNRESOLVED (forward window)', r: null, triggered: true, entry, entryTime: bars[triggeredAt].time };
 }
 
 function runBacktest(symbol, tf, bars, provider, exact) {
