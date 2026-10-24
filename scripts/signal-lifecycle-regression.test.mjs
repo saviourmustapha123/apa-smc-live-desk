@@ -18,7 +18,8 @@ const context = {
   renderLog() {},
   realizedSignalR() { return 0; }
 };
-const vmContext = createContext(context);\nnew Script(lifecycleSource).runInContext(vmContext);
+const vmContext = createContext(context);
+new Script(lifecycleSource).runInContext(vmContext);
 
 function evaluate({ side = 'BUY', bar, status = 'PENDING' }) {
   const signal = {
