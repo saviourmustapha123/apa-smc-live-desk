@@ -638,7 +638,7 @@ function paint(set, levels=[], marks=[], trendDefs=[]){
    for(const bar of s.bars){const d=Math.abs(bar.time-Number(t.time));if(d<distance){nearest=bar;distance=d}}
    const running=['RUNNING','TRIGGERED'].includes(String(t.status||'').toUpperCase());
    const progress=running&&Number.isFinite(t.movePct)?' · '+(t.movePct>=0?'TP ':'SL ')+Math.abs(t.movePct).toFixed(1)+'%':'';
-   marks.push({time:nearest.time,position:t.side==='BUY'?'belowBar':'aboveBar',color:t.side==='BUY'?'#35d39a':'#ff657a',shape:t.side==='BUY'?'arrowUp':'arrowDown',text:t.symbol+' '+t.tf.toUpperCase()+' '+t.side+' · '+(t.verificationState==='RULE-VERIFIED'?'VERIFIED · ':'')+(t.status||'NOT RUNNING')+progress});
+   marks.push({time:nearest.time,position:t.side==='BUY'?'belowBar':'aboveBar',color:t.side==='BUY'?'#35d39a':'#ff657a',shape:t.side==='BUY'?'arrowUp':'arrowDown',text:t.symbol+' '+t.tf.toUpperCase()+' '+t.side+' · '+(t.verificationState==='RULE-VERIFIED'?'VERIFIED · ':'')+tradeStateLabel(t)+progress});
   }
   // Lightweight Charts requires marker timestamps to be sorted after all chart and signal markers are merged.
   marks.sort((a,b)=>a.time-b.time);
@@ -724,7 +724,7 @@ function renderOverlay(){
   const closed=['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED','HISTORICAL'].includes(t.status);
   const entryY=s.series.priceToCoordinate(t.entry);
   if(entryY!=null&&entryY>=0&&entryY<=h){const line=document.createElement('div');line.style.position='absolute';line.style.left=left+'px';line.style.top=entryY+'px';line.style.width=Math.max(2,right-left)+'px';line.style.borderTop='1px dashed '+(t.side==='BUY'?'#35d39a':'#ff657a');line.style.pointerEvents='none';line.style.zIndex='4';s.overlay.appendChild(line);const tag=document.createElement('div');tag.className='chart-level-label';tag.style.left=Math.max(0,Math.min(w-190,left+4))+'px';tag.style.top=Math.max(2,Math.min(h-20,entryY-18))+'px';tag.style.color=t.side==='BUY'?'#35d39a':'#ff657a';const current=Number(t.lastObservedPrice),hasCurrent=Number.isFinite(current)&&current>0,dir=t.side==='BUY'?1:-1,tpPct=hasCurrent&&Math.abs(t.tp-t.entry)>0?(current-t.entry)*dir/Math.abs(t.tp-t.entry)*100:null,slPct=hasCurrent&&Math.abs(t.entry-t.sl)>0?Math.max(0,Math.min(100,-((current-t.entry)*dir/Math.abs(t.entry-t.sl)*100))):null;const liveInfo=['RUNNING','TRIGGERED'].includes(String(t.status||'').toUpperCase())?(tpPct===null?' · waiting for quote':' · TP '+tpPct.toFixed(1)+'% · SL risk '+slPct.toFixed(1)+'% · '+(Number.isFinite(t.rNow)?t.rNow.toFixed(2)+'R':'R —')):(hasCurrent?' · '+Math.abs((current-t.entry)/t.entry*100).toFixed(2)+'% from entry':' · waiting for quote');tag.textContent=t.symbol+' '+t.tf.toUpperCase()+' '+t.side+' · '+(t.verificationState==='RULE-VERIFIED'?'RULE-VERIFIED · ':'')+tradeStateLabel(t)+liveInfo;s.overlay.appendChild(tag)}
-  for(const z of [{high:Math.max(t.entry,t.tp),low:Math.min(t.entry,t.tp),label:(closed?'CLOSED ':'')+'TARGET',color:'#35d39a',fill:'#35d39a18'},{high:Math.max(t.entry,t.sl),low:Math.min(t.entry,t.sl),label:(closed?'CLOSED ':'')+'RISK · '+(t.status||'NOT RUNNING'),color:'#ff657a',fill:'#ff657a18'}]){
+  for(const z of [{high:Math.max(t.entry,t.tp),low:Math.min(t.entry,t.tp),label:(closed?'CLOSED ':'')+'TARGET',color:'#35d39a',fill:'#35d39a18'},{high:Math.max(t.entry,t.sl),low:Math.min(t.entry,t.sl),label:(closed?'CLOSED ':'')+'RISK · '+tradeStateLabel(t),color:'#ff657a',fill:'#ff657a18'}]){
    const y1=s.series.priceToCoordinate(z.high),y2=s.series.priceToCoordinate(z.low);if(y1==null||y2==null)continue;
    const top=Math.max(0,Math.min(y1,y2)),bottom=Math.min(h,Math.max(y1,y2));
    // Keep distant TP/SL levels represented at the chart edge when the candle autoscale puts them off-screen.
@@ -1218,7 +1218,7 @@ function renderSetupBoard(){
  const live=s.log.filter(t=>Number(t.rr)>=3&&!closed.has(String(t.status||'').toUpperCase()));
  const majors=live.filter(t=>majorTF.has(t.tf)).sort((a,b)=>Number(b.time)-Number(a.time)||Number(b.rr)-Number(a.rr));
  const minors=live.filter(t=>!majorTF.has(t.tf)).sort((a,b)=>Number(b.time)-Number(a.time)||Number(b.rr)-Number(a.rr));
- const row=t=>'<div class="row"><span><b>'+escapeHTML(t.symbol)+' · '+escapeHTML(t.tf.toUpperCase())+' · '+escapeHTML(t.side)+'</b><span class="fine"> '+escapeHTML(t.status||'PENDING')+' · '+stamp(t.time)+'</span><div class="fine">Entry '+priceFor(t.entry,t.symbol)+' · SL '+priceFor(t.sl,t.symbol)+' · TP '+priceFor(t.tp,t.symbol)+'</div></span><b>1:'+Number(t.rr).toFixed(2)+'</b></div>';
+ const row=t=>'<div class="row"><span><b>'+escapeHTML(t.symbol)+' · '+escapeHTML(t.tf.toUpperCase())+' · '+escapeHTML(t.side)+'</b><span class="fine"> '+escapeHTML(tradeStateLabel(t))+' · '+stamp(t.time)+'</span><div class="fine">Entry '+priceFor(t.entry,t.symbol)+' · SL '+priceFor(t.sl,t.symbol)+' · TP '+priceFor(t.tp,t.symbol)+'</div></span><b>1:'+Number(t.rr).toFixed(2)+'</b></div>';
  $('setupBoardCount').textContent=live.length+' current candidates';
  $('majorSetupBoard').innerHTML=majors.length?majors.slice(0,5).map(row).join(''):'<div class="muted">No current major-timeframe setup has passed the present rules. Do not force a trade to fill five slots.</div>';
  $('minorSetupBoard').innerHTML=minors.length?minors.map(row).join(''):'<div class="muted">No current minor-timeframe setup has passed the present rules.</div>';
