@@ -196,6 +196,16 @@ test('chart overlay offers clean, balanced, and full density with per-timeframe 
   assert.match(html, /const tradeLimit=mode==='clean'\?4:mode==='balanced'\?12:40/);
 });
 
+test('signal-heavy panels are consolidated into tabs and the duplicate setup board is collapsed by default', () => {
+  assert.match(html, /class="signal-workspace" data-view="today"/);
+  assert.match(html, /data-signal-tab="today"/);
+  assert.match(html, /data-signal-tab="active"/);
+  assert.match(html, /data-signal-tab="performance"/);
+  assert.match(html, /<details class="panel signal-discovery"/);
+  assert.doesNotMatch(html, /<details class="panel signal-discovery"[^>]* open/);
+  assert.match(html, /function events\(\)[\s\S]*data-signal-tab[\s\S]*workspace\.dataset\.view=view/);
+});
+
 test('daily target tracker counts actual 1:3+ candidates without manufacturing signals', () => {
   assert.match(html, /dailyTarget:10/);
   assert.match(html, /function renderDailyTarget\(\)/);
@@ -367,7 +377,10 @@ test('confirmed block and pattern retests are allowed through the final directio
 
 
 test('daily signal pane keeps today\'s signals plus older non-terminal pending and running trades', () => {
-  assert.match(html, /Today’s signal pane/);
+  assert.match(html, /class="signal-workspace" data-view="today"/);
+  assert.match(html, /data-signal-tab="today"/);
+  assert.match(html, /data-signal-view="today"/);
+  assert.match(html, /Today’s signals/);
   assert.match(html, /const daily=s\.log\.filter\(t=>isToday\(t\)\|\|active\(t\)\)/);
   assert.match(html, /Market closure alone does not expire it/);
 });
