@@ -267,6 +267,16 @@ for (const symbol of SYMBOLS) {
       log('');
     } catch (error) {
       state.feedStatus[key] = { status: 'UNAVAILABLE', error: error.message, checkedAt: new Date(nowMs).toISOString() };
+      // Never leave a proxy-derived setup appearing executable after its exact-symbol feed is unavailable.
+      // Keep genuine exact-feed setups pending through a temporary outage, but invalidate known proxy records.
+      const staleOpen = activeFor(symbol, tf);
+      if (staleOpen && (staleOpen.exactSymbolData !== true || /proxy/i.test(String(staleOpen.provider || '')))) {
+        staleOpen.status = 'INVALIDATED';
+        staleOpen.outcome = 'DATA SOURCE INVALID: setup was derived from non-exact symbol data';
+        staleOpen.exitTime = nowSeconds;
+        staleOpen.resultR = null;
+        staleOpen.lastProcessedBarTime = staleOpen.lastProcessedBarTime ?? staleOpen.signalTime;
+      }
       feedFailures.push(key + ': ' + error.message);
       log('## ' + symbol + ' · ' + tf);
       log('- **FEED UNAVAILABLE:** ' + error.message);
