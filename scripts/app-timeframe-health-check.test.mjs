@@ -466,7 +466,7 @@ test('a live pending signal is not marked historical merely because a later cand
 
 test('daily target uses the date a live signal was identified rather than only the candle timestamp', () => {
   assert.match(html, /new Date\(Number\(t\.identifiedAt\)\|\|Number\(t\.time\)\*1000\)/);
-  assert.match(html, /identifiedAt:candidate\.status==='HISTORICAL'\?null:Date\.now\(\)/);
+  assert.match(html, /const verifiedAt=candidate\.status==='HISTORICAL'\?null:Date\.now\(\);additions\.push\(\{\.\.\.candidate,verificationState:candidate\.status==='HISTORICAL'\?'HISTORICAL':'RULE-VERIFIED',verifiedAt,identifiedAt:verifiedAt\}\)/);
 });
 
 
@@ -613,4 +613,18 @@ test('untriggered signals are labelled NOT TRIGGERED and do not display TP or SL
   assert.match(html, /\(running\?'TRIGGERED \/ RUNNING':'NOT TRIGGERED'\)/);
   assert.match(html, /const tpPct=running&&valid&&Math\.abs\(tp-entry\)>0/);
   assert.match(html, /const slPct=running&&valid&&Math\.abs\(entry-sl\)>0/);
+});
+
+
+test('pending signals are labelled NOT TRIGGERED and never show TP or SL progress before entry fills', () => {
+  const start = html.indexOf('function renderVerifiedSignalCards(){');
+  const end = html.indexOf('function renderSignalMonitor(){', start);
+  assert.ok(start >= 0 && end > start, 'verified signal card renderer must exist');
+  const renderer = html.slice(start, end);
+  assert.match(html, /return 'NOT TRIGGERED';/);
+  assert.match(renderer, /const progressMarkup=running\?/);
+  assert.match(renderer, /const tpPct=running&&hasPrice/);
+  assert.match(renderer, /const slPct=running&&hasPrice/);
+  assert.match(html, /const activeRows=allActiveSignals\(\)\.filter\(t=>\['RUNNING','TRIGGERED'\]\.includes\(String\(t\.status\|\|''\)\.toUpperCase\(\)\)\)/);
+  assert.match(html, /A signal enters this live activity table only after its entry is reached/);
 });
