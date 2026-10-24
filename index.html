@@ -223,14 +223,72 @@ function scanOpportunityHistory(symbol,tf,bars){
   const up=cur.close>cur.open,dn=cur.close<cur.open,disp=body>=aa*s.disp;
   const shSweep=!!(hh&&cur.high>hh.p&&cur.close<hh.p),slSweep=!!(ll&&cur.low<ll.p&&cur.close>ll.p);
   const downBreak=!!(ll&&prev.close>=ll.p&&cur.close<ll.p),upBreak=!!(hh&&prev.close<=hh.p&&cur.close>hh.p);
-  let side=null,reason='';
-  if((shSweep&&dn&&disp)||(shSweep&&downBreak)||(downBreak&&dn&&disp)){side='SELL';reason=shSweep?'Buy-side liquidity sweep + bearish candle confirmation':'Bearish structure break + displacement'}
-  else if((slSweep&&up&&disp)||(slSweep&&upBreak)||(upBreak&&up&&disp)){side='BUY';reason=slSweep?'Sell-side liquidity sweep + bullish candle confirmation':'Bullish structure break + displacement'}
-  if(!side)continue;
+  const trendBull=pp.h.length>=2&&pp.l.length>=2&&pp.h.at(-1).p>pp.h.at(-2).p&&pp.l.at(-1).p>pp.l.at(-2).p;
+  const trendBear=pp.h.length>=2&&pp.l.length>=2&&pp.h.at(-1).p<pp.h.at(-2).p&&pp.l.at(-1).p<pp.l.at(-2).p;
+  const bullStructureEvent=upBreak?(trendBear?'CHoCH':'BOS'):null;
+  const bearStructureEvent=downBreak?(trendBull?'CHoCH':'BOS'):null;
+  const reasons=[];
+  let side=null;
+  if(shSweep&&dn){side='SELL';reasons.push('Buy-side liquidity sweep and reclaim')}
+  if(slSweep&&up){if(side&&side!=='BUY')side=null;else side='BUY';if(side==='BUY')reasons.push('Sell-side liquidity sweep and reclaim')}
+  if(upBreak&&(up||disp)){
+   if(side&&side!=='BUY')side=null;
+   else side='BUY';
+   if(side==='BUY')reasons.push((bullStructureEvent||'BOS')+' · close above confirmed swing');
+  }
+  if(downBreak&&(dn||disp)){
+   if(side&&side!=='SELL')side=null;
+   else side='SELL';
+   if(side==='SELL')reasons.push((bearStructureEvent||'BOS')+' · close below confirmed swing');
+  }
+
+  // A three-candle FVG is a location, not a standalone entry. Add it only when
+  // the current candle returns to a recent gap and closes back in its directional half.
+  let fvgRetest=null;
+  const gapStart=Math.max(2,hist.length-24);
+  for(let j=hist.length-2;j>=gapStart;j--){
+   const first=hist[j-2],third=hist[j];
+   if(third.low>first.high){
+    const lo=first.high,hi=third.low,touch=cur.low<=hi&&cur.high>=lo;
+    if(touch&&up&&cur.close>=(lo+hi)/2){fvgRetest={side:'BUY',lo,hi};break}
+   }
+   if(third.high<first.low){
+    const lo=third.high,hi=first.low,touch=cur.low<=hi&&cur.high>=lo;
+    if(touch&&dn&&cur.close<=(lo+hi)/2){fvgRetest={side:'SELL',lo,hi};break}
+   }
+  }
+  if(fvgRetest){
+   if(!side||side===fvgRetest.side){side=fvgRetest.side;reasons.push('Recent FVG retest with directional close')}
+  }
+
+  // Support/resistance role reversals are checked separately from breaker blocks:
+  // SBR/RBS needs a confirmed level break followed by a retest from the other side.
+  const pivotCandidates=[...pp.l.slice(-12).map(p=>({...p,role:'SUPPORT'})),...pp.h.slice(-12).map(p=>({...p,role:'RESISTANCE'}))];
+  for(const pivot of pivotCandidates){
+   const level=pivot.p;
+   if(pivot.role==='SUPPORT'&&dn&&cur.high>=level&&cur.close<level){
+    let broken=false;
+    for(let j=Math.max(pivot.i+1,hist.length-80);j<hist.length-1;j++){if(hist[j].close<level){broken=true;break}}
+    if(broken&&(!side||side==='SELL')){side='SELL';reasons.push('SBR level break and retest');break}
+   }
+   if(pivot.role==='RESISTANCE'&&up&&cur.low<=level&&cur.close>level){
+    let broken=false;
+    for(let j=Math.max(pivot.i+1,hist.length-80);j<hist.length-1;j++){if(hist[j].close>level){broken=true;break}}
+    if(broken&&(!side||side==='BUY')){side='BUY';reasons.push('RBS level break and retest');break}
+   }
+  }
+  if(!side||!reasons.length)continue;
+
+  // The final trigger candle must confirm direction. A liquidity sweep may qualify
+  // without ATR displacement; a plain structure break must show displacement or a
+  // directional close, while all candidates still pass the hard 1:3 target gate.
+  if(side==='BUY'&&!(up&&(slSweep||upBreak||fvgRetest||reasons.some(r=>r.startsWith('RBS')))))continue;
+  if(side==='SELL'&&!(dn&&(shSweep||downBreak||fvgRetest||reasons.some(r=>r.startsWith('SBR')))))continue;
   const entry=cur.close,stop=side==='SELL'?Math.max(cur.high,hh?hh.p:cur.high):Math.min(cur.low,ll?ll.p:cur.low);
   const target=structuralTarget(side,entry,stop,hh,ll,hist);if(!target||!Number.isFinite(target.rr)||target.rr<3)continue;
   const ageBars=b.length-1-i;
-  found.push({symbol,tf,side,entry,sl:stop,tp:target.tp,rr:target.rr,reason,time:cur.time,confidence:'unscored',status:ageBars===0?'NOT RUNNING':'HISTORICAL',movePct:0,rNow:0,ageBars,scanEngine:'APA-SMC heuristic proxy'});
+  const uniqueReasons=[...new Set(reasons)];
+  found.push({symbol,tf,side,entry,sl:stop,tp:target.tp,rr:target.rr,reason:uniqueReasons,time:cur.time,confidence:'unscored',status:ageBars===0?'NOT RUNNING':'HISTORICAL',movePct:0,rNow:0,ageBars,scanEngine:'APA-SMC multi-trigger heuristic proxy'});
  }
  return found;
 }
