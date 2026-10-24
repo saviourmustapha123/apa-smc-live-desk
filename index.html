@@ -588,6 +588,17 @@ async function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode){
  const openTf=new Set(alreadyOpen.map(t=>t.tf));let openCount=alreadyOpen.length;
  for(const [tf,bars] of signalSets)for(const candidate of scanOpportunityHistory(symbol,tf,bars)){
   if(candidate.status==='HISTORICAL')continue;
+  // Do not publish a pending limit setup if the latest confirmed candle has
+  // already crossed its structural stop or target before the setup was admitted.
+  // That prevents a just-created card from appearing and immediately closing
+  // on the first quote because it was already stale at admission time.
+  const lastClosed=(bars||[]).filter(bar=>!bar.isOpen&&Number.isFinite(bar.close)).at(-1);
+  const mark=Number(lastClosed?.close),entry=Number(candidate.entry),sl=Number(candidate.sl),tp=Number(candidate.tp);
+  if(candidate.status!=='RUNNING'&&Number.isFinite(mark)&&Number.isFinite(entry)&&Number.isFinite(sl)&&Number.isFinite(tp)){
+   const preEntryStop=candidate.side==='BUY'?mark<=sl:mark>=sl;
+   const preEntryTarget=candidate.side==='BUY'?mark>=tp:mark<=tp;
+   if(preEntryStop||preEntryTarget)continue;
+  }
   const key=[candidate.symbol,candidate.tf,candidate.side,candidate.time].join('|');
   if(seen.has(key)||openTf.has(tf)||openCount>=4)continue;
   seen.add(key);openTf.add(tf);openCount++;
@@ -994,7 +1005,7 @@ let verifiedSignalFilter='untriggered';
 function renderVerifiedSignalCards(){
  const pane=$('verifiedSignalCards');if(!pane)return;
  const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED','HISTORICAL']);
- const all=s.log.filter(t=>t.verificationState==='RULE-VERIFIED'&&Number(t.rr)>=3);
+ const all=s.log.filter(t=>Number(t.rr)>=3&&String(t.status||'').toUpperCase()!=='HISTORICAL');
  const untriggered=all.filter(t=>['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED'].includes(String(t.status||'NOT TRIGGERED').toUpperCase()));
  const active=all.filter(t=>['RUNNING','TRIGGERED'].includes(String(t.status||'').toUpperCase()));
  // This setup pane is for actionable/current signals only. Expired, missed,
@@ -1042,7 +1053,7 @@ function renderSignalMonitor(){
  const active=t=>!terminal.has(String(t.status||'NOT TRIGGERED').toUpperCase());
  // Only actionable setups and live trades belong in the live queue. Terminal outcomes
  // remain available in the separate performance history.
- const daily=s.log.filter(active).sort((a,b)=>Number(b.time)-Number(a.time));
+ const daily=allActiveSignals();
  const rowDaily=t=>{
   const running=['RUNNING','TRIGGERED'].includes(t.status),closed=['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED'].includes(t.status);
   const outcome=t.outcome||(t.status==='TAKE PROFIT'?'SUCCESS':t.status==='STOP LOSS'?'LOSS':t.status==='INVALIDATED'?'INVALIDATED':t.status==='EXPIRED'?'EXPIRED':t.status==='HISTORICAL'?'UNRESOLVED':closed?'CLOSED':'PENDING');
