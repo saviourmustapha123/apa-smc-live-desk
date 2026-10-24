@@ -374,3 +374,9 @@ test('a live pending signal is not marked historical merely because a later cand
   assert.match(html, /A valid setup stays pending until entry is touched/);
   assert.match(html, /t\.status=t\.status==='NOT RUNNING'\?'NOT RUNNING':'PENDING';t\.outcome='PENDING'/);
 });
+
+
+test('daily target uses the date a live signal was identified rather than only the candle timestamp', () => {
+  assert.match(html, /new Date\(Number\(t\.identifiedAt\)\|\|Number\(t\.time\)\*1000\)/);
+  assert.match(html, /identifiedAt:candidate\.status==='HISTORICAL'\?null:Date\.now\(\)/);
+});
