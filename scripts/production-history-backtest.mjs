@@ -83,7 +83,7 @@ async function fetchBars(symbol, tf) {
       // Keep requests bounded, but prefer a deeper history than the first provider that responds.
       const range = tf === '1m' ? '7d' : tf === '5m' ? '14d' : '60d';
       const json = await getJson('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(yahooSymbol) + '?range=' + range + '&interval=' + tf);
-      consider(normalizeYahoo(json).sort((a,b)=>a.time-b.time), 'Yahoo chart ' + yahooSymbol + ' fallback', true);
+      consider(normalizeYahoo(json).sort((a,b)=>a.time-b.time), 'Yahoo chart ' + yahooSymbol + ' fallback', symbol === 'EURUSD');
     } catch (e) { errors.push('Yahoo: ' + e.message); }
     if (symbol === 'BTCUSD') {
       try {
