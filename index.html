@@ -251,8 +251,8 @@ function detectRecentBlockRetest(bars,k,dispMult){
   const impulse=b[i],prev=b[i-1],base=atr(b.slice(0,i))||Math.max(impulse.high-impulse.low,1e-8),body=Math.abs(impulse.close-impulse.open);
   if(body<base*dispMult)continue;
   const pp=pivots(b.slice(0,i),k),high=pp.h.at(-1),low=pp.l.at(-1);
-  const bullish=impulse.close>impulse.open&&high&&prev.close<=high.p&&impulse.close>high.p&&i>=2&&impulse.low>b[i-2].high;
-  const bearish=impulse.close<impulse.open&&low&&prev.close>=low.p&&impulse.close<low.p&&i>=2&&impulse.high<b[i-2].low;
+  const bullish=impulse.close>impulse.open&&high&&prev.close<=high.p&&impulse.close>high.p;
+  const bearish=impulse.close<impulse.open&&low&&prev.close>=low.p&&impulse.close<low.p;
   if(!bullish&&!bearish)continue;
   let origin=-1;
   for(let j=i-1;j>=Math.max(0,i-3);j--){if(bullish?b[j].close<b[j].open:b[j].close>b[j].open){origin=j;break}}
@@ -354,6 +354,16 @@ function scanOpportunityHistory(symbol,tf,bars){
    side=blockRetest.side;
    reasons.push(blockRetest.type);
   }
+  // Inducement becomes a trade input only when a post-BOS liquidity probe is swept
+  // and reclaimed on the current closed candle in the same direction as the setup.
+  const inducementEvent=side?latestInducementProxy(hist,+s.k):null;
+  const inducementSweep=!!(inducementEvent&&inducementEvent.status==='SWEPT'&&inducementEvent.eventIndex===hist.length-1&&
+    ((inducementEvent.side==='BULLISH'&&up&&slSweep)||(inducementEvent.side==='BEARISH'&&dn&&shSweep)));
+  if(inducementSweep){
+   const inducementSide=inducementEvent.side==='BULLISH'?'BUY':'SELL';
+   if(side!==inducementSide)continue;
+   reasons.push(inducementSide+' post-BOS inducement sweep and reclaim');
+  }
 
   // Premium/discount and equal-level liquidity are context/confluence, not standalone triggers.
   const rangeHigh=hh?.p,rangeLow=ll?.p,mid=rangeHigh!=null&&rangeLow!=null?(rangeHigh+rangeLow)/2:null;
@@ -371,7 +381,8 @@ function scanOpportunityHistory(symbol,tf,bars){
   const hasRoleReversal=reasons.some(r=>r.startsWith('SBR')||r.startsWith('RBS'));
   const validatedSequence=!!blockRetest||!!fvgRetest||
     (!!patternRetest&&(hasSweep||disp||hasStructure))||
-    (hasRoleReversal&&disp&&(hasSweep||hasStructure));
+    (hasRoleReversal&&disp&&(hasSweep||hasStructure))||
+    (inducementSweep&&!!(blockRetest||fvgRetest||patternRetest));
   if(!validatedSequence)continue;
   if(disp)reasons.push('Displacement confirmed (ATR filter)');
   reasons.push('Entry sequence passed: structure + displacement + retest/confluence');
@@ -989,7 +1000,7 @@ function analyse(){
  const inducementMatch=latestInducementProxy(b,+s.k),inducement=inducementMatch?(inducementMatch.side==='BULLISH'?'Possible bullish IDM '+inducementMatch.status.toLowerCase():'Possible bearish IDM '+inducementMatch.status.toLowerCase()):'No confirmed post-BOS inducement proxy';
  const pdText=eq==null?'Range unavailable':x.close>eq?'Premium half':x.close<eq?'Discount half':'At equilibrium';
  const trendDefs=[];if(h.length>=2){const z=h.slice(-2);trendDefs.push({color:'#d1d5db',points:[{time:z[0].t,value:z[0].p},{time:z[1].t,value:z[1].p}]})}if(l.length>=2){const z=l.slice(-2);trendDefs.push({color:'#c4b5fd',points:[{time:z[0].t,value:z[0].p},{time:z[1].t,value:z[1].p}]})}
- const srText=sh&&sl?'R '+price(sh.p)+' / S '+price(sl.p):'Need confirmed pivots',obText=ob?(ob.side==='BULLISH'?'Bullish OB candidate ':'Bearish OB candidate ')+price(ob.low)+'–'+price(ob.high):'No qualified OB (needs displacement + FVG + BOS';
+ const srText=sh&&sl?'R '+price(sh.p)+' / S '+price(sl.p):'Need confirmed pivots',obText=ob?(ob.side==='BULLISH'?'Bullish OB candidate ':'Bearish OB candidate ')+price(ob.low)+'–'+price(ob.high):'No qualified OB (needs displacement + close-confirmed structure break)';
  $('bias').textContent=bias;$('analysisTime').textContent='Updated '+new Date().toLocaleTimeString();
  $('structure').innerHTML=[row('Latest swing high',sh?price(sh.p):'—'),row('Latest swing low',sl?price(sl.p):'—'),row('Structure event',swH?'Buy-side liquidity sweep':swL?'Sell-side liquidity sweep':bearBreak?'Bearish BOS proxy':bullBreak?'Bullish BOS proxy':'No fresh event'),row('CHoCH / structure shift',bearBreak&&bias==='Bullish structure'?'Possible bearish CHoCH':bullBreak&&bias==='Bearish structure'?'Possible bullish CHoCH':'Not confirmed'),row('Fair value gap',fvgBear?'Bearish 3-candle FVG':fvgBull?'Bullish 3-candle FVG':'Not detected on latest 3 bars'),row('Support / resistance',srText),row('Order block',obText),row('Breaker block',breaker?(breaker.side==='BULLISH'?'Bullish breaker retest ':'Bearish breaker retest ')+price(breaker.low)+'–'+price(breaker.high):'No confirmed failed-OB flip + retest'),row('Equal highs / lows',eqh?'EQH · buy-side liquidity':eql?'EQL · sell-side liquidity':'No close equal-level pair'),row('Premium / discount',pdText),row('Displacement',`${(body/a).toFixed(2)}× ATR · ${dis?'passes filter':'below filter'}`),row('Candle',bull?'Bullish':bear?'Bearish':'Doji')].join('');
  $('patterns').innerHTML=[row('Quasimodo (QML)',qml),row('SBR / RBS',sbr?'Support → resistance retest':rbs?'Resistance → support retest':'Not detected'),row('Trendlines','Latest 2 confirmed highs/lows drawn'),row('Inducement',inducement)].join('');
