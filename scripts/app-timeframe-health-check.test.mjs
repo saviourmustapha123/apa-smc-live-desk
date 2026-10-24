@@ -213,3 +213,27 @@ test('signal monitor exposes entry, stop, target, planned R:R, and setup trigger
 });
 
 test('closed forex markets request the last known quote instead of forcing a stale-data 404',()=>{assert.ok(html.includes('async function fetchQuote(sym)'));assert.ok(html.includes('else q=await fetchQuote(s.symbol)'));assert.ok(!html.includes('allowStale=false'));assert.ok(html.includes("endpoint('/latest?symbols='+encodeURIComponent(sym))"));assert.ok(html.includes('historical candles loaded; refresh continues'));assert.ok(html.includes('async function bybitJson(path)'));assert.ok(html.includes('https://api.bytick.com'));assert.ok(html.includes('if(!fresh.length)throw Error(\'Provider returned zero valid candles\')'))});
+
+
+test('signal monitor resolves historical setups from future candles and persists the result', () => {
+  assert.match(html, /function resolveSignalOutcomes\(symbol,tf,bars\)/);
+  assert.match(html, /t\.status=finalStatus;t\.outcome=finalStatus==='TAKE PROFIT'\?'SUCCESS':finalStatus==='STOP LOSS'\?'LOSS'/);
+  assert.match(html, /if\(stopTouched\)\{finalStatus='STOP LOSS'/);
+  assert.match(html, /if\(targetTouched\)\{finalStatus='TAKE PROFIT'/);
+  assert.match(html, /persistSignals\(changed\)/);
+});
+
+test('historical outcome resolution runs for selected and background market scans', () => {
+  assert.match(html, /resolvedSelected\+=resolveSignalOutcomes\(sym,tf,bars\)\.length/);
+  assert.match(html, /resolved\+=resolveSignalOutcomes\(symbol,tf,bars\)\.length/);
+});
+
+test('live opportunity scanner is scheduled with the normal quote and candle refresh cycle', () => {
+  assert.match(html, /await tick\(\);await refreshSelectedCandles\(false\);await refreshTopDown\(false\)/);
+  assert.match(html, /Date\.now\(\)-s\.lastOtherPairScan>=300000/);
+});
+
+test('signal monitor displays completed R results, not only open-trade R values', () => {
+  assert.match(html, /const rNow=Number\.isFinite\(t\.rNow\)\?t\.rNow\.toFixed\(2\)\+'R':'—'/);
+  assert.match(html, /const outcome=t\.outcome\|\|\(t\.status==='TAKE PROFIT'\?'SUCCESS':t\.status==='STOP LOSS'\?'LOSS'/);
+});
