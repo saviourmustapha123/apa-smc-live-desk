@@ -124,7 +124,7 @@ async function getBars(sym,tf,lim,from,to){
   return aggregateHours(hourly,tf==='8h'?8:12).slice(-Math.max(lim,300));
  }
  if(tf==='1M'||tf==='1W'||tf==='1Y'){
-  const years=tf==='1W'?5:25,target=Math.max(sym==='QQQUSDT'?Math.floor(Date.UTC(2026,3,6)/1000):0,Math.floor(Date.now()/1000)-years*365*86400),cachedDaily=dailyHistoryCache.get(sym);
+  const years=tf==='1W'?5:25,qqqListing=s.qqqProvider==='bybit'?Date.UTC(2026,4,7):Date.UTC(2026,3,6),target=Math.max(sym==='QQQUSDT'?Math.floor(qqqListing/1000):0,Math.floor(Date.now()/1000)-years*365*86400),cachedDaily=dailyHistoryCache.get(sym);
   if(cachedDaily&&Date.now()-cachedDaily.at<30000&&cachedDaily.bars.length&&cachedDaily.bars[0].time<=target){const daily=cachedDaily.bars;historyDiagnostics[sym]={dailyBars:daily.length,oldest:daily[0]?.time||null,newest:daily.at(-1)?.time||null,rounds:0,target,reason:'reused in-memory daily history cache',timeframe:tf};if(tf==='1M')return aggregateMonthly(daily).slice(-Math.max(lim,300));if(tf==='1W')return calendarAggregate(daily,'week').slice(-Math.max(lim,260));return calendarAggregate(daily,'year').slice(-Math.max(lim,25))}
   let daily=[];try{daily=await dbGet(sym,'1d')}catch{}
   const latest=await fetchBarsRaw(sym,'1d',1000);
