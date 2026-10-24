@@ -488,19 +488,18 @@ test('a live pending signal is not marked historical merely because a later cand
 
 
 
-test('signal desk and Today table use a consistent qualifying signal pool', () => {
-  assert.match(html, /const all=s\.log\.filter\(t=>Number\(t\.rr\)>=3&&String\(t\.status\|\|'\)\.toUpperCase\(\)!=='HISTORICAL'\)/);
+test('signal desk and Today table use a consistent qualifying signal pool with a distinct missed pane', () => {
+  assert.match(html, /function allActiveSignals\(\).*?Number\(t\.rr\)>=3/);
   assert.match(html, /const daily=allActiveSignals\(\)/);
-  for (const label of ['data-verified-filter="untriggered"','data-verified-filter="active"','data-verified-filter="closed"','id="verifiedSignalList"']) assert.ok(html.includes(label));
+  for (const label of ['data-verified-filter="untriggered"','data-verified-filter="active"','data-verified-filter="closed"','data-verified-filter="missed"','id="verifiedMissedCount"','id="verifiedSignalList"']) assert.ok(html.includes(label));
   assert.match(html, /const tpPct=running&&hasPrice/);
   assert.match(html, /const slPct=running&&hasPrice/);
   assert.match(html, /const progressMarkup=running\?/);
+  assert.match(html, /Entry was not triggered before expiry or invalidation/);
 });
 
-test('performance separates successful and unsuccessful trades without a missed-entry pane', () => {
-  for (const label of ['data-performance-filter="successful"','data-performance-filter="unsuccessful"','id="performanceSuccessCount"','id="performanceLossCount"']) assert.ok(html.includes(label));
-  assert.ok(!html.includes('data-performance-filter="missed"'));
-  assert.ok(!html.includes('data-verified-filter="missed"'));
+test('performance separates successful, unsuccessful, and missed-entry signals', () => {
+  for (const label of ['data-performance-filter="successful"','data-performance-filter="unsuccessful"','data-performance-filter="missed"','id="performanceSuccessCount"','id="performanceLossCount"','id="performanceMissedCount"']) assert.ok(html.includes(label));
 });
 
 
@@ -567,20 +566,20 @@ test('trade horizon maps minute scalps separately from hourly intraday and highe
 
 test('live admission rejects setups whose latest confirmed close already crossed stop or target', () => {
   assert.match(html, /Do not publish a pending limit setup if the latest confirmed candle has/);
-  assert.match(html, /const preEntryStop=candidate\.side==='BUY'\?mark<=sl:mark>=sl/);
-  assert.match(html, /const preEntryTarget=candidate\.side==='BUY'\?mark>=tp:mark<=tp/);
-  assert.match(html, /if\(preEntryStop\|\|preEntryTarget\)continue/);
+  assert.match(html, /function candidateAlreadyPastLevels\(candidate,bars\)/);
+  assert.match(html, /return candidate\.side==='BUY'\?\(mark<=sl\|\|mark>=tp\):\(mark>=sl\|\|mark<=tp\)/);
+  assert.match(html, /if\(candidate\.status!=='RUNNING'&&candidateAlreadyPastLevels\(candidate,bars\)\)continue/);
 });
 
-test('signal admission is synchronous, bounded to six per day and two per market across both scan paths', () => {
+test('signal admission has no artificial daily quota and scans eight execution timeframes', () => {
   assert.match(html, /function signalDayStamp\(t\)/);
-  assert.doesNotMatch(html, /async function signalDayStamp\(t\)/);
-  assert.match(html, /daily limit of 6 new candidates reached/);
-  assert.match(html, /daily limit of 2 candidates for '\+candidate\.symbol\+' reached/);
-  assert.match(html, /openCount>=2\|\|dailySignalAdmission\(candidate,additions\)/);
+  assert.doesNotMatch(html, /daily limit of [0-9]+ new candidates reached/);
+  assert.doesNotMatch(html, /daily limit of [0-9]+ candidates for/);
   assert.match(html, /function candidateAlreadyPastLevels\(candidate,bars\)/);
-  assert.match(html, /Automatic scan · '\+market\+' · 7 execution timeframes checked/);
+  assert.match(html, /Automatic scan · '\+market\+' · 8 execution timeframes checked/);
   assert.match(html, /setInterval\(\(\)=>runAutomaticPairScan\(\),20000\)/);
+  assert.match(html, /content="2026\.10\.24\.19"/);
+  assert.match(html, /t\.verificationState='PROVISIONAL-HEURISTIC'/);
 });
 
 test('daily candidate counter uses identification time rather than the historical candle timestamp', () => {
