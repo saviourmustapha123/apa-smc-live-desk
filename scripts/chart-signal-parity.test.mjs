@@ -52,7 +52,7 @@ test('analyse uses the production journal selector and no longer creates a separ
   const analyseEnd = html.indexOf('\nfunction log(set){', analyseStart);
   assert.ok(analyseStart >= 0 && analyseEnd > analyseStart, 'production analyse() block must exist');
   const source = html.slice(analyseStart, analyseEnd);
-  assert.match(source, /chartSignalFor\(s\.log,s\.symbol,s\.tf\)/);
+  assert.match(source, /chartSignalFor\(\[\.\.\.\(s\.log\|\|\[\]\),\.\.\.\(s\.backgroundLog\|\|\[\]\)\],s\.symbol,s\.tf\)/);
   assert.doesNotMatch(source, /let recentSet=null|structuralTarget\(side,entry,stop/);
   assert.doesNotMatch(source, /log\(set\)/);
 });
@@ -65,4 +65,11 @@ test('production scanner records concrete rejection reasons for empty signal sca
   assert.match(html, /Structural target fails the minimum 1:3 reward-to-risk gate/);
   assert.match(html, /Current setup blocked by market\/data eligibility:/);
   assert.match(html, /No signal: '\+\(blockers\.slice\(0,2\)/);
+});
+
+test('live chart consumes background paper signals from the persistent remote journal', () => {
+  assert.match(html, /paper-trade-state\/data\/background-paper-trading-state\.json/);
+  assert.match(html, /async function syncBackgroundPaperTrades/);
+  assert.match(html, /s\.backgroundLog=records\.filter/);
+  assert.match(html, /s\.backgroundPaperSyncTimer=setInterval\(\(\)=>syncBackgroundPaperTrades\(true\),60000\)/);
 });
