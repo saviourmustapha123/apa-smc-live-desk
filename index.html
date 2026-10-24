@@ -20,6 +20,16 @@
 
 <div id="researchModal" class="hidden"><section class="panel researchbox"><div class="head"><div><b>Strategy Research Lab</b><div class="sub">Strategy discovery, transparent rules, and validation status</div></div><button id="closeResearch">Close</button></div><div class="body">
 <div class="note">The hypothesis generator now proposes deterministic combinations from the documented feature library. These are research proposals only, not validated strategies. Backtesting and promotion remain blocked until reproducible evidence exists. Historical performance cannot prove future profitability.</div>
+<section class="panel" id="backgroundIntelligenceMonitor" style="margin-top:12px"><div class="head"><div><b>Background intelligence monitor</b><div class="sub">Live scanner status, diagnostic clues, and research activity</div></div><span class="pill" id="intelligenceRunState">Checking status…</span></div><div class="body">
+<div class="lab-grid">
+<div class="lab-card"><div class="label">SCANNER</div><h3 id="intelligenceScannerState">Waiting for scanner status</h3><p class="fine" id="intelligenceScannerDetail">The monitor reads the scanner status already reported by this app. It does not invent scan results.</p></div>
+<div class="lab-card"><div class="label">MARKET CONNECTION</div><h3 id="intelligenceConnection">Checking connection…</h3><p class="fine" id="intelligenceConnectionDetail">Connectivity is not proof that candle data is fresh or valid.</p></div>
+<div class="lab-card"><div class="label">VISIBLE SIGNAL QUEUE</div><h3 id="intelligenceSignalCounts">Waiting for signal tables</h3><p class="fine">Counts are read from the visible signal and activity panes, not from hypothetical trades.</p></div>
+</div>
+<div class="lab-card" style="margin-top:10px"><h3>Diagnostic watch</h3><p class="fine" id="intelligenceDiagnostics">Waiting for current scanner and connection status.</p><p class="fine">This interface can surface observable issues. It does not yet autonomously rewrite production strategy code or certify a correction.</p></div>
+<div class="lab-card" style="margin-top:10px"><div class="row" style="justify-content:space-between;align-items:center"><h3 style="margin:0">Recent monitor events</h3><span class="fine">This browser session</span></div><ol id="intelligenceEventLog" class="fine" style="padding-left:20px"><li>Monitor initialising.</li></ol></div>
+<div class="fine" style="margin-top:10px">Runtime boundary: this monitor updates while the app is open. It is not a persistent 24/7 process. The scheduled GitHub health workflow is a separate check and must not be interpreted as continuous strategy execution.</div>
+</div></section>
 <div class="lab-grid" style="margin-top:12px">
 <div class="lab-card"><div class="label">DISCOVERY ENGINE</div><h3>Rule-combination search</h3><div class="lab-status good">PROPOSAL GENERATOR IMPLEMENTED</div><p class="fine">A bounded, deterministic generator proposes combinations of documented SMC-style features. It does not claim strategies are globally novel or profitable.</p></div>
 <div class="lab-card"><div class="label">VALIDATION ENGINE</div><h3>Walk-forward + holdout</h3><div class="lab-status bad">NOT IMPLEMENTED</div><p class="fine">Current checks are not a full cost-aware, out-of-sample validation pipeline.</p></div>
