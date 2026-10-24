@@ -35,6 +35,8 @@ jobs:
         run: node --test scripts/chart-signal-parity.test.mjs scripts/signal-lifecycle-regression.test.mjs
 
       - name: Run historical replay using the actual production scanner
+        env:
+          QQQ_PROXY_URL: ${{ vars.QQQ_PROXY_URL }}
         run: node scripts/production-history-backtest.mjs
 
       - name: Upload production scanner trade-outcome report
