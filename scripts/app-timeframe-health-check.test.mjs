@@ -197,7 +197,7 @@ test('chart overlay offers clean, balanced, and full density with per-timeframe 
 });
 
 test('daily target tracker counts actual 1:3+ candidates without manufacturing signals', () => {
-  assert.match(html, /dailyTarget:6/);
+  assert.match(html, /dailyTarget:10/);
   assert.match(html, /function renderDailyTarget\(\)/);
   assert.match(html, /Only detected setups count; the scanner will not fabricate trades/);
   assert.match(html, /renderSignalMonitor\(\);renderSetupBoard\(\);renderDailyTarget\(\)/);
