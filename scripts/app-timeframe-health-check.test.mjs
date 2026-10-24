@@ -520,3 +520,14 @@ test('chart renders every pending and running signal for the selected pair acros
   assert.match(html, /Keep distant TP\/SL levels represented at the chart edge when the candle autoscale puts them off-screen/);
   assert.match(html, /edge\.textContent=t\.symbol\+' '\+t\.tf\.toUpperCase\(\)\+' '\+t\.side\+' '\+z\.label/);
 });
+
+test('chart heuristic ideas enter the journal only after matching strict sequence validation', () => {
+  const start = html.indexOf('function log(set){');
+  const end = html.indexOf('async function monitorBackgroundQuotes', start);
+  assert.ok(start >= 0 && end > start, 'signal logger and following monitor function must exist');
+  const logger = html.slice(start, end);
+  assert.match(logger, /const validated=scanOpportunityHistory\(set\.symbol,set\.tf,s\.bars\)\.find/);
+  assert.match(logger, /candidate\.time===set\.time&&candidate\.side===set\.side&&candidate\.status==='NOT RUNNING'&&Number\(candidate\.rr\)>=3/);
+  assert.match(logger, /if\(!validated\)\{console\.info\('Signal not journaled: strict sequence validation did not confirm/);
+  assert.match(logger, /set=\{\.\.\.validated,identifiedAt:Number\(set\.identifiedAt\)\|\|Date\.now\(\)\}/);
+});
