@@ -52,8 +52,8 @@ if (/not\*{0,2}\s*validation of the complete proprietary LOWKEY FX APA strategy/
 }
 
 const workflow = await readFile(new URL('../.github/workflows/background-health-check.yml', import.meta.url), 'utf8');
-if (/schedule:[\s\S]*cron:\s*["']\*\/15 \* \* \* \*["']/.test(workflow)) {
-  pass('Background schedule is accurately bounded', 'GitHub Actions is scheduled every 15 minutes, not a persistent 24/7 process');
+if (/schedule:[\s\S]*cron:\s*["']\*\/5 \* \* \* \*["']/.test(workflow)) {
+  pass('Background schedule is accurately bounded', 'GitHub Actions is scheduled every 5 minutes, not a persistent 24/7 process');
 } else {
   fail('Background schedule is accurately bounded', 'Review the declared schedule and avoid claiming persistent runtime');
 }
