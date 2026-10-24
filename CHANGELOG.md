@@ -19,6 +19,7 @@ This is a first corrective patch, not completion of the entire 14-page framework
 
 ## Verification status
 
-- Repository file update: committed.
+- Repository file updates: committed, including regression tests for deterministic equal-pivot ties, forward-horizon boundaries, gap-through-stop precedence, and invalid minimum-RR input.
+- The repository's push-triggered GitHub Actions workflow runs the strategy-core, SMC detector, discovery, research-backtest, and app refresh test suites. The result of the latest run has not yet been independently confirmed here.
 - Browser smoke test and real-feed self-test: not run in this environment.
 - Backtest validation: NOT VALIDATED. No profitability claim is made.
