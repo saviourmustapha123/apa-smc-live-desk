@@ -5,8 +5,8 @@ import { applyCandlesToTrade, summarizePaperTrades } from './paper-trade-lifecyc
 const STATE_URL = new URL('../data/background-paper-trading-state.json', import.meta.url);
 const REPORT_URL = new URL('../artifacts/background-paper-trading-report.md', import.meta.url);
 const SYMBOLS = ['EURUSD', 'BTCUSD', 'QQQUSDT'];
-const TIMEFRAMES = ['5m', '15m', '1h'];
-const SECONDS = { '5m': 300, '15m': 900, '1h': 3600 };
+const TIMEFRAMES = ['1m', '5m', '15m', '1h'];
+const SECONDS = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600 };
 const MAX_FORWARD_BARS = 100;
 const nowMs = Date.now();
 const nowSeconds = Math.floor(nowMs / 1000);
@@ -87,7 +87,7 @@ function configuredQqqProxy() {
 }
 async function fetchBars(symbol, tf) {
   const interval = SECONDS[tf];
-  const range = tf === '5m' ? '14d' : '60d';
+  const range = tf === '1m' ? '7d' : tf === '5m' ? '14d' : '60d';
   const errors = [];
 
   if (symbol === 'EURUSD' || symbol === 'BTCUSD') {
