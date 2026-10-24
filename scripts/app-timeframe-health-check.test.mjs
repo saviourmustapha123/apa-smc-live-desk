@@ -380,3 +380,24 @@ test('daily target uses the date a live signal was identified rather than only t
   assert.match(html, /new Date\(Number\(t\.identifiedAt\)\|\|Number\(t\.time\)\*1000\)/);
   assert.match(html, /identifiedAt:candidate\.status==='HISTORICAL'\?null:Date\.now\(\)/);
 });
+
+
+test('active signal activity pane exposes price, entry distance, TP progress, SL risk and current R', () => {
+  assert.match(html, /id="activeActivity"/);
+  assert.match(html, /id="activeActivityCount"/);
+  assert.match(html, /TP progress/);
+  assert.match(html, /SL risk/);
+  assert.match(html, /Entry distance/);
+  assert.match(html, /t\.lastObservedPrice=p/);
+});
+
+test('daily target is ten but scanner still reports actual qualified setups rather than fabricating them', () => {
+  assert.match(html, /dailyTarget:10/);
+  assert.match(html, /Only detected setups count; the scanner will not fabricate trades/);
+});
+
+test('active progress is rendered for pending signals and historical candle marks across markets', () => {
+  assert.match(html, /const activeRows=allActiveSignals\(\)/);
+  assert.match(html, /const last=closedBars\.at\(-1\),mark=last\.close/);
+  assert.match(html, /const last=closedBars\.at\(-1\),p=last\.close/);
+});
