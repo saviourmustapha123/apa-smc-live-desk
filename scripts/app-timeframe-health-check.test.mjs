@@ -86,10 +86,15 @@ test('chart drawing isolates analysis exceptions instead of aborting candle disp
   assert.match(html, /Candles remain visible/);
 });
 
-test('historical opportunity scan uses monthly/yearly minimum history instead of a fixed 35-bar floor', () => {
-  assert.match(html, /for\(let i=minimum-1;i<b\.length;i\+\+\)/);
-  assert.match(html, /const scanStart=Math\.max\(minimumBars-1,b\.length-120\)/);
+test('production scanner retains monthly/yearly minimum history and chart does not promote historical proxy candidates', () => {
+  assert.match(html, /function scanOpportunityHistory\(symbol,tf,bars\)[\s\S]*?minimum=tf==='1Y'\?10:tf==='1M'\?20:35/);
   assert.match(html, /minimumBars=s\.tf==='1Y'\?10:s\.tf==='1M'\?20:35/);
+  const start = html.indexOf('function analyse(){');
+  const end = html.indexOf('\nfunction log(set){', start);
+  assert.ok(start >= 0 && end > start);
+  const analyseSource = html.slice(start, end);
+  assert.match(analyseSource, /chartSignalFor\(s\.log,s\.symbol,s\.tf\)/);
+  assert.doesNotMatch(analyseSource, /let recentSet=null/);
 });
 
 test('chart exposes 8H and 12H timeframe controls', () => {
@@ -287,7 +292,7 @@ test('live opportunity scanner is scheduled with the normal quote and candle ref
 
 test('invalidated setups are separate from missed trades in performance', () => {
   assert.ok(html.includes("const missedPerformance=all.filter(t=>['EXPIRED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));"));
-  assert.ok(html.includes("const missed=all.filter(t=>['EXPIRED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));"));
+  assert.ok(html.includes("const missed=all.filter(t=>['EXPIRED','INVALIDATED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));"));
   assert.ok(html.includes("const invalidatedPerformance=all.filter(t=>String(t.status||'').toUpperCase()==='INVALIDATED');"));
   assert.ok(html.includes("invalidated:'performanceInvalidatedCount'"));
   assert.match(html, /const activeCount=all\.filter\(active\)\.length,other=all\.filter\(t=>\['EXPIRED','INVALIDATED','CLOSED'\]\.includes\(t\.status\)\)\.length/);
