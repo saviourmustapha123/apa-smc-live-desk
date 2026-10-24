@@ -578,11 +578,19 @@ async function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode){
  const [m1,m5,m15,h1,h4,h8,h12,d1]=await Promise.all([load('1m',1000),load('5m',1000),load('15m',1000),load('1h',1000),load('4h',1000),load('8h',300),load('12h',300),load('1d',1000)]);
  const weekly=await load('1W',1300),monthly=await load('1M',300),yearly=await load('1Y',25);
  const sets=[['1m',m1],['5m',m5],['15m',m15],['1h',h1],['4h',h4],['8h',h8],['12h',h12],['1d',d1],['1W',weekly],['1M',monthly],['1Y',yearly]];
+ // Higher/lower context frames remain available on the chart, but manual-entry alerts
+ // are limited to practical execution frames to avoid eleven overlapping alerts per pair.
+ const signalSets=sets.filter(([tf])=>['5m','15m','1h','4h','8h','12h','1d'].includes(tf));
  const seen=new Set(s.log.map(t=>[t.symbol,t.tf,t.side,t.time].join('|'))),additions=[];
- for(const [tf,bars] of sets)for(const candidate of scanOpportunityHistory(symbol,tf,bars)){
-  if(freshOnly&&candidate.status==='HISTORICAL')continue;
+ const openStatuses=new Set(['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED','RUNNING','TRIGGERED','ACTIVE']);
+ const alreadyOpen=s.log.filter(t=>t.symbol===symbol&&openStatuses.has(String(t.status||'').toUpperCase())&&Number(t.rr)>=3);
+ const openTf=new Set(alreadyOpen.map(t=>t.tf));let openCount=alreadyOpen.length;
+ for(const [tf,bars] of signalSets)for(const candidate of scanOpportunityHistory(symbol,tf,bars)){
+  if(candidate.status==='HISTORICAL')continue;
   const key=[candidate.symbol,candidate.tf,candidate.side,candidate.time].join('|');
-  if(!seen.has(key)){seen.add(key);const verifiedAt=candidate.status==='HISTORICAL'?null:Date.now();additions.push({...candidate,verificationState:candidate.status==='HISTORICAL'?'HISTORICAL':'RULE-VERIFIED',verifiedAt,identifiedAt:verifiedAt})}
+  if(seen.has(key)||openTf.has(tf)||openCount>=4)continue;
+  seen.add(key);openTf.add(tf);openCount++;
+  const verifiedAt=Date.now();additions.push({...candidate,verificationState:'RULE-VERIFIED',verifiedAt,identifiedAt:verifiedAt});
  }
  if(additions.length){additions.sort((a,b)=>b.time-a.time);s.log.unshift(...additions);s.log.sort((a,b)=>Number(b.time)-Number(a.time));save();await persistSignals(additions)}
  let resolved=0;for(const [tf,bars] of sets)resolved+=resolveSignalOutcomes(symbol,tf,bars).length;
@@ -610,10 +618,15 @@ async function refreshTopDown(force=false,freshOnly=s.signalFreshMode){
   const scanSets=[['1m',m1],['5m',m5],['15m',m15],['1h',h1],['4h',h4],['8h',h8],['12h',h12],['1d',d1],['1W',weekly],['1M',monthly],['1Y',yearly]];
   rebuildUnifiedAnnotations(scanSets);
   const additions=[],seen=new Set(s.log.map(t=>[t.symbol,t.tf,t.side,t.time].join('|')));
-  for(const [tf,bars] of scanSets)for(const candidate of scanOpportunityHistory(sym,tf,bars)){
-   if(freshOnly&&candidate.status==='HISTORICAL')continue;
+  const signalSets=scanSets.filter(([tf])=>['5m','15m','1h','4h','8h','12h','1d'].includes(tf));
+  const openStatuses=new Set(['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED','RUNNING','TRIGGERED','ACTIVE']);
+  const alreadyOpen=s.log.filter(t=>t.symbol===sym&&openStatuses.has(String(t.status||'').toUpperCase())&&Number(t.rr)>=3);
+  const openTf=new Set(alreadyOpen.map(t=>t.tf));let openCount=alreadyOpen.length;
+  for(const [tf,bars] of signalSets)for(const candidate of scanOpportunityHistory(sym,tf,bars)){
+   if(candidate.status==='HISTORICAL')continue;
    const key=[candidate.symbol,candidate.tf,candidate.side,candidate.time].join('|');
-   if(!seen.has(key)){seen.add(key);additions.push(candidate)}
+   if(seen.has(key)||openTf.has(tf)||openCount>=4)continue;
+   seen.add(key);openTf.add(tf);openCount++;additions.push(candidate);
   }
   if(additions.length){
    const verifiedAt=Date.now();
