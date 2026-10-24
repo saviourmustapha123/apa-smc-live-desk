@@ -16,10 +16,13 @@ const failures = [];
 const reports = [];
 
 async function fetchBars(symbol, interval) {
+  const aggregateHours = interval === '8h' ? 8 : interval === '12h' ? 12 : 1;
+  const sourceInterval = aggregateHours > 1 ? '1h' : interval;
+  const sourceSeconds = TIMEFRAME_SECONDS[sourceInterval];
   let rows;
   let normalise;
   if (symbol === 'QQQUSDT') {
-    const url = BYBIT_API + '&interval=' + BYBIT_INTERVAL[interval] + '&limit=1000';
+    const url = BYBIT_API + '&interval=' + BYBIT_INTERVAL[sourceInterval] + '&limit=1000';
     const response = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
     if (!response.ok) throw new Error('Bybit HTTP ' + response.status);
     const json = await response.json();
@@ -27,7 +30,7 @@ async function fetchBars(symbol, interval) {
     rows = json.result && json.result.list || [];
     normalise = b => ({ time: Number(b[0]) / 1000, open: Number(b[1]), high: Number(b[2]), low: Number(b[3]), close: Number(b[4]) });
   } else {
-    const url = API + '/' + symbol + '/ohlc?interval=' + interval + '&limit=1000';
+    const url = API + '/' + symbol + '/ohlc?interval=' + sourceInterval + '&limit=1000';
     const response = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
     if (!response.ok) throw new Error('HTTP ' + response.status);
     const json = await response.json();
@@ -39,12 +42,23 @@ async function fetchBars(symbol, interval) {
     };
   }
   const now = Math.floor(Date.now() / 1000);
-  const seconds = TIMEFRAME_SECONDS[interval];
-  const bars = rows.map(normalise).map(b => Object.assign({}, b, { isOpen: Boolean(b.isOpen) || b.time + seconds > now }))
+  let bars = rows.map(normalise).map(b => Object.assign({}, b, { isOpen: Boolean(b.isOpen) || b.time + sourceSeconds > now }))
     .filter(b => !b.isOpen && Number.isFinite(b.time) && b.time > 0 && [b.open,b.high,b.low,b.close].every(Number.isFinite) && b.high >= Math.max(b.open,b.close,b.low) && b.low <= Math.min(b.open,b.close,b.high))
     .sort((a,b) => a.time-b.time);
   const unique = new Map(bars.map(b => [b.time,b]));
-  return [...unique.values()];
+  bars = [...unique.values()];
+  if (aggregateHours > 1) {
+    const width = aggregateHours * 3600;
+    const groups = new Map();
+    for (const bar of bars) {
+      const bucket = Math.floor(bar.time / width) * width;
+      if (!groups.has(bucket)) groups.set(bucket, []);
+      groups.get(bucket).push(bar);
+    }
+    bars = [...groups.entries()].filter(([,group]) => group.length === aggregateHours && group.every((bar,i) => i === 0 || bar.time - group[i-1].time === 3600))
+      .map(([time,group]) => ({ time, open: group[0].open, high: Math.max(...group.map(b=>b.high)), low: Math.min(...group.map(b=>b.low)), close: group[group.length-1].close, isOpen: time + width > now }));
+  }
+  return bars;
 }
 
 for (const symbol of SYMBOLS) for (const timeframe of TIMEFRAMES) {
