@@ -514,6 +514,7 @@ test('chart renders every pending and running signal for the selected pair acros
   assert.match(html, /map the[\s\S]{0,100}nearest visible candle/);
   assert.match(html, /const activeTrades=s\.log\.filter\(t=>validTrade\(t\)&&!terminalStates\.has/);
   assert.match(html, /const visibleTrades=\[\.\.\.activeTrades\.sort/);
+  assert.match(html, /marks\.sort\(\(a,b\)=>a\.time-b\.time\);[\s\S]{0,100}Explicit zone geometry/);
   assert.match(html, /Clean mode limits completed-history drawings only; it never hides a live or not-yet-triggered setup/);
   assert.match(html, /TP '\+tpPct\.toFixed\(1\)\+'% · SL risk '\+slPct\.toFixed\(1\)\+'%/);
 });
