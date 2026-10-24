@@ -80,3 +80,13 @@ test('pending order is marked missed if target was already touched on its signal
   assert.match(trade.outcome, /signal candle/i);
   assert.equal(trade.resultR, null);
 });
+
+test('pending order is marked missed if entry was already touched on its signal candle', () => {
+  const trade = applyCandlesToTrade(pending({ signalTime: 1, lastProcessedBarTime: 1 }), [
+    candle(1, 99, 101, 100, 100),
+    candle(2, 99, 101)
+  ]);
+  assert.equal(trade.status, 'MISSED ENTRY');
+  assert.match(trade.outcome, /entry level already touched/i);
+  assert.equal(trade.resultR, null);
+});
