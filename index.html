@@ -1024,16 +1024,21 @@ function estimateTargetHorizon(tf,bars,entry,tp){
  const durationEstimate=expectedMinutes<60?'~'+expectedMinutes+' min':expectedMinutes<1440?'~'+(expectedMinutes/60).toFixed(1)+' hours':'~'+(expectedMinutes/1440).toFixed(1)+' days';
  return {horizon:signalHorizonForTf(tf),expectedBars,expectedMinutes,durationEstimate};
 }
+function targetLevelUnreached(side,target,bars,targetIndex){
+ if(!Number.isFinite(target)||!Array.isArray(bars)||!Number.isInteger(targetIndex)||targetIndex<0)return false;
+ const later=bars.slice(targetIndex+1);
+ return side==='BUY'?later.every(bar=>Number.isFinite(bar.high)&&bar.high<target):side==='SELL'?later.every(bar=>Number.isFinite(bar.low)&&bar.low>target):false;
+}
 function structuralTarget(side,entry,stop,highPivot,lowPivot,bars){
  const confirmed=pivots(bars,Math.max(2,+s.k||3));
  const lastIndex=bars.length-1,confirmBefore=lastIndex-Math.max(2,+s.k||3);
  const risk=Math.abs(entry-stop);
  if(!(Number.isFinite(risk)&&risk>0))return null;
- // Choose the nearest confirmed opposing swing that actually permits 3R.
- // Do not reject a valid setup just because a nearer swing cannot meet the minimum.
+ // Only target an opposing swing that has not already been crossed after it formed.
+ // A broken target is behind price, not a valid future take-profit level.
  const candidates=(side==='BUY'
-  ? confirmed.h.filter(p=>p.i<=confirmBefore&&p.p>entry)
-  : confirmed.l.filter(p=>p.i<=confirmBefore&&p.p<entry))
+  ? confirmed.h.filter(p=>p.i<=confirmBefore&&p.p>entry&&targetLevelUnreached('BUY',p.p,bars,p.i))
+  : confirmed.l.filter(p=>p.i<=confirmBefore&&p.p<entry&&targetLevelUnreached('SELL',p.p,bars,p.i)))
   .map(p=>({tp:p.p,rr:Math.abs(p.p-entry)/risk,index:p.i}))
   .filter(p=>Number.isFinite(p.rr)&&p.rr>=3)
   .sort((a,b)=>side==='BUY'?a.tp-b.tp:b.tp-a.tp);
