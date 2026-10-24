@@ -420,6 +420,15 @@ test('historical outcome resolution accounts for stop gaps at the candle open', 
   assert.match(html, /t\.rNow=realizedSignalR\(t\);t\.lastActivityAt=closedAt/);
 });
 
+test('active signals on background markets are monitored with their own fresh quotes', () => {
+  assert.match(html, /function monitorTrades\(p,symbol=s\.symbol\)/);
+  assert.match(html, /async function monitorBackgroundQuotes\(\)/);
+  assert.match(html, /const markets=\[\.\.\.new Set\(s\.log\.filter\(t=>!terminal\.has\(String\(t\.status\|\|''\)\.toUpperCase\(\)&&t\.symbol!==s\.symbol\)\.map\(t=>t\.symbol\)\)\]/);
+  assert.match(html, /monitorTrades\(p,symbol\)/);
+  assert.match(html, /Background signal monitor skipped stale\/unverified quote/);
+  assert.match(html, /await tick\(\);await monitorBackgroundQuotes\(\);await refreshSelectedCandles\(false\)/);
+});
+
 test('last activity timestamp changes on state transitions, while quote refresh has its own timestamp', () => {
   assert.match(html, /if\(t\.status!==previousStatus\)\{t\.lastActivityAt=now;changed=true/);
   assert.match(html, /if\(t\.lastObservedPrice!==p\)\{[\s\S]*?t\.lastPriceUpdateAt=now;[\s\S]*?persistSignals\(changedSignals\)/);
