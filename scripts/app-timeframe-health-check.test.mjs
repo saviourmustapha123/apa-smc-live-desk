@@ -105,6 +105,11 @@ test('weekly/monthly/yearly views reuse sufficiently deep daily history during r
   assert.match(html, /dailyHistoryCache\.set\(sym,\{at:Date\.now\(\),bars:daily\}\)/);
 });
 
+test('live chart loaders that await data are declared async', () => {
+  assert.match(html, /async function getBars\(sym,tf,lim,from,to\)\{/);
+  assert.match(html, /async function switchSymbol\(sym\)\{/);
+});
+
 test('QQQUSDT supports Bybit and Binance venue-specific quotes, candles, and cache isolation', () => {
   assert.match(html, /QQQUSDT:\{label:'QQQUSDT · ETF perpetual'/);
   assert.match(html, /https:\/\/fapi\.binance\.com/);
