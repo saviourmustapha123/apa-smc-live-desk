@@ -337,3 +337,13 @@ test('equal highs/lows and premium/discount contribute context without acting as
   assert.match(html, /Discount-half context/);
   assert.match(html, /Premium-half context/);
 });
+
+
+test('QML and head-and-shoulders patterns require a neckline retest and directional rejection before becoming signal triggers', () => {
+  assert.match(html, /function detectPatternRetest\(bars,k\)/);
+  assert.match(html, /QML neckline retest/);
+  assert.match(html, /Inverse QML neckline retest/);
+  assert.match(html, /Head-and-shoulders neckline retest/);
+  assert.match(html, /Inverse head-and-shoulders neckline retest/);
+  assert.match(html, /const patternRetest=detectPatternRetest\(hist,\+s\.k\)/);
+});
