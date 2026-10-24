@@ -294,3 +294,30 @@ test('historical signal is marked missed when target trades beyond entry without
   assert.equal(result.status, 'MISSED ENTRY');
   assert.equal(result.outcome, 'MISSED ENTRY');
 });
+
+
+test('signal generation includes multiple setup families rather than only sweep and break candles', () => {
+  const start = html.indexOf('function scanOpportunityHistory(symbol,tf,bars){');
+  const end = html.indexOf('function resolveSignalOutcomes', start);
+  assert.ok(start >= 0 && end > start, 'signal scanner should be present');
+  const scanner = html.slice(start, end);
+  assert.match(scanner, /Buy-side liquidity sweep and reclaim/);
+  assert.match(scanner, /Sell-side liquidity sweep and reclaim/);
+  assert.match(scanner, /bullStructureEvent/);
+  assert.match(scanner, /bearStructureEvent/);
+  assert.match(scanner, /Recent FVG retest with directional close/);
+  assert.match(scanner, /SBR level break and retest/);
+  assert.match(scanner, /RBS level break and retest/);
+  assert.match(scanner, /target\.rr<3/);
+});
+
+test('BOS and CHoCH are classified from the preceding swing trend, not treated as interchangeable labels', () => {
+  assert.match(html, /const bullStructureEvent=upBreak\?\(trendBear\?'CHoCH':'BOS'\):null/);
+  assert.match(html, /const bearStructureEvent=downBreak\?\(trendBull\?'CHoCH':'BOS'\):null/);
+});
+
+test('multi-trigger signal reasons are retained as structured explanations', () => {
+  assert.match(html, /const uniqueReasons=\[\.\.\.new Set\(reasons\)\]/);
+  assert.match(html, /reason:uniqueReasons/);
+  assert.match(html, /APA-SMC multi-trigger heuristic proxy/);
+});
