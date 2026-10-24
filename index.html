@@ -1233,6 +1233,25 @@ function chartSignalFor(log,symbol,tf){
     !terminalStatuses.has(String(t.status||'').toUpperCase()))
   .sort((a,b)=>Number(b.time)-Number(a.time))[0]||null;
 }
+const BACKGROUND_PAPER_STATE_URL='https://raw.githubusercontent.com/saviourmustapha123/apa-smc-live-desk/paper-trade-state/data/background-paper-trading-state.json';
+async function syncBackgroundPaperTrades(redraw=true){
+ try{
+  const response=await fetch(BACKGROUND_PAPER_STATE_URL,{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
+  if(!response.ok)throw new Error('Background paper journal HTTP '+response.status);
+  const payload=await response.json();
+  const records=Array.isArray(payload.trades)?payload.trades:[];
+  s.backgroundLog=records.filter(t=>t&&['NOT RUNNING','ACTIVE'].includes(String(t.status||'').toUpperCase())&&
+   Number.isFinite(Number(t.signalTime))&&Number(t.rr)>=3&&['BUY','SELL'].includes(t.side))
+   .map(t=>({...t,time:Number(t.signalTime),tf:t.tf,source:'BACKGROUND PAPER SCANNER',backgroundPaperTrade:true}));
+  s.backgroundPaperUpdatedAt=payload.updatedAt||null;
+  if(redraw&&s.symbol&&s.tf&&s.backgroundLog.some(t=>t.symbol===s.symbol&&t.tf===s.tf))draw();
+  return true;
+ }catch(error){
+  s.backgroundPaperError=error.message;
+  console.warn('Background paper journal unavailable; local journal remains active:',error);
+  return false;
+ }
+}
 
 function analyse(){
  const b=s.bars.filter(c=>!c.isOpen);s.zoneDefs=[];s.overlaySignal=null;const minimumBars=s.tf==='1Y'?10:s.tf==='1M'?20:35;if(b.length<minimumBars){$('bias').textContent='Need more candles';$('analysisTime').textContent='At least '+minimumBars+' candles are required';$('signal').innerHTML='<h3>Insufficient candles</h3><div class="muted">Load more real OHLC bars before analysis. Existing overlays are cleared to avoid showing stale levels.</div>';paint(null,[],[],[]);renderOverlay();return}
@@ -1316,7 +1335,7 @@ function analyse(){
   if(inducementMatch){const im=inducementMatch;marks.push({time:im.time,position:im.side==='BEARISH'?'aboveBar':'belowBar',color:'#a3e635',shape:'diamond',text:'IDM '+im.status});s.zoneDefs.push({start:im.time,end:im.eventIndex!=null?b[im.eventIndex].time:x.time,high:im.level+a*.03,low:im.level-a*.03,label:'IDM '+im.status+' · proxy',color:'#a3e635',fill:'#a3e63520',extendRight:false})}if(swH)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:'BSL sweep'});if(swL)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:'SSL sweep'});if(bearBreak)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:bias==='Bullish structure'?'CHoCH?':'BOS↓'});if(bullBreak)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:bias==='Bearish structure'?'CHoCH?':'BOS↑'});if(fvgBear)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'square',text:'FVG'});if(fvgBull)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'square',text:'FVG'});if(sbr)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'circle',text:'SBR'});if(rbs)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'circle',text:'RBS'});
  addAdvancedAnnotations(b,marks);
  // Actionable levels on the chart come from the same production signal journal as the live desk.
- const chartSignal=chartSignalFor(s.log,s.symbol,s.tf);
+ const chartSignal=chartSignalFor([...(s.log||[]),...(s.backgroundLog||[])],s.symbol,s.tf);
  if(chartSignal){
   s.overlaySignal=chartSignal;
   levelLines.push(['SIGNAL ENTRY',chartSignal.entry,chartSignal.side==='BUY'?'#35d39a':'#ff657a'],['SIGNAL STOP',chartSignal.sl,'#ff657a'],['SIGNAL TARGET · 1:'+Number(chartSignal.rr).toFixed(2),chartSignal.tp,'#35d39a']);
@@ -1511,7 +1530,7 @@ function events(){
  $('saveSettings').onclick=()=>{s.api=safeApiBase($('apiBase').value.trim());s.qqqProxy=safeQqqProxy($('qqqProxy').value.trim());s.qqqProvider=['bybit','binance'].includes($('qqqProvider')?.value)?$('qqqProvider').value:'bybit';$('apiBase').value=s.api;$('qqqProxy').value=s.qqqProxy;s.initial=+$('initialBars').value;save();$('modal').classList.add('hidden');start()};
  $('saveRules').onclick=()=>{s.k=+$('swing').value;s.disp=+$('disp').value;s.refresh=+$('refreshSec').value;save();start();toast('Rules saved. Targets are derived from confirmed opposing structure, not a fixed R:R input.')};
 }
-async function main(){loadPrefs();renderPairSelector();events();try{initChart()}catch(e){console.error(e);return}try{s.db=await dbOpen();await loadSignalStore();s.minute=await dbGet(s.symbol,'1m');s.data=await dbGet(s.symbol,s.tf)}catch(e){toast('Local database unavailable; data will be session-only')}renderLog();if($('signalModePill'))$('signalModePill').textContent=s.signalFreshMode?'Fresh signals only':'Normal scan';if($('signalEngineStatus'))$('signalEngineStatus').textContent=s.signalFreshMode?'Fresh scan mode is active. Historical candidates will not be re-imported.':'Ready · signals are provisional until strategy validation is complete.';await start();s.topDownTimer=setInterval(()=>refreshTopDown(),60000)}
+async function main(){loadPrefs();renderPairSelector();events();try{initChart()}catch(e){console.error(e);return}try{s.db=await dbOpen();await loadSignalStore();await syncBackgroundPaperTrades(false);s.minute=await dbGet(s.symbol,'1m');s.data=await dbGet(s.symbol,s.tf)}catch(e){toast('Local database unavailable; data will be session-only')}renderLog();if($('signalModePill'))$('signalModePill').textContent=s.signalFreshMode?'Fresh signals only':'Normal scan';if($('signalEngineStatus'))$('signalEngineStatus').textContent=s.signalFreshMode?'Fresh scan mode is active. Historical candidates will not be re-imported.':'Ready · signals are provisional until strategy validation is complete.';await start();s.topDownTimer=setInterval(()=>refreshTopDown(),60000);s.backgroundPaperSyncTimer=setInterval(()=>syncBackgroundPaperTrades(true),60000)}
 main().catch(e=>{status('App startup failed: '+e.message,'bad');console.error(e)});
 window.addEventListener('offline',()=>{status('OFFLINE · cached candles only. New live signals are paused until market data reconnects.','bad');renderMarketSession(s.symbol,'unknown',false)});
 window.addEventListener('online',()=>{status('Connection restored · refreshing market data and signal context');marketHealthBySymbol.delete(s.symbol);s.lastTopDownAt=0;start();refreshTopDown(true)});
