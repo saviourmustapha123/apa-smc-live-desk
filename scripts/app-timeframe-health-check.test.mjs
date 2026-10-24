@@ -480,3 +480,22 @@ test('performance separates successful and unsuccessful trades without a missed-
   assert.ok(!html.includes('data-performance-filter="missed"'));
   assert.ok(!html.includes('data-verified-filter="missed"'));
 });
+
+
+test('fresh live signals are blocked when offline, during FX closure, or when the latest candle is stale', () => {
+  assert.match(html, /function fxSessionOpenAt\(/);
+  assert.match(html, /function marketSessionOpen\(/);
+  assert.match(html, /function signalEligibilityReason\(/);
+  assert.match(html, /navigator\.onLine===false/);
+  assert.match(html, /latest closed candle is stale/);
+  assert.match(html, /if\(ageBars===0&&!liveEligible\)continue/);
+  assert.match(html, /if\(latest&&liveEligible&&!found\.some/);
+});
+
+test('offline and reconnect events clearly pause fresh signals and resume automatic refresh', () => {
+  assert.match(html, /window\.addEventListener\('offline'/);
+  assert.match(html, /cached candles only\. New live signals are paused/);
+  assert.match(html, /window\.addEventListener\('online'/);
+  assert.match(html, /marketHealthBySymbol\.delete\(s\.symbol\)/);
+  assert.match(html, /refreshTopDown\(true\)/);
+});
