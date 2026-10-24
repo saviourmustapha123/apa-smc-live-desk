@@ -206,7 +206,7 @@ log('- Generated: ' + new Date().toISOString());
 log('- Engine: actual production scanOpportunityHistory source extracted from index.html, not the simplified proxy strategy.');
 log('- Entry model: signal is evaluated after its candle closes; a limit/entry level must be touched on a later candle. Stops/targets are checked only after fill. If both are touched in one candle, stop-first is assumed. Only one pending or active trade is allowed per pair/timeframe at a time.');
 log('- Minimum RR: 1:3. Maximum forward evaluation: ' + MAX_FORWARD_BARS + ' candles. No commission, spread, funding or slippage is included; R results are before costs.');
-log('- Metrics are gross of spread, commission, funding and slippage. This is historical candle replay, not live brokerage execution or proof of future profitability. Results with missing symbol feeds are not complete.');
+log('- Net R is the sum of resolved simulated wins and losses before transaction costs. Spread, commission, funding and slippage are excluded. This is historical candle replay, not live brokerage execution or proof of future profitability. Results with missing or proxy symbol feeds are not complete.');
 log('');
 log('| Pair | TF | Provider | Exact symbol data? | Bars | Days | Candidates | Evaluated | Filled | Wins | Losses | Unresolved | Missed | Invalidated | Win rate | Net R | PF | Expectancy R | Max DD R |');
 log('|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
@@ -221,7 +221,7 @@ for (const symbol of SYMBOLS) {
       const result = runBacktest(symbol, tf, bars, data.provider, data.exact);
       log('- Last closed candle: ' + iso(bars.at(-1).time) + '; close ' + bars.at(-1).close);
       if (data.exact) exactCoverage++; else proxyCoverage++;
-      const rate = result.winRate == null ? 'n/a' : result.winRate.toFixed(1) + '%';
+      const rate = result.winRate == null ? 'n/a' : result.winRate.toFixed(1) + '% (n=' + (result.wins + result.losses) + ')';
       log('| ' + symbol + ' | ' + tf + ' | ' + data.provider + ' | ' + (data.exact ? 'yes' : 'NO, proxy') + ' | ' + result.bars + ' | ' + result.days.toFixed(1) + ' | ' + result.candidates + ' | ' + result.evaluated + ' | ' + result.executed + ' | ' + result.wins + ' | ' + result.losses + ' | ' + result.unresolved + ' | ' + result.missed + ' | ' + result.invalidated + ' | ' + rate + ' | ' + result.netR.toFixed(2) + 'R | ' + (result.profitFactor === Infinity ? '∞' : result.profitFactor == null ? 'n/a' : result.profitFactor.toFixed(2)) + ' | ' + (result.expectancyR == null ? 'n/a' : result.expectancyR.toFixed(2) + 'R') + ' | ' + result.maxDrawdownR.toFixed(2) + 'R |');
       if (!data.exact) warnings.push(symbol + ' ' + tf + ' uses a symbol/venue proxy');
       if (result.days < 30) warnings.push(symbol + ' ' + tf + ' has less than 30 days of history');
