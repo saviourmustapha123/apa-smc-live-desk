@@ -1,21 +1,22 @@
-# QQQUSDT regional data proxy
+# QQQUSDT market-data CORS proxy
 
-The GitHub Pages app runs in the visitor's browser. It cannot bypass a Binance HTTP 451 regional restriction on its own. This Cloudflare Worker provides a small, read-only CORS proxy for the public Binance USDⓈ-M Futures endpoints needed by the app.
+The GitHub Pages app requests public exchange data directly from the visitor's browser. Some browsers, networks or regional routes can block these calls with a Network/CORS error. This Cloudflare Worker is a read-only proxy for the public QQQUSDT perpetual ticker and candle endpoints on **Bybit and Binance**.
 
-## Deploy once
+## Deploy or update the Worker
 
 1. Sign in to Cloudflare and open **Workers & Pages**.
-2. Create a Worker, for example `apa-qqqusdt-feed`.
-3. Open the repository file [`proxy/qqqusdt-worker.js`](./qqqusdt-worker.js), copy its complete contents, and paste them into the Worker editor.
-4. Deploy the Worker and copy its HTTPS URL, for example `https://apa-qqqusdt-feed.YOUR-SUBDOMAIN.workers.dev`.
-5. Open the APA SMC Live Desk website, go to **Settings**, paste that URL into **QQQUSDT Binance data proxy**, and select **Save & reconnect**.
-6. Select QQQUSDT and use **Settings → Test feed**. The test must return a live price and candles before trusting the feed.
+2. Create a Worker, or open the Worker you already deployed for APA SMC Live Desk.
+3. Open [`proxy/qqqusdt-worker.js`](./qqqusdt-worker.js), copy its complete current contents, and paste them into the Cloudflare Worker editor.
+4. **Deploy the updated Worker.** Updating this GitHub file alone does not update a Worker in your Cloudflare account.
+5. Copy the Worker HTTPS URL, for example `https://apa-qqqusdt-feed.YOUR-SUBDOMAIN.workers.dev`.
+6. Open the APA SMC Live Desk website, go to **Settings**, paste the URL into **QQQUSDT CORS proxy**, and select **Save & reconnect**.
+7. Select QQQUSDT and use **Settings → Test feed**. The test must return a valid quote and candles before treating the feed as live.
 
-The Worker allows only GET requests to the QQQUSDT ticker and kline endpoints, validates the requested interval and limits, contains no API keys, and does not place trades. It forwards upstream errors instead of manufacturing prices. If Cloudflare's outbound request also receives a Binance regional restriction, this proxy will not solve it; a market-data provider with permitted QQQUSDT perpetual coverage would then be required.
+The app routes Bybit requests through the Worker when a proxy URL is configured and routes Binance requests through it as well. The Worker validates the allowed paths, QQQUSDT symbol, category, intervals and limits. It contains no API keys and does not place trades. Upstream errors are forwarded rather than replaced with invented prices.
 
 ## Important
 
 - This is a read-only public market-data proxy, not a trading endpoint.
-- The app still requires internet access to the Worker, Binance and the chart library.
+- The app and Worker still require internet access.
 - Do not enter passwords, API keys or trading credentials into the Worker or website.
-- Deploying the Worker is a separate step because it requires access to a Cloudflare account. The repository cannot deploy into your account automatically.
+- Deploying the Worker is separate from GitHub because it requires access to your Cloudflare account. The repository cannot deploy into that account automatically.
