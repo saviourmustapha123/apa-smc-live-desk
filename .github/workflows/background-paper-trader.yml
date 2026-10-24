@@ -1,0 +1,84 @@
+name: APA SMC background paper trader
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apa-smc-background-paper-trader
+  cancel-in-progress: false
+
+jobs:
+  paper-trader:
+    name: Scan pairs and update simulated trade outcomes
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check out production app
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Load persistent paper journal from state branch
+        run: |
+          mkdir -p data artifacts
+          if git fetch origin paper-trade-state; then
+            if git show FETCH_HEAD:data/background-paper-trading-state.json > data/background-paper-trading-state.json; then
+              echo "Loaded prior paper journal from paper-trade-state."
+            else
+              printf '{"version":1,"lastScannedBarTime":{},"feedStatus":{},"trades":[]}' > data/background-paper-trading-state.json
+            fi
+          else
+            printf '{"version":1,"lastScannedBarTime":{},"feedStatus":{},"trades":[]}' > data/background-paper-trading-state.json
+            echo "No prior paper journal found; initialized an empty journal."
+          fi
+
+      - name: Test paper-trade lifecycle rules
+        run: node --test scripts/paper-trade-lifecycle.test.mjs
+
+      - name: Run production scanner against current closed candles
+        id: paper_trader
+        run: node scripts/background-paper-trader.mjs
+
+      - name: Add paper-trading report to run summary
+        if: always()
+        run: |
+          if [ -f artifacts/background-paper-trading-report.md ]; then
+            cat artifacts/background-paper-trading-report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload background paper-trading report and journal snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apa-smc-background-paper-trading
+          path: |
+            artifacts/background-paper-trading-report.md
+            data/background-paper-trading-state.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Persist paper journal on its dedicated branch
+        if: always()
+        run: |
+          if [ ! -f data/background-paper-trading-state.json ]; then
+            echo "No state file exists; skipping persistence."
+            exit 0
+          fi
+          mkdir -p /tmp/apa-smc-paper-state
+          cp data/background-paper-trading-state.json /tmp/apa-smc-paper-state/state.json
+          git checkout --orphan paper-state-temp
+          git rm -rf . >/dev/null 2>&1 || true
+          git clean -fdx
+          mkdir -p data
+          cp /tmp/apa-smc-paper-state/state.json data/background-paper-trading-state.json
+          git add data/background-paper-trading-state.json
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "Refresh background paper-trading state [skip ci]"
+          git push --force origin HEAD:paper-trade-state
