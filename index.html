@@ -429,7 +429,7 @@ async function scanBackgroundPair(symbol){
  const seen=new Set(s.log.map(t=>[t.symbol,t.tf,t.side,t.time].join('|'))),additions=[];
  for(const [tf,bars] of sets)for(const candidate of scanOpportunityHistory(symbol,tf,bars)){
   const key=[candidate.symbol,candidate.tf,candidate.side,candidate.time].join('|');
-  if(!seen.has(key)){seen.add(key);additions.push(candidate)}
+  if(!seen.has(key)){seen.add(key);additions.push({...candidate,identifiedAt:candidate.status==='HISTORICAL'?null:Date.now()})}
  }
  if(additions.length){additions.sort((a,b)=>b.time-a.time);s.log.unshift(...additions);s.log.sort((a,b)=>Number(b.time)-Number(a.time));save();await persistSignals(additions)}
  let resolved=0;for(const [tf,bars] of sets)resolved+=resolveSignalOutcomes(symbol,tf,bars).length;
@@ -745,7 +745,7 @@ function tradeStateLabel(t){
 }
 function renderDailyTarget(){
  const now=new Date(),todayKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
- const today=s.log.filter(t=>{if(!Number.isFinite(Number(t.time))||Number(t.rr)<3)return false;const d=new Date(Number(t.time)*1000);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')===todayKey});
+ const today=s.log.filter(t=>{if(!Number.isFinite(Number(t.time))||Number(t.rr)<3)return false;const d=new Date(Number(t.identifiedAt)||Number(t.time)*1000);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')===todayKey});
  const count=today.length,target=Math.max(1,+s.dailyTarget||6),pct=Math.min(100,count/target*100);
  if($('dailyTargetCount'))$('dailyTargetCount').textContent=count+' / '+target;
  if($('dailyTargetBar'))$('dailyTargetBar').style.width=pct+'%';
@@ -753,7 +753,7 @@ function renderDailyTarget(){
 }
 function renderSignalMonitor(){
  const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','MISSED ENTRY','CLOSED','HISTORICAL']);
- const isToday=t=>{const d=new Date(Number(t.time)*1000),n=new Date();return Number.isFinite(Number(t.time))&&d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()};
+ const isToday=t=>{const d=new Date(Number(t.identifiedAt)||Number(t.time)*1000),n=new Date();return Number.isFinite(Number(t.time))&&d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()};
  const active=t=>!terminal.has(String(t.status||'NOT RUNNING').toUpperCase());
  const daily=s.log.filter(t=>isToday(t)||active(t)).sort((a,b)=>Number(b.time)-Number(a.time));
  const rowDaily=t=>{
@@ -908,7 +908,7 @@ function log(set){
  if(existing){s.lastKey=key;return}
  if(s.lastKey===key)return;
  s.lastKey=key;
- const item={...set,status:set.status||'NOT RUNNING',loggedAt:Date.now()};
+ const item={...set,status:set.status||'NOT RUNNING',identifiedAt:Number(set.identifiedAt)||Date.now(),loggedAt:Date.now()};
  s.log.unshift(item);
  save();persistSignals([item]);
  renderLog();renderSignalMonitor();
