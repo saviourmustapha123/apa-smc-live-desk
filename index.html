@@ -563,6 +563,8 @@ function paint(set, levels=[], marks=[], trendDefs=[]){
    const progress=running&&Number.isFinite(t.movePct)?' · '+(t.movePct>=0?'TP ':'SL ')+Math.abs(t.movePct).toFixed(1)+'%':'';
    marks.push({time:nearest.time,position:t.side==='BUY'?'belowBar':'aboveBar',color:t.side==='BUY'?'#35d39a':'#ff657a',shape:t.side==='BUY'?'arrowUp':'arrowDown',text:t.symbol+' '+t.tf.toUpperCase()+' '+t.side+' · '+(t.status||'NOT RUNNING')+progress});
   }
+  // Lightweight Charts requires marker timestamps to be sorted after all chart and signal markers are merged.
+  marks.sort((a,b)=>a.time-b.time);
   // Explicit zone geometry is supplied by the structure/FVG/OB detectors below; no full-width price lines.
   if(set){
    const entryTime=set.time||s.bars.at(-1)?.time;
