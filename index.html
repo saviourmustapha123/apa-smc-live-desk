@@ -604,7 +604,7 @@ function candidateAlreadyPastLevels(candidate,bars){
  if(![mark,entry,sl,tp].every(Number.isFinite))return false;
  return candidate.side==='BUY'?(mark<=sl||mark>=tp):(mark>=sl||mark<=tp);
 }
-function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode){
+async function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode){
  const load=async(tf,limit)=>{let cached=[];try{cached=await dbGet(symbol,tf)}catch{}try{const fresh=await getBars(symbol,tf,limit);if(fresh.length)await dbPut(fresh,symbol,tf);const map=new Map(cached.map(b=>[b.time,b]));fresh.forEach(b=>map.set(b.time,b));return [...map.values()].sort((a,b)=>a.time-b.time).slice(-2000)}catch{return cached.slice(-2000)}};
  const [m1,m5,m15,h1,h4,h8,h12,d1]=await Promise.all([load('1m',1000),load('5m',1000),load('15m',1000),load('1h',1000),load('4h',1000),load('8h',300),load('12h',300),load('1d',1000)]);
  const weekly=await load('1W',1300),monthly=await load('1M',300),yearly=await load('1Y',25);
