@@ -33,8 +33,8 @@ if (start < 0 || next < 0) {
     'Pattern and recent block retest helpers are invoked');
   requireScanner('Inducement sweep is directionally constrained', /latestInducementProxy[\s\S]*inducementSweep[\s\S]*eventIndex===hist\.length-1/,
     'Inducement proxy must be swept on the current candle and align with direction');
-  requireScanner('Structure, displacement, POI and liquidity sequence gate', /validatedSequence=hasEntryZone&&recentStructuralDisplacement&&hasLiquidityConfluence[\s\S]*if\(!validatedSequence\)continue/,
-    'A candidate must pass the explicit confluence sequence');
+  requireScanner('Structure, displacement, POI and liquidity sequence gate', /validatedSequence=hasEntryZone&&recentStructuralDisplacement&&hasLiquidityConfluence[\s\S]*if\(!validatedSequence\)[\s\S]*continue;/,
+    'A candidate must pass the explicit confluence sequence and record a rejection reason when it fails');
   requireScanner('Hard minimum 1:3 structural target gate', /structuralTarget\(side,entry,stop,hh,ll,hist\)[\s\S]*target\.rr<3/,
     'Rejects missing targets and targets below 3R');
   requireScanner('Pending order-block setup path', /pendingOrderBlockOpportunity\(symbol,tf,b\)/,
