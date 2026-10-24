@@ -145,7 +145,8 @@ test('live inducement proxy is tied to a post-BOS pullback and exposes status', 
 });
 
 test('QQQUSDT long history target is clamped to its documented listing date', () => {
-  assert.match(html, /Date\.UTC\(2026,3,6\)/);
+  assert.match(html, /Date\.UTC\(2026,4,7\)/);
+  assert.match(html, /s\.qqqProvider==='bybit'\?Date\.UTC\(2026,4,7\):Date\.UTC\(2026,3,6\)/);
 });
 
 test('background scan iterates over every configured market except the active one', () => {
