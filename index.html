@@ -580,7 +580,7 @@ async function signalDayStamp(t){
 }
 function dailySignalAdmission(candidate,queued=[]){
  const today=signalDayStamp({identifiedAt:Date.now()});
- const all=[...s.log,...queued];
+ const all=[...s.log,...queued.map(t=>({...t,identifiedAt:Number(t.identifiedAt)||Date.now()}))];
  const createdToday=all.filter(t=>signalDayStamp(t)===today&&String(t.status||'').toUpperCase()!=='HISTORICAL');
  if(createdToday.length>=6)return 'daily limit of 6 new candidates reached';
  const sameMarket=createdToday.filter(t=>t.symbol===candidate.symbol);
