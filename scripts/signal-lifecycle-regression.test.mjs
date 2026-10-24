@@ -102,8 +102,8 @@ test('a persisted trigger skips candles fully before entry time instead of repla
   context.s.log = [signal];
   vmContext.resolveSignalOutcomes('BTCUSD', '5m', [
     { time: 200, isOpen: false, open: 100, high: 116, low: 99, close: 114 },
-    { time: 600, isOpen: false, open: 114, high: 116, low: 110, close: 115 },
-    { time: 900, isOpen: false, open: 115, high: 116, low: 114, close: 115 }
+    { time: 600, isOpen: false, open: 112, high: 114, low: 110, close: 113 },
+    { time: 900, isOpen: false, open: 113, high: 114, low: 112, close: 113 }
   ]);
   assert.equal(signal.status, 'RUNNING');
   assert.equal(signal.outcome, 'OPEN');
