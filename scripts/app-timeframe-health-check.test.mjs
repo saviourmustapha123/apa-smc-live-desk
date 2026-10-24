@@ -499,3 +499,16 @@ test('offline and reconnect events clearly pause fresh signals and resume automa
   assert.match(html, /marketHealthBySymbol\.delete\(s\.symbol\)/);
   assert.match(html, /refreshTopDown\(true\)/);
 });
+
+test('untriggered EURUSD setups expire at the weekly market closure without fake trade P&L', () => {
+  assert.match(html, /function expirePendingSignalsForClosedSessions\(now=Date\.now\(\)\)/);
+  assert.match(html, /if\(fxSessionOpenAt\(new Date\(now\)\)\)return 0/);
+  assert.match(html, /t\.status='EXPIRED';t\.outcome='EXPIRED';t\.exitPrice=null;t\.rNow=null;t\.movePct=null/);
+  assert.match(html, /Forex weekly session closed before entry was triggered/);
+  assert.match(html, /expirePendingSignalsForClosedSessions\(\);await tick\(\);s\.timer=setInterval/);
+});
+test('live setup generation fails closed while offline or when a market session is closed', () => {
+  assert.match(html, /if\(typeof navigator!=='undefined'&&navigator\.onLine===false\)return 'offline: cached data only'/);
+  assert.match(html, /if\(!marketSessionOpen\(symbol,new Date\(now\)\)\)return 'market session closed'/);
+  assert.match(html, /if\(ageBars===0&&!liveEligible\)continue/);
+});
