@@ -407,7 +407,7 @@ function resolveSignalOutcomes(symbol,tf,bars){
   }else if(entered){
    t.status='RUNNING';t.outcome='OPEN';t.triggeredAt=triggeredAt;
    const last=closedBars.at(-1),p=last.close,favourable=(p-entry)*dir,denom=favourable>=0?Math.abs(tp-entry):risk;
-   t.movePct=denom>0?Math.max(-100,Math.min(100,favourable/denom*100)):null;t.rNow=(p-entry)*dir/(risk||1e-12);
+   t.lastObservedPrice=p;t.movePct=denom>0?Math.max(-100,Math.min(100,favourable/denom*100)):null;t.rNow=(p-entry)*dir/(risk||1e-12);
   }else if(t.status!=='HISTORICAL'){
    // Keep every market's live panel current from its latest CLOSED candle, even when it is not selected.
    const last=closedBars.at(-1),mark=last.close;
