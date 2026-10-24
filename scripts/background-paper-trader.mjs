@@ -136,7 +136,12 @@ function activeFor(symbol, tf) {
 }
 function validSignal(signal, signalBar) {
   if (!signal || signal.status !== 'NOT RUNNING' || !Number.isFinite(signal.rr) || signal.rr < 3) return false;
-  if (!signalBar || (signal.side === 'BUY' ? signalBar.high >= signal.tp : signal.side === 'SELL' ? signalBar.low <= signal.tp : true)) return false;
+  if (!signalBar) return false;
+  const targetTouchedOnSignal = signal.side === 'BUY'
+    ? signalBar.high >= signal.tp
+    : signal.side === 'SELL' ? signalBar.low <= signal.tp : true;
+  const entryTouchedOnSignal = signalBar.low <= signal.entry && signalBar.high >= signal.entry;
+  if (targetTouchedOnSignal || entryTouchedOnSignal) return false;
   const risk = signal.side === 'BUY' ? signal.entry - signal.sl : signal.sl - signal.entry;
   const reward = signal.side === 'BUY' ? signal.tp - signal.entry : signal.entry - signal.tp;
   return Number.isFinite(risk) && Number.isFinite(reward) && risk > 0 && reward / risk >= 3;
