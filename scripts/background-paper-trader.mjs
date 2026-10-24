@@ -136,7 +136,7 @@ function activeFor(symbol, tf) {
   );
 }
 function validSignal(signal, signalBar) {
-  if (!signal || signal.status !== 'NOT RUNNING' || !Number.isFinite(signal.rr) || signal.rr < 3) return false;
+  if (!signal || signal.status !== 'NOT RUNNING' || !Number.isFinite(signal.rr) || signal.rr < MIN_RR) return false;
   if (!signalBar) return false;
   const targetTouchedOnSignal = signal.side === 'BUY'
     ? signalBar.high >= signal.tp
