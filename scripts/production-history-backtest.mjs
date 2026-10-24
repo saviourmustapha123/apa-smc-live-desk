@@ -265,8 +265,8 @@ for (const symbol of SYMBOLS) {
   }
 }
 log('## Validation summary');
-log('- Exact pair/timeframe data coverage: ' + exactCoverage + '/9');
-log('- Proxy pair/timeframe coverage: ' + proxyCoverage + '/9 (not valid as exact-contract proof)');
+log('- Exact pair/timeframe data coverage: ' + exactCoverage + '/' + (SYMBOLS.length * TIMEFRAMES.length));
+log('- Proxy pair/timeframe coverage: ' + proxyCoverage + '/' + (SYMBOLS.length * TIMEFRAMES.length) + ' (not valid as exact-contract proof)');
 log('- Data failures: ' + failures.length);
 log('- Warnings: ' + warnings.length);
 for (const x of warnings) log('- WARNING: ' + x);
