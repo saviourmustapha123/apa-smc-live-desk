@@ -140,7 +140,7 @@ test('simulator processes a gap through the stop before the later candle range',
   ];
   const result = simulate(bars, {index:0,side:'BUY',sl:95,tp:115}, 2);
   assert.equal(result.result, 'LOSS (gap through stop)');
-  assert.equal(result.r, -6);
+  assert.equal(result.r, -1.2);
 });
 
 test('simulator rejects invalid inputs and minimum reward-to-risk below 3', () => {
