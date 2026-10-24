@@ -96,3 +96,32 @@ Gate 5: forward shadow/paper operation runs for a predefined period with no crit
 Gate 6: any production change is versioned, observable, reversible, and explicitly authorized.
 
 Do not invent numeric thresholds after seeing results. Define them before each experiment. No system can guarantee perfect trading or continuous uptime.
+
+
+## Continuous strategy improvement mission
+
+The background research system exists primarily to improve the deployed live-signal generation strategy, not merely to count signals or run a generic proxy backtest. It must investigate why entry setups succeed, fail, trigger late, fail to trigger, or are incorrectly classified, then propose evidence-backed corrections to the production strategy.
+
+### Research tracks that run independently
+
+Maintain separate, timestamped research tracks for:
+
+- **Quick execution and entry mechanics:** entry timing, trigger precision, spread/slippage sensitivity, invalidation-before-entry, late fills, missed entries, and stop/target ordering. Run small deterministic regression fixtures frequently.
+- **Intraday execution:** session-aware setups, lower-timeframe confirmation, intraday liquidity and structure, and instrument-specific trading-hour restrictions.
+- **Swing execution:** higher-timeframe context, structural targets, longer holding horizons, overnight/weekend gaps, financing where relevant, and expiry rules.
+- **Multi-timeframe interaction:** verify that context, setup, confirmation, and execution timeframes agree as intended; detect contradictory timeframe signals, stale higher-timeframe candles, lookahead, and accidental timeframe mixing.
+- **Strategy-variable interaction:** test sensitivity and interaction among lookback/pivot sensitivity, ATR and displacement thresholds, sweep/inducement definitions, structure breaks, FVG/IFVG and order-block retests, session filters, entry trigger, invalidation, stop placement, structural target, minimum 1:3 RR, and signal lifecycle. Change one factor at a time where possible, then use controlled factorial or walk-forward tests to identify interactions rather than tuning by intuition.
+- **Pair-specific behavior:** run only symbols actually supported by the live configuration and use each venue's correct feed, contract specification, trading hours, precision, costs, and session rules. Report unavailable feeds as blocked coverage, not as a successful test.
+- **External research:** search the web for primary exchange/broker documentation, technical specifications, reputable research, and reproducible methods relevant to each diagnosed problem. Record URLs, retrieval date, claims, limitations, and the experiment that tests each claim. Online advice is a hypothesis, never an automatic production rule.
+
+### Improvement cycle and promotion rules
+
+For every detected problem or misunderstanding, create a diagnostic record with the affected pair, timeframe, strategy/rule, variable interactions, evidence timestamps, expected behavior, observed behavior, severity, and reproducible test case. Compare the production baseline with an isolated candidate change on the same historical timestamps. Measure both improvements and regressions by setup type, pair, timeframe, session/regime, and quick/intraday/swing horizon.
+
+Keep fast regression checks separate from long-horizon historical replay and forward shadow testing. A quick pass can detect implementation mistakes but cannot certify a strategy. Longer tests must use sufficient history, chronological validation, out-of-sample data, realistic costs, and adequate resolved trades. If evidence or data coverage is insufficient, label the result inconclusive.
+
+The research engine may automatically collect evidence, diagnose, generate candidate patches, and run isolated tests. It must not silently rewrite or promote the live strategy. Promote only after all applicable release gates pass, preserve the prior version and rollback path, and require explicit authorization for production behavior changes.
+
+### Required research status labels
+
+Use explicit statuses: QUEUED, RUNNING, BLOCKED_DATA, FAILED_TEST, INCONCLUSIVE, CANDIDATE_IMPROVEMENT, REGRESSION_FOUND, APPROVED_FOR_SHADOW, SHADOW_PASS, REJECTED, and PROMOTED_WITH_AUTHORIZATION. Each result must show its code version, data window, sample size, coverage, and next action.
