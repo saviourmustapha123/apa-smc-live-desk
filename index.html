@@ -1313,6 +1313,9 @@ function events(){
 }
 async function main(){loadPrefs();renderPairSelector();events();try{initChart()}catch(e){console.error(e);return}try{s.db=await dbOpen();await loadSignalStore();s.minute=await dbGet(s.symbol,'1m');s.data=await dbGet(s.symbol,s.tf)}catch(e){toast('Local database unavailable; data will be session-only')}renderLog();if($('signalModePill'))$('signalModePill').textContent=s.signalFreshMode?'Fresh signals only':'Normal scan';if($('signalEngineStatus'))$('signalEngineStatus').textContent=s.signalFreshMode?'Fresh scan mode is active. Historical candidates will not be re-imported.':'Ready · signals are provisional until strategy validation is complete.';await start();s.topDownTimer=setInterval(()=>refreshTopDown(),60000)}
 main().catch(e=>{status('App startup failed: '+e.message,'bad');console.error(e)});
+window.addEventListener('offline',()=>{status('OFFLINE · cached candles only. New live signals are paused until market data reconnects.','bad');renderMarketSession(s.symbol,'unknown',false)});
+window.addEventListener('online',()=>{status('Connection restored · refreshing market data and signal context');marketHealthBySymbol.delete(s.symbol);s.lastTopDownAt=0;start();refreshTopDown(true)});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine){s.lastTopDownAt=0;refreshSelectedCandles(true);refreshTopDown(true)}});
 })();
 // Installable mobile web app: no app-store package or manual APK updates required.
 (function(){
