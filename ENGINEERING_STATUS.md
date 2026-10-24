@@ -46,6 +46,17 @@ Append a dated entry for each material change. Include the commit, reason, check
 - Added regression tests for adverse stop gaps and favorable target gaps.
 - Verification: GitHub Actions triggered for these commits; final workflow result is pending at the time of this entry. Do not mark the correction fully verified until the test workflow passes.
 
+### 2026-10-24 — Pending-entry gap classification and production lifecycle tests
+
+- Production fix commit: `549da2c3df99bf8d6e76612b494d79bc06e98e3e`.
+- Test harness commits: `a2f27265d1a22ce887365ca40693a2476087e85f`, `c3fbab045677e93b1ec81072ec46638d7d3fb32c`, and `f45cffbbe61f827adccdafac32b9fdc6ecc24f3c`; engineering audit now requires the lifecycle test file in `7581998f751bd6af1a5ffaa09bb51e76d7c85b1e`.
+- Defect: a pending signal could be treated as triggered when a candle opened beyond its stop or target, then its later high/low retraced across entry. That could create a false loss or win despite no valid entry sequence.
+- Correction: resolve pending opening gaps first. A gap through the structural stop is classified as invalidated; a gap through the target before entry is classified as expired/missed. Only then is the candle range checked for an entry touch.
+- Added six regression tests that execute the production `resolveSignalOutcomes` function extracted from `index.html`: long/short stop gaps, long/short target gaps, a valid entry trigger, and no TP/SL progress while untriggered.
+- Verification: GitHub Actions background health check passed at commit `f45cffbbe61f827adccdafac32b9fdc6ecc24f3c`; engineering audit reported 18/18 controls and the lifecycle suite passed 6/6 tests. The market-feed check still reports three warnings from market-session/region restrictions, not code-test failures.
+- Deployment of this exact revision was still running at the time of this ledger update; verify the Pages workflow before describing it as live.
+- Limitation: these deterministic lifecycle tests cover the identified gap/trigger cases but are not a complete real-browser UI acceptance test or proof of strategy profitability.
+
 ## Open work, in priority order
 
 1. Verify the live UI on the deployed site: Untriggered, Active and Missed must be separate, and performance must separate successful, unsuccessful and missed signals. Confirm that pending signals show no TP/SL progress.
