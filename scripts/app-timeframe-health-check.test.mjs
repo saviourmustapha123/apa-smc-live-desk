@@ -567,3 +567,10 @@ test('daily candidate counter uses identification time rather than the historica
   assert.match(html, /queued\.map\(t=>\(\{\.\.\.t,identifiedAt:Number\(t\.identifiedAt\)\|\|Date\.now\(\)\}\)\)/);
   assert.match(html, /const createdToday=all\.filter\(t=>signalDayStamp\(t\)===today/);
 });
+
+test('untriggered setups expire only after a documented timeframe-specific entry window', () => {
+  assert.match(html, /Pending entries need a finite, timeframe-specific validity window/);
+  assert.match(html, /const maxPendingBars=\{'5m':18,'15m':16,'1h':24,'4h':18,'8h':12,'12h':10,'1d':7\}\[tf\]\|\|24/);
+  assert.match(html, /Entry window expired after '\+maxPendingBars\+' closed '\+tf\+' candles without an entry fill/);
+  assert.match(html, /t\.closedReason\|\|t\.reason\|\|t\.scanEngine/);
+});
