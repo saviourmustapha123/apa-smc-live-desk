@@ -1104,3 +1104,10 @@ test('verified signal pane includes pending and running signals from all markets
   assert.match(html, /const slPct=running&&hasPrice&&risk>0/);
   assert.match(html, /const progressMarkup=running\?/);
 });
+
+
+test('daily signal monitor does not calculate TP progress or SL risk before a signal is running', () => {
+  assert.match(html, /const tpPct=running&&hasPrice&&tpDistance>0/);
+  assert.match(html, /const slPct=running&&hasPrice&&riskDistance>0/);
+  assert.match(html, /const progress=running\?[\s\S]*?active\(t\)\?[\s\S]*?Entry '[\s\S]*?away/);
+});
