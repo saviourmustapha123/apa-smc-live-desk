@@ -175,7 +175,9 @@ test('all-timeframe SMC zones are rebuilt into one symbol-wide overlay and mappe
   assert.match(html, /s\.globalMarks=allMarks\.sort/);
   assert.match(html, /const marksToDraw=\(s\.globalMarks\|\|\[\]\)\.filter\(mark=>mode!==\x27clean\x27\|\|mark\.sourceTf===s\.tf\|\|htf\.has\(mark\.sourceTf\)\)/);
   assert.ok(html.includes("tag.textContent='['+mark.sourceTf.toUpperCase()+'] '+mark.text"));
-  assert.match(html, /t\.symbol===s\.symbol&&String\(t\.status\|\|\x27\x27\)\.toUpperCase\(\)!==\x27HISTORICAL\x27/);
+  assert.match(html, /const activeTrades=s\.log\.filter\(t=>validTrade\(t\)&&!terminalStates\.has/);
+  assert.match(html, /const visibleTrades=\[\.\.\.activeTrades\.sort/);
+  assert.match(html, /const completedTrades=mode==='clean'\?\[\]:s\.log\.filter/);
 });
 
 test('QQQUSDT supports a configurable Cloudflare Workers proxy for region-restricted Binance data', () => {
