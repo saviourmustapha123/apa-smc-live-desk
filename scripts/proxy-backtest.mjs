@@ -1,6 +1,6 @@
 import { assessAt, simulate } from './strategy-core.mjs';
 const API = 'https://biquote.io/api';
-const BYBIT_API = 'https://api.bybit.com/v5/market/kline?category=linear&symbol=QQQUSDT';
+const BYBIT_HOSTS = ['https://api.bybit.com', 'https://api.bytick.com'];
 const SYMBOLS = ['EURUSD', 'BTCUSD', 'QQQUSDT'];
 const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '8h', '12h', '1d'];
 const TIMEFRAME_SECONDS = { '1m':60, '5m':300, '15m':900, '1h':3600, '4h':14400, '8h':28800, '12h':43200, '1d':86400 };
@@ -16,18 +16,27 @@ const failures = [];
 const reports = [];
 
 async function fetchBars(symbol, interval) {
-  const aggregateHours = interval === '8h' ? 8 : interval === '12h' ? 12 : 1;
-  const sourceInterval = aggregateHours > 1 ? '1h' : interval;
+  const aggregateHours = interval === '8h' ? 2 : interval === '12h' ? 3 : 1;
+  const sourceInterval = aggregateHours > 1 ? '4h' : interval;
   const sourceSeconds = TIMEFRAME_SECONDS[sourceInterval];
   let rows;
   let normalise;
   if (symbol === 'QQQUSDT') {
-    const url = BYBIT_API + '&interval=' + BYBIT_INTERVAL[sourceInterval] + '&limit=1000';
-    const response = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
-    if (!response.ok) throw new Error('Bybit HTTP ' + response.status);
-    const json = await response.json();
-    if (Number(json.retCode) !== 0) throw new Error('Bybit API: ' + (json.retMsg || json.retCode));
-    rows = json.result && json.result.list || [];
+    let lastError;
+    for (const host of BYBIT_HOSTS) {
+      try {
+        const url = host + '/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + BYBIT_INTERVAL[sourceInterval] + '&limit=1000';
+        const response = await fetch(url, { signal: AbortSignal.timeout(12000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const json = await response.json();
+        if (Number(json.retCode) !== 0) throw new Error(json.retMsg || json.retCode);
+        rows = json.result && json.result.list || [];
+        if (!rows.length) throw new Error('No OHLC rows');
+        lastError = null;
+        break;
+      } catch (error) { lastError = error; }
+    }
+    if (lastError) throw new Error('Bybit and Bytick providers unavailable: ' + lastError.message);
     normalise = b => ({ time: Number(b[0]) / 1000, open: Number(b[1]), high: Number(b[2]), low: Number(b[3]), close: Number(b[4]) });
   } else {
     const url = API + '/' + symbol + '/ohlc?interval=' + sourceInterval + '&limit=1000';
@@ -55,7 +64,7 @@ async function fetchBars(symbol, interval) {
       if (!groups.has(bucket)) groups.set(bucket, []);
       groups.get(bucket).push(bar);
     }
-    bars = [...groups.entries()].filter(([,group]) => group.length === aggregateHours && group.every((bar,i) => i === 0 || bar.time - group[i-1].time === 3600))
+    bars = [...groups.entries()].filter(([,group]) => group.length === aggregateHours && group.every((bar,i) => i === 0 || bar.time - group[i-1].time === sourceSeconds))
       .map(([time,group]) => ({ time, open: group[0].open, high: Math.max(...group.map(b=>b.high)), low: Math.min(...group.map(b=>b.low)), close: group[group.length-1].close, isOpen: time + width > now }));
   }
   return bars;
@@ -64,7 +73,8 @@ async function fetchBars(symbol, interval) {
 for (const symbol of SYMBOLS) for (const timeframe of TIMEFRAMES) {
   try {
     const bars=await fetchBars(symbol,timeframe);
-    if (bars.length<100) throw new Error(`Only ${bars.length} closed, valid bars; at least 100 required`);
+    const minimumBars = ['8h','12h','1d'].includes(timeframe) ? 40 : 100;
+    if (bars.length<minimumBars) throw new Error(`Only ${bars.length} closed, valid bars; at least ${minimumBars} required`);
     const candidates=[];
     for (let end=40;end<=bars.length;end++) {
       const prefix=bars.slice(0,end);
