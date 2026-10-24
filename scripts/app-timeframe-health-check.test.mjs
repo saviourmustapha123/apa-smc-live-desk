@@ -191,10 +191,10 @@ test('QQQUSDT supports a configurable Cloudflare Workers proxy for region-restri
 
 test('chart overlay offers clean, balanced, and full density with per-timeframe zone caps', () => {
   assert.match(html, /id="overlayDensity"/);
-  assert.match(html, /value="clean" selected>Clean/);
-  assert.match(html, /value="balanced">Balanced/);
+  assert.match(html, /value="clean">Clean/);
+  assert.match(html, /value="balanced" selected>Balanced/);
   assert.match(html, /value="full">Full map/);
-  assert.match(html, /const zoneLimit=mode==='clean'\?2:mode==='balanced'\?6:24/);
+  assert.match(html, /const zoneLimit=mode==='clean'\?2:mode==='balanced'\?10:40/);
   assert.match(html, /const tradeLimit=mode==='clean'\?4:mode==='balanced'\?12:40/);
 });
 
