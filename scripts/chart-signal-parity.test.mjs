@@ -73,3 +73,9 @@ test('live chart consumes background paper signals from the persistent remote jo
   assert.match(html, /s\.backgroundLog=records\.filter/);
   assert.match(html, /s\.backgroundPaperSyncTimer=setInterval\(\(\)=>syncBackgroundPaperTrades\(true\),60000\)/);
 });
+
+test('background chart overlays are explicitly labelled as simulated paper signals, never live broker executions', () => {
+  assert.match(html, /BACKGROUND PAPER JOURNAL/);
+  assert.match(html, /chartSignal\.backgroundPaperTrade\?' · PAPER':' · LIVE JOURNAL'/);
+  assert.match(html, /Background paper entries are simulated, not broker executions/);
+});
