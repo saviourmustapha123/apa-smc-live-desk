@@ -239,7 +239,7 @@ test('historical outcome resolution runs for selected and background market scan
 });
 
 test('live opportunity scanner is scheduled with the normal quote and candle refresh cycle', () => {
-  assert.match(html, /await tick\(\);await refreshSelectedCandles\(false\);await refreshTopDown\(false\)/);
+  assert.match(html, /await tick\(\);await monitorBackgroundQuotes\(\);await refreshSelectedCandles\(false\);await refreshTopDown\(false\)/);
   assert.match(html, /Date\.now\(\)-s\.lastOtherPairScan>=300000/);
 });
 
@@ -423,7 +423,7 @@ test('historical outcome resolution accounts for stop gaps at the candle open', 
 test('active signals on background markets are monitored with their own fresh quotes', () => {
   assert.match(html, /function monitorTrades\(p,symbol=s\.symbol\)/);
   assert.match(html, /async function monitorBackgroundQuotes\(\)/);
-  assert.match(html, /const markets=\[\.\.\.new Set\(s\.log\.filter\(t=>!terminal\.has\(String\(t\.status\|\|''\)\.toUpperCase\(\)&&t\.symbol!==s\.symbol\)\.map\(t=>t\.symbol\)\)\]/);
+  assert.match(html, /const markets=\[\.\.\.new Set\(s\.log\.filter\(t=>!terminal\.has\(String\(t\.status\|\|''\)\.toUpperCase\(\)\)&&t\.symbol!==s\.symbol\)\.map\(t=>t\.symbol\)\)\]/);
   assert.match(html, /monitorTrades\(p,symbol\)/);
   assert.match(html, /Background signal monitor skipped stale\/unverified quote/);
   assert.match(html, /await tick\(\);await monitorBackgroundQuotes\(\);await refreshSelectedCandles\(false\)/);
