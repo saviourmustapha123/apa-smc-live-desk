@@ -95,8 +95,8 @@ async function fetchBars(symbol, tf) {
     for (const [provider, fetcher] of providers) {
       try {
         const bars = (await fetcher()).sort((a,b)=>a.time-b.time);
-        if (bars.length >= 100 && (!best || bars.length > best.bars.length)) best = { bars, provider, exact: true };
-        else if (bars.length < 100) errors.push(provider + ' returned only ' + bars.length + ' valid bars');
+        if (bars.length >= 100) { best = { bars, provider, exact: true }; break; }
+        errors.push(provider + ' returned only ' + bars.length + ' valid bars');
       } catch (e) { errors.push(provider + ': ' + e.message); }
     }
     if (best) return best;
@@ -153,7 +153,7 @@ function executeSignal(signal, bars, index) {
 function runBacktest(symbol, tf, bars, provider, exact) {
   const byTime = new Map(bars.map((b,i)=>[b.time,i]));
   const unique = new Map();
-  const coreSize = 250;
+  const coreSize = 500;
   const overlap = 250;
   let diagnostic = null;
   // Replay overlapping windows so scanner history retention does not truncate the dataset.
