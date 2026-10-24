@@ -38,6 +38,29 @@ test('rejects setups below 1:3 based on the next-open fill price', () => {
   assert.match(result.trades[0].reason, /below minimum/);
 });
 
+
+test('prices a gap through the stop at the opening price before inspecting candle extremes', () => {
+  const result = runResearchBacktest({
+    bars: bars([100,101,99,100],[100,102,99,101],[94,116,90,110]),
+    signals: [{ signalIndex:0, side:'LONG', stop:95, target:115 }],
+    costs: { totalCostR: 0 }
+  });
+  assert.equal(result.trades[0].exitReason, 'GAP_THROUGH_STOP');
+  assert.equal(result.trades[0].exitPrice, 94);
+  assert.ok(result.trades[0].grossR < -1);
+});
+
+test('handles a favorable opening gap through the target before candle range checks', () => {
+  const result = runResearchBacktest({
+    bars: bars([100,101,99,100],[100,104,99,103],[116,118,95,110]),
+    signals: [{ signalIndex:0, side:'LONG', stop:95, target:115 }],
+    costs: { totalCostR: 0 }
+  });
+  assert.equal(result.trades[0].exitReason, 'TARGET_AT_OPEN');
+  assert.equal(result.trades[0].exitPrice, 115);
+  assert.equal(result.trades[0].grossR, 3);
+});
+
 test('requires explicit transaction-cost assumption', () => {
   assert.throws(() => runResearchBacktest({
     bars: bars([100,101,99,100],[100,104,99,103]),
