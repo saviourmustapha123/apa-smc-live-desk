@@ -1071,14 +1071,14 @@ function renderVerifiedSignalCards(){
  const untriggered=all.filter(t=>['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED'].includes(String(t.status||'NOT TRIGGERED').toUpperCase()));
  const active=all.filter(t=>['RUNNING','TRIGGERED'].includes(String(t.status||'').toUpperCase()));
  const closed=all.filter(t=>['TAKE PROFIT','STOP LOSS'].includes(String(t.status||'').toUpperCase()));
- const missed=all.filter(t=>['EXPIRED','INVALIDATED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));
+ const missed=all.filter(t=>['EXPIRED','MISSED ENTRY','MISSED'].includes(String(t.status||'').toUpperCase()));
  const counts={untriggered:untriggered.length,active:active.length,closed:closed.length,missed:missed.length};
  for(const [key,id] of Object.entries({untriggered:'untriggeredCount',active:'verifiedActiveCount',closed:'verifiedClosedCount',missed:'verifiedMissedCount'})){const el=$(id);if(el)el.textContent=String(counts[key])}
  pane.querySelectorAll('[data-verified-filter]').forEach(btn=>{const selected=btn.dataset.verifiedFilter===verifiedSignalFilter;btn.classList.toggle('active',selected);btn.setAttribute('aria-selected',String(selected));});
  const list=$('verifiedSignalList');if(!list)return;
  const source=verifiedSignalFilter==='active'?active:verifiedSignalFilter==='closed'?closed:verifiedSignalFilter==='missed'?missed:untriggered;
  pane.querySelectorAll('[data-verified-filter]').forEach(btn=>btn.onclick=()=>{verifiedSignalFilter=btn.dataset.verifiedFilter;renderVerifiedSignalCards()});
- if(!source.length){list.innerHTML='<div class="fine">'+(verifiedSignalFilter==='active'?'No triggered trades are running. Pending entries are kept in Not triggered.':verifiedSignalFilter==='closed'?'No completed take-profit or stop-loss outcomes are recorded yet.':verifiedSignalFilter==='missed'?'No expired or invalidated pre-entry setups are recorded yet.':'No qualified signal is waiting for entry on the current scan.')+'</div>';return}
+ if(!source.length){list.innerHTML='<div class="fine">'+(verifiedSignalFilter==='active'?'No triggered trades are running. Pending entries are kept in Not triggered.':verifiedSignalFilter==='closed'?'No completed take-profit or stop-loss outcomes are recorded yet.':verifiedSignalFilter==='missed'?'No missed or expired entry setups are recorded yet.':'No qualified signal is waiting for entry on the current scan.')+'</div>';return}
  list.innerHTML=source.slice(0,5).map(t=>{
   const entry=Number(t.entry),sl=Number(t.sl),tp=Number(t.tp),p=Number(t.lastObservedPrice),hasPrice=Number.isFinite(p)&&p>0,running=['RUNNING','TRIGGERED'].includes(String(t.status||'').toUpperCase()),risk=Math.abs(entry-sl),reward=Math.abs(tp-entry),dir=t.side==='BUY'?1:-1;
   const tpPct=running&&hasPrice&&reward>0?(p-entry)*dir/reward*100:null;
