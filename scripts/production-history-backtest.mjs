@@ -2,11 +2,11 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { createProductionScannerReplay } from './production-scanner-replay.mjs';
 
 const OUT = new URL('../artifacts/production-history-backtest.md', import.meta.url);
-const TIMEFRAMES = ['5m', '15m', '1h'];
+const TIMEFRAMES = ['1m', '5m', '15m', '1h'];
 const SYMBOLS = ['EURUSD', 'BTCUSD', 'QQQUSDT'];
 const MIN_RR = 3;
 const MAX_FORWARD_BARS = 100;
-const INTERVAL_SECONDS = { '5m': 300, '15m': 900, '1h': 3600 };
+const INTERVAL_SECONDS = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600 };
 const report = [];
 const failures = [];
 const warnings = [];
@@ -81,7 +81,7 @@ async function fetchBars(symbol, tf) {
     const yahooSymbol = symbol === 'EURUSD' ? 'EURUSD=X' : 'BTC-USD';
     try {
       // Keep requests bounded, but prefer a deeper history than the first provider that responds.
-      const range = tf === '5m' ? '14d' : '60d';
+      const range = tf === '1m' ? '7d' : tf === '5m' ? '14d' : '60d';
       const json = await getJson('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(yahooSymbol) + '?range=' + range + '&interval=' + tf);
       consider(normalizeYahoo(json).sort((a,b)=>a.time-b.time), 'Yahoo chart ' + yahooSymbol + ' fallback', true);
     } catch (e) { errors.push('Yahoo: ' + e.message); }
@@ -99,7 +99,7 @@ async function fetchBars(symbol, tf) {
       ['Binance USD-M', async () => normalizeBinance(await getJson('https://fapi.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
       ['Binance API alternate', async () => normalizeBinance(await getJson('https://api.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
       ['Binance GCP alternate', async () => normalizeBinance(await getJson('https://api-gcp.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
-      ['Bybit', async () => { const j = await getJson('https://api.bybit.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + ({'5m':'5','15m':'15','1h':'60'}[tf]) + '&limit=1000'); if (Number(j.retCode)!==0) throw new Error(j.retMsg || 'retCode ' + j.retCode); return normalizeBybit(j.result?.list || []); }],
+      ['Bybit', async () => { const j = await getJson('https://api.bybit.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + ({'1m':'1','5m':'5','15m':'15','1h':'60'}[tf]) + '&limit=1000'); if (Number(j.retCode)!==0) throw new Error(j.retMsg || 'retCode ' + j.retCode); return normalizeBybit(j.result?.list || []); }],
       ['Bytick', async () => { const j = await getJson('https://api.bytick.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + ({'5m':'5','15m':'15','1h':'60'}[tf]) + '&limit=1000'); if (Number(j.retCode)!==0) throw new Error(j.retMsg || 'retCode ' + j.retCode); return normalizeBybit(j.result?.list || []); }],
       ['Gate USDT futures', async () => normalizeGate(await getJson('https://api.gateio.ws/api/v4/futures/usdt/candlesticks?contract=QQQ_USDT&interval=' + tf + '&limit=1000'))]
     ];
