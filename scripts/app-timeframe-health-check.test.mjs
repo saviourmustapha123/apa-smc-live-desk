@@ -223,7 +223,7 @@ test('signal-heavy panels are consolidated into tabs and the duplicate setup boa
 });
 
 test('daily target tracker counts actual 1:3+ candidates without manufacturing signals', () => {
-  assert.match(html, /dailyTarget:10/);
+  assert.match(html, /dailyTarget:6/);
   assert.match(html, /function renderDailyTarget\(\)/);
   assert.match(html, /Only detected setups count; the scanner will not fabricate trades/);
   assert.match(html, /renderSignalMonitor\(\);renderSetupBoard\(\);renderDailyTarget\(\)/);
@@ -550,4 +550,20 @@ test('live admission rejects setups whose latest confirmed close already crossed
   assert.match(html, /const preEntryStop=candidate\.side==='BUY'\?mark<=sl:mark>=sl/);
   assert.match(html, /const preEntryTarget=candidate\.side==='BUY'\?mark>=tp:mark<=tp/);
   assert.match(html, /if\(preEntryStop\|\|preEntryTarget\)continue/);
+});
+
+test('signal admission is synchronous, bounded to six per day and two per market across both scan paths', () => {
+  assert.match(html, /function signalDayStamp\(t\)/);
+  assert.doesNotMatch(html, /async function signalDayStamp\(t\)/);
+  assert.match(html, /daily limit of 6 new candidates reached/);
+  assert.match(html, /daily limit of 2 candidates for '\+candidate\.symbol\+' reached/);
+  assert.match(html, /openCount>=2\|\|dailySignalAdmission\(candidate,additions\)/);
+  assert.match(html, /function candidateAlreadyPastLevels\(candidate,bars\)/);
+  assert.match(html, /Automatic scan · '\+market\+' · 7 execution timeframes checked/);
+  assert.match(html, /setInterval\(\(\)=>runAutomaticPairScan\(\),20000\)/);
+});
+
+test('daily candidate counter uses identification time rather than the historical candle timestamp', () => {
+  assert.match(html, /queued\.map\(t=>\(\{\.\.\.t,identifiedAt:Number\(t\.identifiedAt\)\|\|Date\.now\(\)\}\)\)/);
+  assert.match(html, /const createdToday=all\.filter\(t=>signalDayStamp\(t\)===today/);
 });
