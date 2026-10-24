@@ -117,7 +117,7 @@ async function getHourlyHistory(sym){
  const task=(async()=>{let local=[];try{local=await dbGet(sym,'1h')}catch{}const fresh=await fetchBarsRaw(sym,'1h',1000);if(sym==='QQQUSDT')local=local.filter(b=>!b.provider||b.provider===s.qqqProvider);const merged=new Map(local.map(b=>[b.time,b]));for(const bar of fresh)merged.set(bar.time,bar);const bars=[...merged.values()].sort((a,b)=>a.time-b.time);if(bars.length)await dbPut(bars,sym,'1h');hourlyHistoryCache.set(sym,{at:Date.now(),bars});return bars})();
  hourlyHistoryPending.set(sym,task);try{return await task}finally{hourlyHistoryPending.delete(sym)}
 }
-async function getBars(sym,tf,lim,from,to){
+async async function getBars(sym,tf,lim,from,to){
  if(tf==='8h'||tf==='12h'){
   if(sym==='QQQUSDT')return fetchBarsRaw(sym,tf,Math.max(lim,300),from,to);
   const hourly=await getHourlyHistory(sym);
