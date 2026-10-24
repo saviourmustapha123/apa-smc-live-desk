@@ -347,3 +347,9 @@ test('QML and head-and-shoulders patterns require a neckline retest and directio
   assert.match(html, /Inverse head-and-shoulders neckline retest/);
   assert.match(html, /const patternRetest=detectPatternRetest\(hist,\+s\.k\)/);
 });
+
+
+test('confirmed block and pattern retests are allowed through the final direction gate', () => {
+  assert.match(html, /patternRetest\?\.side==='BUY'\|\|blockRetest\?\.side==='BUY'/);
+  assert.match(html, /patternRetest\?\.side==='SELL'\|\|blockRetest\?\.side==='SELL'/);
+});
