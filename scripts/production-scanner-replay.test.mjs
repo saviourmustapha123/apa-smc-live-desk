@@ -56,3 +56,16 @@ test('closed-market eligibility is enforced for EURUSD on Saturday', () => {
   assert.match(result.diagnostic.eligibilityReason, /market session closed/);
   assert.equal(result.signals.filter(s => s.status === 'NOT RUNNING').length, 0);
 });
+
+test('production target-level guard rejects opposing swings already crossed after formation', () => {
+  const engine = createProductionScannerReplay({ now: NOW });
+  const bars = [
+    { time: 1, open: 100, high: 105, low: 95, close: 100 },
+    { time: 2, open: 100, high: 106, low: 96, close: 102 },
+    { time: 3, open: 102, high: 104, low: 94, close: 100 }
+  ];
+  assert.equal(engine.targetLevelUnreached('BUY', 105, bars, 0), false);
+  assert.equal(engine.targetLevelUnreached('BUY', 107, bars, 0), true);
+  assert.equal(engine.targetLevelUnreached('SELL', 95, bars, 0), false);
+  assert.equal(engine.targetLevelUnreached('SELL', 90, bars, 0), true);
+});
