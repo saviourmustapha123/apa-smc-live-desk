@@ -42,7 +42,7 @@ if (start < 0 || next < 0) {
 }
 
 const proxy = await readFile(new URL('./proxy-backtest.mjs', import.meta.url), 'utf8');
-if (/not\\*{0,2}\\s*validation of the complete proprietary LOWKEY FX APA strategy/i.test(proxy) &&
+if (/not\*{0,2}\s*validation of the complete proprietary LOWKEY FX APA strategy/i.test(proxy) &&
     /gross proxy only/i.test(proxy)) {
   pass('Proxy backtest is not misrepresented as full production validation',
     'Current historical backtest explicitly labels its strategy and cost limitations');
