@@ -168,7 +168,8 @@ for (const symbol of SYMBOLS) {
   for (const tf of TIMEFRAMES) {
     try {
       const data = await fetchBars(symbol, tf);
-      const bars = data.bars.filter(b => Number.isFinite(b.time) && [b.open,b.high,b.low,b.close].every(Number.isFinite))
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const bars = data.bars.filter(b => Number.isFinite(b.time) && [b.open,b.high,b.low,b.close].every(Number.isFinite) && b.time + INTERVAL_SECONDS[tf] <= nowSeconds)
         .sort((a,b)=>a.time-b.time);
       const result = runBacktest(symbol, tf, bars, data.provider, data.exact);
       const rate = result.winRate == null ? 'n/a' : result.winRate.toFixed(1) + '%';
