@@ -1,0 +1,81 @@
+import { readFile } from 'node:fs/promises';
+
+const app = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+const failures = [];
+const checks = [];
+const pass = (name, detail) => checks.push({ name, ok: true, detail });
+const fail = (name, detail) => { checks.push({ name, ok: false, detail }); failures.push(name); };
+
+const start = app.indexOf('function scanOpportunityHistory(');
+const next = app.indexOf('\nfunction ', start + 20);
+if (start < 0 || next < 0) {
+  fail('Production scanner can be isolated', 'Could not locate scanOpportunityHistory boundaries in index.html');
+} else {
+  const scanner = app.slice(start, next);
+  pass('Production scanner can be isolated', 'Audits the current scanOpportunityHistory source; does not execute it or claim a backtest');
+
+  const requireScanner = (name, pattern, detail) =>
+    pattern.test(scanner) ? pass(name, detail) : fail(name, detail);
+
+  requireScanner('Closed candles only', /filter\(x\s*=>\s*!x\.isOpen\)/,
+    'Scanner filters open candles before historical analysis');
+  requireScanner('Market/session/data eligibility guard', /signalEligibilityReason\(symbol,tf,b\)/,
+    'Scanner consults freshness, connection and market-session eligibility');
+  requireScanner('Buy-side and sell-side liquidity sweeps', /shSweep[\s\S]*slSweep/,
+    'Both sweep directions are represented in production scanner logic');
+  requireScanner('BOS/CHoCH structure breaks', /upBreak[\s\S]*downBreak[\s\S]*CHoCH/,
+    'Close-confirmed swing breaks and trend-context labels are represented');
+  requireScanner('FVG and IFVG retests', /fvgRetest[\s\S]*ifvgRetest[\s\S]*IFVG/,
+    'Gap zones are treated as retest locations rather than standalone entries');
+  requireScanner('SBR/RBS role reversal', /SBR[\s\S]*RBS/,
+    'Support/resistance role reversal conditions are represented');
+  requireScanner('Pattern and order-block retest checks', /detectPatternRetest\([\s\S]*detectRecentBlockRetest\(/,
+    'Pattern and recent block retest helpers are invoked');
+  requireScanner('Inducement sweep is directionally constrained', /latestInducementProxy[\s\S]*inducementSweep[\s\S]*eventIndex===hist\.length-1/,
+    'Inducement proxy must be swept on the current candle and align with direction');
+  requireScanner('Structure, displacement, POI and liquidity sequence gate', /validatedSequence=hasEntryZone&&recentStructuralDisplacement&&hasLiquidityConfluence[\s\S]*if\(!validatedSequence\)continue/,
+    'A candidate must pass the explicit confluence sequence');
+  requireScanner('Hard minimum 1:3 structural target gate', /structuralTarget\(side,entry,stop,hh,ll,hist\)[\s\S]*target\.rr<3/,
+    'Rejects missing targets and targets below 3R');
+  requireScanner('Pending order-block setup path', /pendingOrderBlockOpportunity\(symbol,tf,b\)/,
+    'Can represent a pending setup before entry is triggered');
+}
+
+const proxy = await readFile(new URL('./proxy-backtest.mjs', import.meta.url), 'utf8');
+if (/not validation of the complete proprietary LOWKEY FX APA strategy/i.test(proxy) &&
+    /gross proxy only/i.test(proxy)) {
+  pass('Proxy backtest is not misrepresented as full production validation',
+    'Current historical backtest explicitly labels its strategy and cost limitations');
+} else {
+  fail('Proxy backtest is not misrepresented as full production validation',
+    'Keep proxy results distinct from validation of the full production scanner');
+}
+
+const workflow = await readFile(new URL('../.github/workflows/background-health-check.yml', import.meta.url), 'utf8');
+if (/schedule:[\s\S]*cron:\s*["']\*\/15 \* \* \* \*["']/.test(workflow)) {
+  pass('Background schedule is accurately bounded', 'GitHub Actions is scheduled every 15 minutes, not a persistent 24/7 process');
+} else {
+  fail('Background schedule is accurately bounded', 'Review the declared schedule and avoid claiming persistent runtime');
+}
+
+console.log('APA · SMC production strategy source audit');
+console.log('Scope: static source-coverage audit only. It is not a candle replay, browser integration test, or profitability proof.');
+for (const c of checks) console.log((c.ok ? 'PASS' : 'FAIL') + '  ' + c.name + ' — ' + c.detail);
+console.log('\nResult: ' + (checks.length - failures.length) + '/' + checks.length + ' checks passed; ' + failures.length + ' failed.');
+
+if (process.env.GITHUB_STEP_SUMMARY) {
+  const { appendFile } = await import('node:fs/promises');
+  const summary = [
+    '# Production strategy source audit',
+    '',
+    '> Static source-coverage audit only. This does not execute the production scanner against historical candles and does not validate profitability.',
+    '',
+    '| Status | Check | Detail |',
+    '|---|---|---|',
+    ...checks.map(c => '| ' + (c.ok ? 'PASS' : 'FAIL') + ' | ' + c.name.replaceAll('|', '\\|') + ' | ' + c.detail.replaceAll('|', '\\|') + ' |'),
+    '',
+    '**Result:** ' + (checks.length - failures.length) + '/' + checks.length + ' checks passed; ' + failures.length + ' failed.'
+  ].join('\n');
+  await appendFile(process.env.GITHUB_STEP_SUMMARY, summary + '\n');
+}
+if (failures.length) process.exitCode = 1;
