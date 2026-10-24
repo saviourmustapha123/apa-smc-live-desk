@@ -609,12 +609,17 @@ function renderOverlay(){
  allowedZones.sort((a,b)=>(priority[a.kind]??7)-(priority[b.kind]??7)||Number(b.start)-Number(a.start));
  const zoneCounts=new Map(),unifiedZones=allowedZones.filter(z=>{const key=z.sourceTf||s.tf,n=zoneCounts.get(key)||0;if(n>=zoneLimit)return false;zoneCounts.set(key,n+1);return true;});
  for(const z of unifiedZones){
-  const x1=chartXForTime(z.start),mappedX2=chartXForTime(z.end),x2=z.extendRight?plotRight:mappedX2;
+  const mappedX1=chartXForTime(z.start),mappedX2=chartXForTime(z.end);
+  // Older active zones must still project across the visible chart even when their origin is off-screen.
+  const x1=mappedX1==null&&z.extendRight?0:mappedX1,x2=z.extendRight?plotRight:mappedX2;
   const y1=s.series.priceToCoordinate(z.high),y2=s.series.priceToCoordinate(z.low);
   if(x1==null||x2==null||y1==null||y2==null)continue;
-  const left=Math.max(0,Math.min(x1,x2)),right=Math.min(w,Math.max(x1,x2)),top=Math.max(0,Math.min(y1,y2)),bottom=Math.min(h,Math.max(y1,y2));
-  if(right-left<2||bottom-top<2||right<0||left>w||bottom<0||top>h)continue;
-  const box=document.createElement('div');box.className='chart-zone';box.style.left=left+'px';box.style.top=top+'px';box.style.width=Math.max(2,right-left)+'px';box.style.height=Math.max(2,bottom-top)+'px';box.style.borderColor=z.color;box.style.background=z.fill||z.color+'20';
+  const left=Math.max(0,Math.min(x1,x2)),right=Math.min(w,Math.max(x1,x2)),rawTop=Math.min(y1,y2),rawBottom=Math.max(y1,y2);
+  // Narrow OB/inducement price ranges often map to less than 2 pixels; keep a visible 4px band.
+  const center=(rawTop+rawBottom)/2,minBand=(z.kind==='order-block'||z.kind==='inducement'||z.kind==='breaker'||z.kind==='breaker-block')?4:2;
+  const top=Math.max(0,Math.min(h,Math.min(rawTop,center-minBand/2))),bottom=Math.max(0,Math.min(h,Math.max(rawBottom,center+minBand/2)));
+  if(right-left<2||bottom-top<1||right<0||left>w||bottom<0||top>h)continue;
+  const box=document.createElement('div');box.className='chart-zone';box.style.left=left+'px';box.style.top=top+'px';box.style.width=Math.max(2,right-left)+'px';box.style.height=Math.max(minBand,bottom-top)+'px';box.style.borderColor=z.color;box.style.background=z.fill||z.color+'20';
   if(z.kind==='reward'||z.kind==='risk'||z.kind==='entry')box.style.zIndex=z.kind==='entry'?'3':'2';
   const label=document.createElement('span');label.className='chart-zone-label';label.style.color=z.color;label.textContent=z.label;box.appendChild(label);s.overlay.appendChild(box);
  }
@@ -736,7 +741,14 @@ function addAdvancedAnnotations(b,marks){
    if(sweepAt>=0&&breakAt>=sweepAt)inducementCandidates.push({inner,outer,sweepAt,breakAt,bearish:side.high});
   }
  }
- for(const q of inducementCandidates.slice(-3)){const yPad=liqTol*.4;zone(q.inner.t,b[q.breakAt].time,q.inner.p+yPad,q.inner.p-yPad,(q.bearish?'BEARISH':'BULLISH')+' INDUCEMENT CANDIDATE','#a3e635','#a3e63530','inducement',false);marks.push({time:b[q.sweepAt].time,position:q.bearish?'aboveBar':'belowBar',color:'#a3e635',shape:'diamond',text:q.bearish?'INDUCEMENT ↓':'INDUCEMENT ↑'});}
+ for(const q of inducementCandidates.slice(-3)){const yPad=liqTol*.4;zone(q.inner.t,b[q.breakAt].time,q.inner.p+yPad,q.inner.p-yPad,(q.bearish?'BEARISH':'BULLISH')+' INDUCEMENT · SWEPT → STRUCTURE BREAK','#a3e635','#a3e63530','inducement',false);marks.push({time:b[q.sweepAt].time,position:q.bearish?'aboveBar':'belowBar',color:'#a3e635',shape:'diamond',text:q.bearish?'INDUCEMENT SWEPT ↓':'INDUCEMENT SWEPT ↑'});}
+ // Pre-sweep inducement is shown only after a confirmed BOS and a later confirmed pullback pivot.
+ const idm=latestInducementProxy(b,k);
+ if(idm&&idm.status==='CANDIDATE'&&idm.eventIndex==null){
+  const yPad=Math.max(rangeForLiquidity(b,last)*.05,Math.abs(idm.level)*.000002);
+  zone(idm.time,b[last].time,idm.level+yPad,idm.level-yPad,(idm.side==='BULLISH'?'BULLISH':'BEARISH')+' INDUCEMENT CANDIDATE · POST-BOS PULLBACK','#a3e635','#a3e63530','inducement',true);
+  marks.push({time:idm.time,position:idm.side==='BULLISH'?'belowBar':'aboveBar',color:'#a3e635',shape:'diamond',text:(idm.side==='BULLISH'?'BULLISH':'BEARISH')+' IDM CANDIDATE'});
+ }
  // QML candidate detection: five alternating confirmed swings, with the protected prior swing as the QML level.
  // The shape alone is only a candidate; a retest label is shown only when the latest closed candle rejects that level.
  const qmlRaw=[...confirmedH.map(p=>({...p,type:'H'})),...confirmedL.map(p=>({...p,type:'L'}))].sort((a,b)=>a.i-b.i);
@@ -886,12 +898,14 @@ function recentQualifiedZones(b,k,dispMult){
   const impulse=b[i],prior=b[i-1],baseAtr=atr(b.slice(0,i))||Math.max(impulse.high-impulse.low,1e-8),body=Math.abs(impulse.close-impulse.open);
   if(body<baseAtr*dispMult)continue;
   const priorPivots=pivots(b.slice(0,i),k),high=priorPivots.h.at(-1),low=priorPivots.l.at(-1);
-  const bullish=impulse.close>impulse.open&&high&&prior.close<=high.p&&impulse.close>high.p&&i>=2&&impulse.low>b[i-2].high;
-  const bearish=impulse.close<impulse.open&&low&&prior.close>=low.p&&impulse.close<low.p&&i>=2&&impulse.high<b[i-2].low;
+  // Core OB qualification: displacement must close through a confirmed opposing swing.
+  // A three-candle FVG is supporting confluence, not a mandatory condition for every valid OB.
+  const bullish=impulse.close>impulse.open&&high&&prior.close<=high.p&&impulse.close>high.p;
+  const bearish=impulse.close<impulse.open&&low&&prior.close>=low.p&&impulse.close<low.p;
   if(!bullish&&!bearish)continue;
   let origin=-1;for(let j=i-1;j>=Math.max(0,i-3);j--){if(bullish?b[j].close<b[j].open:b[j].close>b[j].open){origin=j;break}}
   if(origin<0)continue;
-  const candle=b[origin],ob={index:origin,time:candle.time,low:candle.low,high:candle.high,side:bullish?'BULLISH':'BEARISH',impulseIndex:i,invalidatedAt:null};
+  const candle=b[origin],hasFvg=i>=2&&(bullish?impulse.low>b[i-2].high:impulse.high<b[i-2].low),ob={index:origin,time:candle.time,low:candle.low,high:candle.high,side:bullish?'BULLISH':'BEARISH',impulseIndex:i,hasFvg,invalidatedAt:null};
   for(let j=i+1;j<b.length;j++){if(ob.side==='BULLISH'?b[j].close<ob.low:b[j].close>ob.high){ob.invalidatedAt=j;break}}
   if(ob.invalidatedAt==null){blocks.push(ob);continue}
   const side=ob.side==='BULLISH'?'BEARISH':'BULLISH';let oppositeBreak=-1;
