@@ -1034,7 +1034,7 @@ function structuralTarget(side,entry,stop,highPivot,lowPivot,bars){
  const lastIndex=bars.length-1,confirmBefore=lastIndex-Math.max(2,+s.k||3);
  const risk=Math.abs(entry-stop);
  if(!(Number.isFinite(risk)&&risk>0))return null;
- // Only target an opposing swing that has not already been crossed after it formed.
+ // Choose the nearest confirmed opposing swing that actually permits 3R, but only if it remains ahead of price.
  // A broken target is behind price, not a valid future take-profit level.
  const candidates=(side==='BUY'
   ? confirmed.h.filter(p=>p.i<=confirmBefore&&p.p>entry&&targetLevelUnreached('BUY',p.p,bars,p.i))
