@@ -16,7 +16,7 @@ function extractFunction(name) {
 const functionNames = [
   'fxSessionOpenAt', 'marketSessionOpen', 'signalEligibilityReason',
   'pivots', 'atr', 'detectPatternRetest', 'detectRecentBlockRetest',
-  'latestInducementProxy', 'structuralTarget', 'signalHorizonForTf',
+  'latestInducementProxy', 'targetLevelUnreached', 'structuralTarget', 'signalHorizonForTf',
   'estimateTargetHorizon', 'pendingOrderBlockOpportunity', 'scanOpportunityHistory'
 ];
 
@@ -38,6 +38,10 @@ export function createProductionScannerReplay({ now = Date.now(), k = 3, displac
       const signals = context.__scan(symbol, tf, bars);
       const diagnostic = context.__diagnostics().get(symbol + '|' + tf) || null;
       return { signals, diagnostic };
+    },
+    targetLevelUnreached(side, target, bars, targetIndex) {
+      return context.__targetLevelUnreached(side, target, bars, targetIndex);
+    }
     }
   };
 }
