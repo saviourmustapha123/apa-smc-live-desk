@@ -35,7 +35,7 @@ if (start < 0 || next < 0) {
     'Inducement proxy must be swept on the current candle and align with direction');
   requireScanner('Structure, displacement, POI and liquidity sequence gate', /validatedSequence=hasEntryZone&&recentStructuralDisplacement&&hasLiquidityConfluence[\s\S]*if\(!validatedSequence\)[\s\S]*continue;/,
     'A candidate must pass the explicit confluence sequence and record a rejection reason when it fails');
-  requireScanner('Hard minimum 1:3 structural target gate', /structuralTarget\(side,entry,stop,hh,ll,hist\)[\s\S]*target\\.rr<MIN_REWARD_RISK/,
+    requireScanner('Hard minimum 1:3 structural target gate', /structuralTarget\(side,entry,stop,hh,ll,hist\)[\s\S]*target\.rr<MIN_REWARD_RISK/,
     'Rejects missing targets and targets below 3R');
   requireScanner('Pending order-block setup path', /pendingOrderBlockOpportunity\(symbol,tf,b\)/,
     'Can represent a pending setup before entry is triggered');
