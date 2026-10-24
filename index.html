@@ -50,18 +50,11 @@ const symbolConfig={EURUSD:{label:'EUR/USD',type:'forex',precision:5},BTCUSD:{la
 const marketHealthBySymbol=new Map();
 function fxSessionOpenAt(now=new Date()){const day=now.getUTCDay(),minute=now.getUTCHours()*60+now.getUTCMinutes();if(day===6)return false;if(day===0)return minute>=22*60;if(day===5)return minute<21*60;return true}
 function marketSessionOpen(sym,now=new Date()){return sym==='EURUSD'?fxSessionOpenAt(now):true}
-function expirePendingSignalsForClosedSessions(now=Date.now()){
- if(fxSessionOpenAt(new Date(now)))return 0;
- let count=0;const changed=[];
- for(const t of s.log){
-  if(t.symbol!=='EURUSD'||!['NOT RUNNING','PENDING','UNTRIGGERED'].includes(String(t.status||'').toUpperCase()))continue;
-  t.status='EXPIRED';t.outcome='EXPIRED';t.exitPrice=null;t.rNow=null;t.movePct=null;t.closedAt=now;t.lastActivityAt=now;
-  t.expiryReason='Forex weekly session closed before entry was triggered';
-  t.reason=[...(Array.isArray(t.reason)?t.reason:[String(t.reason||'').trim()].filter(Boolean)),t.expiryReason];
-  changed.push(t);count++;
- }
- if(changed.length){save();persistSignals(changed);renderLog();renderSignalMonitor();renderSetupBoard()}
- return count;
+function expirePendingSignalsForClosedSessions(){
+ // Session closure is not setup invalidation. Keep valid untriggered EURUSD
+ // ideas pending through the weekend; candle-based entry/SL/TP logic alone
+ // decides whether a setup triggers, invalidates, or reaches target first.
+ return 0;
 }
 function signalEligibilityReason(symbol,tf,bars,now=Date.now()){if(typeof navigator!=='undefined'&&navigator.onLine===false)return 'offline: cached data only';if(!marketSessionOpen(symbol,new Date(now)))return 'market session closed';const health=marketHealthBySymbol.get(symbol);if(health&&now-health.checkedAt<10*60*1000){if(health.marketState==='closed')return 'provider reports market closed';if(health.stale)return 'quote is stale or freshness is unknown'}const closed=(bars||[]).filter(b=>!b.isOpen&&Number.isFinite(b.time)).sort((a,b)=>a.time-b.time).at(-1);if(!closed)return 'no confirmed closed candle';const maxAge={'1m':300,'5m':1200,'15m':3600,'1h':10800,'4h':21600,'8h':43200,'12h':64800,'1d':172800,'1W':1209600,'1M':3888000,'1Y':34560000}[tf]||3600;const age=now/1000-closed.time;if(age>maxAge)return 'latest closed candle is stale ('+Math.round(age/60)+' minutes old)';return null}
 const BINANCE_FUTURES_API='https://fapi.binance.com';
@@ -988,9 +981,11 @@ function renderVerifiedSignalCards(){
  const pane=$('verifiedSignalCards');if(!pane)return;
  const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED','HISTORICAL']);
  const all=s.log.filter(t=>t.verificationState==='RULE-VERIFIED'&&Number(t.rr)>=3);
- const untriggered=all.filter(t=>['NOT RUNNING','NOT TRIGGERED','PENDING'].includes(String(t.status||'NOT TRIGGERED').toUpperCase()));
+ const untriggered=all.filter(t=>['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED'].includes(String(t.status||'NOT TRIGGERED').toUpperCase()));
  const active=all.filter(t=>['RUNNING','TRIGGERED'].includes(String(t.status||'').toUpperCase()));
- const closed=all.filter(t=>terminal.has(String(t.status||'').toUpperCase()));
+ // This setup pane is for actionable/current signals only. Expired, missed,
+ // invalidated and historical records belong in performance/audit history.
+ const closed=all.filter(t=>['TAKE PROFIT','STOP LOSS'].includes(String(t.status||'').toUpperCase()));
  const counts={untriggered:untriggered.length,active:active.length,closed:closed.length};
  for(const [key,id] of Object.entries({untriggered:'untriggeredCount',active:'verifiedActiveCount',closed:'verifiedClosedCount'})){const el=$(id);if(el)el.textContent=String(counts[key])}
  pane.querySelectorAll('[data-verified-filter]').forEach(btn=>{const selected=btn.dataset.verifiedFilter===verifiedSignalFilter;btn.classList.toggle('active',selected);btn.setAttribute('aria-selected',String(selected));});
@@ -1328,7 +1323,7 @@ function renderSetupBoard(){
  const row=t=>'<div class="row"><span><b>'+escapeHTML(t.symbol)+' · '+escapeHTML(t.tf.toUpperCase())+' · '+escapeHTML(t.side)+'</b><span class="fine"> '+escapeHTML(tradeStateLabel(t))+' · '+stamp(t.time)+'</span><div class="fine">Entry '+priceFor(t.entry,t.symbol)+' · SL '+priceFor(t.sl,t.symbol)+' · TP '+priceFor(t.tp,t.symbol)+'</div></span><b>1:'+Number(t.rr).toFixed(2)+'</b></div>';
  $('setupBoardCount').textContent=live.length+' current candidates';
  $('majorSetupBoard').innerHTML=majors.length?majors.slice(0,5).map(row).join(''):'<div class="muted">No current major-timeframe setup has passed the present rules. Do not force a trade to fill five slots.</div>';
- $('minorSetupBoard').innerHTML=minors.length?minors.map(row).join(''):'<div class="muted">No current minor-timeframe setup has passed the present rules.</div>';
+ $('minorSetupBoard').innerHTML=minors.length?minors.slice(0,5).map(row).join(''):'<div class="muted">No current minor-timeframe setup has passed the present rules.</div>';
 }
 function renderLog(){
  $('journal').innerHTML=s.log.length?s.log.map(x=>{
