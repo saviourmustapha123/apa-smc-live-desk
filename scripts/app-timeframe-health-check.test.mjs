@@ -531,3 +531,22 @@ test('chart heuristic ideas enter the journal only after matching strict sequenc
   assert.match(logger, /if\(!validated\)\{console\.info\('Signal not journaled: strict sequence validation did not confirm/);
   assert.match(logger, /set=\{\.\.\.validated,identifiedAt:Number\(set\.identifiedAt\)\|\|Date\.now\(\)\}/);
 });
+
+test('live chart annotations include QML, swing references, liquidity, inducement, FVG, structure, reversal and APA price action', () => {
+  const start = html.indexOf('function addAdvancedAnnotations');
+  const end = html.indexOf('function rebuildUnifiedAnnotations', start);
+  assert.ok(start >= 0 && end > start, 'advanced annotation function boundaries must exist');
+  const annotations = html.slice(start, end);
+  for (const label of [
+    'QML CANDIDATE', 'QML LEVEL RETEST', 'SWING HIGH / BSL REFERENCE',
+    'SWING LOW / SSL REFERENCE', 'BUY-SIDE LIQUIDITY', 'SELL-SIDE LIQUIDITY',
+    'INDUCEMENT CANDIDATE', 'FVG', 'iFVG', 'BREAKER BLOCK',
+    'CHoCH', 'BOS', 'SBR', 'RBS', 'APA-STYLE BULLISH REJECTION',
+    'APA-STYLE BEARISH REJECTION', 'APA-STYLE BULLISH ENGULF',
+    'APA-STYLE BEARISH ENGULF', 'APA-STYLE BULLISH DISPLACEMENT',
+    'APA-STYLE BEARISH DISPLACEMENT'
+  ]) assert.ok(annotations.includes(label), 'expected live chart annotation: ' + label);
+  assert.match(html, /const zoneLimit=mode==='clean'\?2:mode==='balanced'\?10:40/);
+  assert.match(html, /const markerLimit=mode==='clean'\?14:mode==='balanced'\?140:500/);
+  assert.match(html, /overlayDensity:'balanced'/);
+});
