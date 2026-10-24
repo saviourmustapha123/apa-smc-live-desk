@@ -47,10 +47,21 @@ try {
     if (Number(response.retCode) === 0 && ticker?.symbol === 'QQQUSDT' && Number(ticker.lastPrice) > 0) pass('Bybit QQQUSDT perpetual live quote', ticker.lastPrice);
     else fail('Bybit QQQUSDT perpetual live quote', response.retMsg || 'Missing valid ticker');
     for (const interval of ['1', '60', '480', '720']) {
-      const data = await (await get('https://api.bybit.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + interval + '&limit=3')).json();
-      const rows = data.result?.list;
-      if (Number(data.retCode) === 0 && Array.isArray(rows) && rows.length && rows.every(r => Array.isArray(r) && [0,1,2,3,4,5].every(i => Number.isFinite(Number(r[i]))))) pass('Bybit QQQUSDT interval ' + interval, rows.length + ' valid OHLCV rows');
-      else fail('Bybit QQQUSDT interval ' + interval, data.retMsg || 'No valid OHLCV rows');
+      const url = 'https://api.bybit.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + interval + '&limit=3';
+      let validRows = null, lastDetail = 'No valid OHLCV rows';
+      // Public feeds can intermittently return an empty result with retCode=0.
+      // Retry the same read before failing the workflow; do not waive the data check.
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const data = await (await get(url)).json();
+        const rows = data.result?.list;
+        const valid = Number(data.retCode) === 0 && Array.isArray(rows) && rows.length &&
+          rows.every(r => Array.isArray(r) && [0,1,2,3,4,5].every(i => Number.isFinite(Number(r[i]))));
+        if (valid) { validRows = rows; break; }
+        lastDetail = data.retMsg || 'No valid OHLCV rows';
+        if (attempt < 3) await new Promise(resolve => setTimeout(resolve, attempt * 300));
+      }
+      if (validRows) pass('Bybit QQQUSDT interval ' + interval, validRows.length + ' valid OHLCV rows');
+      else fail('Bybit QQQUSDT interval ' + interval, lastDetail + ' after 3 attempts');
     }
   } catch (e) { if (/HTTP (403|451)/.test(e.message)) warn('Bybit public market-data endpoint is region-restricted from this CI runner', e.message); else fail('Bybit QQQUSDT market feed', e.message); }
 
