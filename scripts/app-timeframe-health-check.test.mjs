@@ -171,7 +171,7 @@ test('all-timeframe SMC zones are rebuilt into one symbol-wide overlay and mappe
   assert.match(html, /function rebuildUnifiedAnnotations\(scanSets\)/);
   assert.ok(html.includes("label:'['+tf.toUpperCase()+'] '+z.label"));
   assert.match(html, /const allZones=\[\.\.\.\(s\.globalZones\|\|\[\]\)\.filter\(z=>z\.sourceTf!==s\.tf\),\.\.\.\(s\.zoneDefs\|\|\[\]\)\.map\(z=>\(\{\.\.\.z,sourceTf:s\.tf\}\)\)\]/);
-  assert.match(html, /const x1=chartXForTime\(z\.start\),mappedX2=chartXForTime\(z\.end\)/);
+  assert.match(html, /const mappedX1=chartXForTime\(z\.start\),mappedX2=chartXForTime\(z\.end\)/);
   assert.match(html, /s\.globalMarks=allMarks\.sort/);
   assert.match(html, /const marksToDraw=\(s\.globalMarks\|\|\[\]\)\.filter\(mark=>mode!==\x27clean\x27\|\|mark\.sourceTf===s\.tf\|\|htf\.has\(mark\.sourceTf\)\)/);
   assert.ok(html.includes("tag.textContent='['+mark.sourceTf.toUpperCase()+'] '+mark.text"));
@@ -519,6 +519,19 @@ test('chart renders every pending and running signal for the selected pair acros
   assert.match(html, /TP '\+tpPct\.toFixed\(1\)\+'% · SL risk '\+slPct\.toFixed\(1\)\+'%/);
   assert.match(html, /Keep distant TP\/SL levels represented at the chart edge when the candle autoscale puts them off-screen/);
   assert.match(html, /edge\.textContent=t\.symbol\+' '\+t\.tf\.toUpperCase\(\)\+' '\+t\.side\+' '\+z\.label/);
+});
+
+test('order block retests do not require an FVG when displacement and a close-confirmed structure break exist', () => {
+  assert.match(html, /const bullish=impulse\.close>impulse\.open&&high&&prev\.close<=high\.p&&impulse\.close>high\.p;/);
+  assert.match(html, /const bearish=impulse\.close<impulse\.open&&low&&prev\.close>=low\.p&&impulse\.close<low\.p;/);
+  assert.match(html, /No qualified OB \(needs displacement \+ close-confirmed structure break\)/);
+});
+
+test('post-BOS inducement sweep is consumed by the live signal sequence and must align with a retest', () => {
+  assert.match(html, /const inducementEvent=side\?latestInducementProxy\(hist,\+s\.k\):null/);
+  assert.match(html, /inducementEvent\.status==='SWEPT'&&inducementEvent\.eventIndex===hist\.length-1/);
+  assert.match(html, /post-BOS inducement sweep and reclaim/);
+  assert.match(html, /inducementSweep&&!!\(blockRetest\|\|fvgRetest\|\|patternRetest\)/);
 });
 
 test('chart heuristic ideas enter the journal only after matching strict sequence validation', () => {
