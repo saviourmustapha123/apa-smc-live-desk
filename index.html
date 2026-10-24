@@ -483,7 +483,7 @@ function resolveSignalOutcomes(symbol,tf,bars){
  const closedBars=(bars||[]).filter(b=>!b.isOpen&&Number.isFinite(b.time)&&Number.isFinite(b.high)&&Number.isFinite(b.low)).sort((a,b)=>a.time-b.time);
  if(!closedBars.length)return [];
  const changed=[],now=Date.now();
- const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED','HISTORICAL']);
+ const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED']);
  for(const t of s.log){
   if(t.symbol!==symbol||t.tf!==tf||terminal.has(t.status))continue;
   const entry=Number(t.entry),sl=Number(t.sl),tp=Number(t.tp);
