@@ -56,6 +56,7 @@
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id), DB='apa-smc-live-db', STORE='bars', SIGNALS='signals';
+const MIN_REWARD_RISK=3;
 const s={symbol:'EURUSD',tf:'5m',api:'https://biquote.io/api',qqqProxy:'',qqqProvider:'bybit',initial:600,refresh:5,rr:4,k:3,disp:1,db:null,chart:null,series:null,bars:[],data:[],minute:[],log:[],timer:null,stopLoad:false,busy:false,candleFeedOk:false,lines:[],trendSeries:[],markers:null,lastKey:'',didFit:false,overlay:null,zoneDefs:[],globalZones:[],globalMarks:[],globalAnnotationAt:0,overlaySignal:null,overlayDensity:'balanced',dailyTarget:6,topDownBusy:false,lastTopDownAt:0,lastOtherPairScan:0,topDownTimer:null,lastCandlePollAt:0,candlePollBusy:false,signalFreshMode:true,signalRefreshBusy:false,backgroundQuoteBusy:false};
 const symbolConfig={EURUSD:{label:'EUR/USD',type:'forex',precision:5},BTCUSD:{label:'BTC/USD',type:'crypto',precision:2},QQQUSDT:{label:'QQQUSDT · ETF perpetual',type:'equity-perp',precision:2}};
 const marketHealthBySymbol=new Map();
@@ -125,7 +126,7 @@ async function loadSignalStore(){
 
 function save(){try{localStorage.setItem('apa-desk-settings',JSON.stringify({api:s.api,qqqProxy:s.qqqProxy,qqqProvider:s.qqqProvider,initial:s.initial,refresh:s.refresh,k:s.k,disp:s.disp,symbol:s.symbol,tf:s.tf,overlayDensity:s.overlayDensity,signalFreshMode:s.signalFreshMode}))}catch(e){console.warn('Local settings could not be saved',e);if($('toast'))toast('Browser storage unavailable or full. Export your journal for backup.')}}
 function renderPairSelector(){const host=$('pairSelector');if(!host)return;host.innerHTML=Object.entries(symbolConfig).map(([symbol,meta])=>'<button class="pair '+(s.symbol===symbol?'active':'')+'" data-s="'+symbol+'">'+meta.label+'</button>').join('');host.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>switchSymbol(b.dataset.s))}
-function loadPrefs(){try{const p=JSON.parse(localStorage.getItem('apa-desk-settings')||'{}');if(p&&typeof p==='object'&&!Array.isArray(p)){s.api=safeApiBase(p.api);s.qqqProxy=safeQqqProxy(p.qqqProxy);if(['bybit','binance'].includes(p.qqqProvider))s.qqqProvider=p.qqqProvider;if(Number.isFinite(+p.initial))s.initial=Math.min(1000,Math.max(100,+p.initial));if(Number.isFinite(+p.refresh))s.refresh=Math.min(60,Math.max(2,+p.refresh));if(Number.isFinite(+p.k))s.k=Math.min(10,Math.max(2,+p.k));if(Number.isFinite(+p.disp))s.disp=Math.min(5,Math.max(.1,+p.disp));if(symbolConfig[p.symbol])s.symbol=p.symbol;if(['clean','balanced','full'].includes(p.overlayDensity))s.overlayDensity=p.overlayDensity;s.signalFreshMode=true;if(Object.hasOwn(secs,p.tf))s.tf=p.tf}const log=JSON.parse(localStorage.getItem('apa-desk-log')||'[]');s.log=Array.isArray(log)?log.filter(t=>t&&typeof t==='object'&&Number(t.rr)>=3&&Number.isFinite(Number(t.time))&&['BUY','SELL'].includes(t.side)&&symbolConfig[t.symbol]&&Object.hasOwn(secs,t.tf)):[]}catch{s.log=[]}s.api=safeApiBase(s.api);if(!symbolConfig[s.symbol])s.symbol='EURUSD';if(!Object.hasOwn(secs,s.tf))s.tf='5m';s.rr=Number(s.rr)||4;$('apiBase').value=s.api;$('qqqProxy').value=s.qqqProxy;if($('qqqProvider'))$('qqqProvider').value=s.qqqProvider;$('initialBars').value=s.initial;$('refreshSec').value=s.refresh;$('swing').value=s.k;$('disp').value=s.disp;document.querySelectorAll('[data-s]').forEach(b=>b.classList.toggle('active',b.dataset.s===s.symbol));document.querySelectorAll('[data-t]').forEach(b=>b.classList.toggle('active',b.dataset.t===s.tf))}
+function loadPrefs(){try{const p=JSON.parse(localStorage.getItem('apa-desk-settings')||'{}');if(p&&typeof p==='object'&&!Array.isArray(p)){s.api=safeApiBase(p.api);s.qqqProxy=safeQqqProxy(p.qqqProxy);if(['bybit','binance'].includes(p.qqqProvider))s.qqqProvider=p.qqqProvider;if(Number.isFinite(+p.initial))s.initial=Math.min(1000,Math.max(100,+p.initial));if(Number.isFinite(+p.refresh))s.refresh=Math.min(60,Math.max(2,+p.refresh));if(Number.isFinite(+p.k))s.k=Math.min(10,Math.max(2,+p.k));if(Number.isFinite(+p.disp))s.disp=Math.min(5,Math.max(.1,+p.disp));if(symbolConfig[p.symbol])s.symbol=p.symbol;if(['clean','balanced','full'].includes(p.overlayDensity))s.overlayDensity=p.overlayDensity;s.signalFreshMode=true;if(Object.hasOwn(secs,p.tf))s.tf=p.tf}const log=JSON.parse(localStorage.getItem('apa-desk-log')||'[]');s.log=Array.isArray(log)?log.filter(t=>t&&typeof t==='object'&&Number(t.rr)>=MIN_REWARD_RISK&&Number.isFinite(Number(t.time))&&['BUY','SELL'].includes(t.side)&&symbolConfig[t.symbol]&&Object.hasOwn(secs,t.tf)):[]}catch{s.log=[]}s.api=safeApiBase(s.api);if(!symbolConfig[s.symbol])s.symbol='EURUSD';if(!Object.hasOwn(secs,s.tf))s.tf='5m';$('apiBase').value=s.api;$('qqqProxy').value=s.qqqProxy;if($('qqqProvider'))$('qqqProvider').value=s.qqqProvider;$('initialBars').value=s.initial;$('refreshSec').value=s.refresh;$('swing').value=s.k;$('disp').value=s.disp;document.querySelectorAll('[data-s]').forEach(b=>b.classList.toggle('active',b.dataset.s===s.symbol));document.querySelectorAll('[data-t]').forEach(b=>b.classList.toggle('active',b.dataset.t===s.tf))}
 async function json(url){let r;try{r=await fetch(url,{cache:'no-store',mode:'cors'})}catch(e){throw Error('Network/CORS failure contacting '+new URL(url).hostname+'. The browser or network could be blocking this provider. Try the alternate provider or configure the HTTPS QQQUSDT proxy in Settings. '+e.message)}if(!r.ok){let detail='';try{let d=await r.json();detail=d.message||d.error||''}catch{}if(r.status===451)throw Error('HTTP 451 · Binance has region-restricted this public API request. QQQUSDT cannot be shown as live from this connection; a reachable market-data proxy/provider is required.');throw Error('HTTP '+r.status+(detail?' · '+detail:''))}return r.json()}
 function endpoint(p){s.api=safeApiBase(s.api);return s.api.replace(/\/$/,'')+p}
  async function fetchQuote(sym){try{return await json(endpoint('/'+encodeURIComponent(sym)))}catch(primary){try{const batch=await json(endpoint('/latest?symbols='+encodeURIComponent(sym)));const q=batch?.[sym]||batch?.data?.[sym];if(q)return q}catch(fallback){}throw primary}}
@@ -336,7 +337,7 @@ function pendingOrderBlockOpportunity(symbol,tf,bars){
   const stop=bullish?zone.low-buffer:zone.high+buffer;
   if(!(bullish?stop<entry:stop>entry))continue;
   const target=structuralTarget(side,entry,stop,high,low,b);
-  if(!target||target.rr<3)continue;
+  if(!target||target.rr<MIN_REWARD_RISK)continue;
   const reasons=[
    (bullish?'Bullish':'Bearish')+' close-confirmed BOS',
    'ATR-qualified displacement',
@@ -502,7 +503,7 @@ function scanOpportunityHistory(symbol,tf,bars){
   const buffer=aa*0.1,stop=side==='SELL'?Math.max(cur.high,hh?hh.p:cur.high)+buffer:Math.min(cur.low,ll?ll.p:cur.low)-buffer;
   const entry=rawEntry;
   if(!(Number.isFinite(entry)&&Number.isFinite(stop)&&(side==='BUY'?stop<entry:stop>entry))){rejectLatest('Invalid entry or stop: structural risk direction is not valid');continue;}
-  const target=structuralTarget(side,entry,stop,hh,ll,hist);if(!target||!Number.isFinite(target.rr)){rejectLatest('No valid structural target could be calculated');continue;}if(target.rr<3){rejectLatest('Structural target fails the minimum 1:3 reward-to-risk gate');continue;}
+  const target=structuralTarget(side,entry,stop,hh,ll,hist);if(!target||!Number.isFinite(target.rr)){rejectLatest('No valid structural target could be calculated');continue;}if(target.rr<MIN_REWARD_RISK){rejectLatest('Structural target fails the minimum 1:3 reward-to-risk gate');continue;}
   const ageBars=b.length-1-i;
   if(ageBars===0&&!liveEligible){rejectLatest('Current setup blocked by market/data eligibility: '+eligibilityReason);continue;}
   const uniqueReasons=[...new Set(reasons)];
@@ -645,7 +646,7 @@ async function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode){
  const signalSets=sets.filter(([tf])=>['1m','5m','15m','1h','4h','8h','12h','1d'].includes(tf));
  const seen=new Set(s.log.map(t=>[t.symbol,t.tf,t.side,t.time].join('|'))),additions=[];
  const openStatuses=new Set(['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED','RUNNING','TRIGGERED','ACTIVE']);
- const alreadyOpen=s.log.filter(t=>t.symbol===symbol&&openStatuses.has(String(t.status||'').toUpperCase())&&Number(t.rr)>=3);
+ const alreadyOpen=s.log.filter(t=>t.symbol===symbol&&openStatuses.has(String(t.status||'').toUpperCase())&&Number(t.rr)>=MIN_REWARD_RISK);
  const openTf=new Set(alreadyOpen.map(t=>t.tf));let openCount=alreadyOpen.length;
  for(const [tf,bars] of signalSets)for(const candidate of scanOpportunityHistory(symbol,tf,bars)){
   if(candidate.status==='HISTORICAL')continue;
@@ -687,7 +688,7 @@ async function refreshTopDown(force=false,freshOnly=s.signalFreshMode){
   const additions=[],seen=new Set(s.log.map(t=>[t.symbol,t.tf,t.side,t.time].join('|')));
   const signalSets=scanSets.filter(([tf])=>['1m','5m','15m','1h','4h','8h','12h','1d'].includes(tf));
   const openStatuses=new Set(['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED','RUNNING','TRIGGERED','ACTIVE']);
-  const alreadyOpen=s.log.filter(t=>t.symbol===sym&&openStatuses.has(String(t.status||'').toUpperCase())&&Number(t.rr)>=3);
+  const alreadyOpen=s.log.filter(t=>t.symbol===sym&&openStatuses.has(String(t.status||'').toUpperCase())&&Number(t.rr)>=MIN_REWARD_RISK);
   const openTf=new Set(alreadyOpen.map(t=>t.tf));let openCount=alreadyOpen.length;
   for(const [tf,bars] of signalSets)for(const candidate of scanOpportunityHistory(sym,tf,bars)){
    if(candidate.status==='HISTORICAL')continue;
@@ -1040,7 +1041,7 @@ function structuralTarget(side,entry,stop,highPivot,lowPivot,bars){
   ? confirmed.h.filter(p=>p.i<=confirmBefore&&p.p>entry&&targetLevelUnreached('BUY',p.p,bars,p.i))
   : confirmed.l.filter(p=>p.i<=confirmBefore&&p.p<entry&&targetLevelUnreached('SELL',p.p,bars,p.i)))
   .map(p=>({tp:p.p,rr:Math.abs(p.p-entry)/risk,index:p.i}))
-  .filter(p=>Number.isFinite(p.rr)&&p.rr>=3)
+  .filter(p=>Number.isFinite(p.rr)&&p.rr>=MIN_REWARD_RISK)
   .sort((a,b)=>side==='BUY'?a.tp-b.tp:b.tp-a.tp);
  if(!candidates.length)return null;
  return {tp:candidates[0].tp,rr:candidates[0].rr,targetSwingIndex:candidates[0].index};
@@ -1056,19 +1057,19 @@ function tradeStateLabel(t){
 }
 function renderDailyTarget(){
  const now=new Date(),todayKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
- const today=s.log.filter(t=>{if(!Number.isFinite(Number(t.time))||Number(t.rr)<3)return false;const d=new Date(Number(t.identifiedAt)||Number(t.time)*1000);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')===todayKey});
+ const today=s.log.filter(t=>{if(!Number.isFinite(Number(t.time))||Number(t.rr)<MIN_REWARD_RISK)return false;const d=new Date(Number(t.identifiedAt)||Number(t.time)*1000);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')===todayKey});
  const count=today.length,target=Math.max(1,+s.dailyTarget||6),pct=Math.min(100,count/target*100);
  if($('dailyTargetCount'))$('dailyTargetCount').textContent=count+' / '+target;
  if($('dailyTargetBar'))$('dailyTargetBar').style.width=pct+'%';
  if($('dailyTargetText'))$('dailyTargetText').textContent=count>=target?'Daily target reached · '+count+' qualifying 1:3+ candidates logged.':'Target: '+target+' qualifying 1:3+ setups in today’s candles · '+(target-count)+' more needed. Only detected setups count; the scanner will not fabricate trades.';
 }
-function allActiveSignals(){const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED','HISTORICAL']);return s.log.filter(t=>!terminal.has(String(t.status||'NOT RUNNING').toUpperCase())&&Number(t.rr)>=3).sort((a,b)=>Number(b.identifiedAt||b.time*1000)-Number(a.identifiedAt||a.time*1000))}
+function allActiveSignals(){const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED','HISTORICAL']);return s.log.filter(t=>!terminal.has(String(t.status||'NOT RUNNING').toUpperCase())&&Number(t.rr)>=MIN_REWARD_RISK).sort((a,b)=>Number(b.identifiedAt||b.time*1000)-Number(a.identifiedAt||a.time*1000))}
 
 let verifiedSignalFilter='untriggered';
 function renderVerifiedSignalCards(){
  const pane=$('verifiedSignalCards');if(!pane)return;
  const terminal=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED','HISTORICAL']);
- const all=s.log.filter(t=>Number(t.rr)>=3&&String(t.status||'').toUpperCase()!=='HISTORICAL');
+ const all=s.log.filter(t=>Number(t.rr)>=MIN_REWARD_RISK&&String(t.status||'').toUpperCase()!=='HISTORICAL');
  const untriggered=all.filter(t=>['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED'].includes(String(t.status||'NOT TRIGGERED').toUpperCase()));
  const active=all.filter(t=>['RUNNING','TRIGGERED'].includes(String(t.status||'').toUpperCase()));
  const closed=all.filter(t=>['TAKE PROFIT','STOP LOSS'].includes(String(t.status||'').toUpperCase()));
@@ -1228,7 +1229,7 @@ function chartSignalFor(log,symbol,tf){
  const openStatuses=new Set(['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED','RUNNING','TRIGGERED','ACTIVE']);
  const terminalStatuses=new Set(['TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','MISSED ENTRY','MISSED','CLOSED','HISTORICAL']);
  return (Array.isArray(log)?log:[])
-  .filter(t=>t&&t.symbol===symbol&&t.tf===tf&&Number(t.rr)>=3&&
+  .filter(t=>t&&t.symbol===symbol&&t.tf===tf&&Number(t.rr)>=MIN_REWARD_RISK&&
     openStatuses.has(String(t.status||'').toUpperCase())&&
     !terminalStatuses.has(String(t.status||'').toUpperCase()))
   .sort((a,b)=>Number(b.time)-Number(a.time))[0]||null;
@@ -1241,7 +1242,7 @@ async function syncBackgroundPaperTrades(redraw=true){
   const payload=await response.json();
   const records=Array.isArray(payload.trades)?payload.trades:[];
   s.backgroundLog=records.filter(t=>t&&['NOT RUNNING','ACTIVE'].includes(String(t.status||'').toUpperCase())&&
-   Number.isFinite(Number(t.signalTime))&&Number(t.rr)>=3&&['BUY','SELL'].includes(t.side))
+   Number.isFinite(Number(t.signalTime))&&Number(t.rr)>=MIN_REWARD_RISK&&['BUY','SELL'].includes(t.side))
    .map(t=>({...t,time:Number(t.signalTime),tf:t.tf,source:'BACKGROUND PAPER SCANNER',backgroundPaperTrade:true}));
   s.backgroundPaperUpdatedAt=payload.updatedAt||null;
   if(redraw&&s.symbol&&s.tf&&s.backgroundLog.some(t=>t.symbol===s.symbol&&t.tf===s.tf))draw();
@@ -1356,12 +1357,12 @@ function analyse(){
  paint(null,levelLines,marks,trendDefs);renderOverlay();
 }
 function log(set){
-  if(!set||!Number.isFinite(Number(set.rr))||Number(set.rr)<3)return;
+  if(!set||!Number.isFinite(Number(set.rr))||Number(set.rr)<MIN_REWARD_RISK)return;
   // Chart-only APA-style heuristics may display a provisional idea, but the journal only
   // accepts a matching latest-candle setup that also passes the stricter SMC sequence scanner.
   // This prevents a lone sweep/BOS candle from becoming an actionable logged signal.
   const validated=scanOpportunityHistory(set.symbol,set.tf,s.bars).find(candidate=>
-   candidate.time===set.time&&candidate.side===set.side&&candidate.status==='NOT RUNNING'&&Number(candidate.rr)>=3
+   candidate.time===set.time&&candidate.side===set.side&&candidate.status==='NOT RUNNING'&&Number(candidate.rr)>=MIN_REWARD_RISK
   );
   if(!validated){console.info('Signal not journaled: strict sequence validation did not confirm '+[set.symbol,set.tf,set.side,set.time].join('|'));return}
   set={...validated,identifiedAt:Number(set.identifiedAt)||Date.now()};
@@ -1458,7 +1459,7 @@ function monitorTrades(p,symbol=s.symbol){
 }
 function renderSetupBoard(){
  const majorTF=new Set(['1h','4h','1d','1W','1M','1Y']),closed=new Set(['HISTORICAL','TAKE PROFIT','STOP LOSS','INVALIDATED','EXPIRED','CLOSED']);
- const live=s.log.filter(t=>Number(t.rr)>=3&&!closed.has(String(t.status||'').toUpperCase()));
+ const live=s.log.filter(t=>Number(t.rr)>=MIN_REWARD_RISK&&!closed.has(String(t.status||'').toUpperCase()));
  const majors=live.filter(t=>majorTF.has(t.tf)).sort((a,b)=>Number(b.time)-Number(a.time)||Number(b.rr)-Number(a.rr));
  const minors=live.filter(t=>!majorTF.has(t.tf)).sort((a,b)=>Number(b.time)-Number(a.time)||Number(b.rr)-Number(a.rr));
  const row=t=>'<div class="row"><span><b>'+escapeHTML(t.symbol)+' · '+escapeHTML(t.tf.toUpperCase())+' · '+escapeHTML(t.side)+'</b><span class="fine"> '+escapeHTML(tradeStateLabel(t))+' · '+stamp(t.time)+'</span><div class="fine">Entry '+priceFor(t.entry,t.symbol)+' · SL '+priceFor(t.sl,t.symbol)+' · TP '+priceFor(t.tp,t.symbol)+'</div></span><b>1:'+Number(t.rr).toFixed(2)+'</b></div>';
