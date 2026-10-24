@@ -1,0 +1,47 @@
+name: APA SMC production history backtest
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 1 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apa-smc-production-history-backtest
+  cancel-in-progress: false
+
+jobs:
+  production-history-backtest:
+    name: Replay production scanner and publish trade outcomes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run production scanner replay tests
+        run: node --test scripts/production-scanner-replay.test.mjs
+
+      - name: Run chart and lifecycle parity tests
+        run: node --test scripts/chart-signal-parity.test.mjs scripts/signal-lifecycle-regression.test.mjs
+
+      - name: Run historical replay using the actual production scanner
+        run: node scripts/production-history-backtest.mjs
+
+      - name: Upload production scanner trade-outcome report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apa-smc-production-history-backtest
+          path: artifacts/production-history-backtest.md
+          if-no-files-found: warn
+          retention-days: 30
