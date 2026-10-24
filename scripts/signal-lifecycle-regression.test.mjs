@@ -70,7 +70,7 @@ test('a normal entry touch transitions a pending setup to active and then calcul
   assert.equal(signal.status, 'RUNNING');
   assert.equal(signal.outcome, 'OPEN');
   assert.equal(signal.triggeredAt, 200000);
-  assert.equal(signal.movePct, 0.2);
+  assert.equal(signal.movePct, 20);
   assert.equal(signal.rNow, 0.6);
 });
 
