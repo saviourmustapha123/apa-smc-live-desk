@@ -45,7 +45,7 @@ test('repeated replay of identical candles is deterministic', () => {
   const bars = candles(180);
   const first = createProductionScannerReplay({ now: NOW }).scan('BTCUSD', '5m', bars);
   const second = createProductionScannerReplay({ now: NOW }).scan('BTCUSD', '5m', bars);
-  assert.deepEqual(first.signals, second.signals);
+  assert.equal(JSON.stringify(first.signals), JSON.stringify(second.signals));
   assert.equal(first.diagnostic.latestRejection, second.diagnostic.latestRejection);
 });
 
