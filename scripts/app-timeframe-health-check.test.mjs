@@ -512,3 +512,24 @@ test('live setup generation fails closed while offline or when a market session 
   assert.match(html, /if\(!marketSessionOpen\(symbol,new Date\(now\)\)\)return 'market session closed'/);
   assert.match(html, /if\(ageBars===0&&!liveEligible\)continue/);
 });
+
+test('signal candidates expose scalp, intraday, swing, or position horizon with a rough ATR target window', () => {
+  assert.match(html, /function signalHorizonForTf\(tf\)/);
+  assert.match(html, /return short\?'SCALP':intraday\?'INTRADAY':extended\?'SWING':'POSITION'/);
+  assert.match(html, /function estimateTargetHorizon\(tf,bars,entry,tp\)/);
+  assert.match(html, /rough ATR estimate, not a promise/);
+  assert.match(html, /const timing=estimateTargetHorizon\(tf,hist,entry,target\.tp\)/);
+  assert.match(html, /const timing=estimateTargetHorizon\(tf,b,entry,target\.tp\)/);
+});
+test('qualified order blocks are clearly labelled and prioritised in the chart overlay', () => {
+  assert.match(html, /BULLISH DEMAND':'BEARISH SUPPLY'\)\+' ORDER BLOCK · DISPLACEMENT \+ BOS'/);
+  assert.match(html, /text:obBullish\?'BULLISH OB':'BEARISH OB'/);
+  assert.match(html, /const priority=\{'order-block':0/);
+  assert.match(html, /kind:'order-block'/);
+});
+test('BTCUSD and QQQUSDT perpetual use 24/7 market-session logic while EURUSD follows forex hours', () => {
+  assert.match(html, /function marketSessionOpen\(sym,now=new Date\(\)\)\{return sym==='EURUSD'\?fxSessionOpenAt\(now\):true\}/);
+  assert.match(html, /BTCUSD:\{label:'BTC\/USD',type:'crypto'/);
+  assert.match(html, /QQQUSDT:\{label:'QQQUSDT · ETF perpetual'/);
+  assert.match(html, /else if\(String\(providerState\)\.toLowerCase\(\)==='closed'\)/);
+});
