@@ -23,7 +23,11 @@ test('book-derived candidate gate enforces minimum 1:3 RR using actual prices', 
   assert.equal(STRATEGY_GATES.minimumRewardRisk, 3);
   assert.equal(passesCandidateGate({ entry: 100, sl: 99, tp: 103, rr: 3 }), true);
   assert.equal(passesCandidateGate({ entry: 100, sl: 99, tp: 102.99, rr: 3 }), false);
-  assert.equal(passesCandidateGate({ entry: 100, sl: 99, tp: 104, rr: 2.5 }), false);
+  assert.equal(passesCandidateGate({ entry: 100, sl: 99, tp: 104, rr: 2.5 }), true, 'actual 4R prices override stale displayed RR');
+  assert.equal(passesCandidateGate({ entry: 100, sl: 99, tp: 102, rr: 99 }), false, 'actual 2R prices override inflated displayed RR');
+  assert.equal(passesCandidateGate({ entry: 100, sl: 101, tp: 103, direction: 'buy' }), false, 'long stop must be below entry');
+  assert.equal(passesCandidateGate({ entry: 100, sl: 99, tp: 97, direction: 'buy' }), false, 'long target must be above entry');
+  assert.equal(passesCandidateGate({ entry: 100, sl: 101, tp: 97, direction: 'sell' }), true);
   assert.equal(passesCandidateGate({ entry: 100, sl: 100, tp: 105 }), false);
   assert.equal(passesCandidateGate({ entry: 100, sl: 99 }), false);
 });
