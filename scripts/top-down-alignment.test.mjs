@@ -56,3 +56,28 @@ test('bearish candidate requires bearish alignment and rejects unknown direction
   assert.equal(evaluate('15m', 'SELL', aligned('15m', -1), now).allowed, true);
   assert.equal(evaluate('15m', 'SIDEWAYS', aligned('15m'), now).allowed, false);
 });
+
+test('production admission loop invokes the top-down gate before admitting a signal', () => {
+  const refreshStart = html.indexOf('async function refreshTopDown(');
+  const refreshEnd = html.indexOf('\nasync function ', refreshStart + 30);
+  assert.ok(refreshStart >= 0 && refreshEnd > refreshStart, 'refreshTopDown production function must exist');
+  const refresh = html.slice(refreshStart, refreshEnd);
+  const gateCall = refresh.indexOf('evaluateTopDownAlignment(tf,candidate.side,barsByTf)');
+  const admitted = refresh.indexOf('seen.add(key);openTf.add(tf);openCount++');
+  assert.ok(gateCall >= 0, 'production candidate loop must call the top-down gate');
+  assert.ok(admitted > gateCall, 'candidate must pass gate before being admitted');
+  assert.match(refresh, /if\(!alignment\.allowed\)[\s\S]*continue;/,
+    'failed alignment must skip candidate admission');
+  assert.match(refresh, /candidate\.topDownAlignment=/,
+    'admitted candidate must retain its alignment audit trail');
+});
+
+test('the top-down gate does not replace the independent minimum 1:3 risk-reward gate', () => {
+  const refreshStart = html.indexOf('async function refreshTopDown(');
+  const refreshEnd = html.indexOf('\nasync function ', refreshStart + 30);
+  const refresh = html.slice(refreshStart, refreshEnd);
+  assert.match(html, /MIN_REWARD_RISK\s*=\s*3|MIN_REWARD_RISK\s*>=?\s*3/,
+    'application must retain its 3R minimum');
+  assert.match(refresh, /Number\(t\.rr\)>=MIN_REWARD_RISK/,
+    'existing open-signal policy must continue enforcing minimum reward/risk');
+});
