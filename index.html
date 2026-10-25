@@ -734,6 +734,10 @@ async function refreshTopDown(force=false,freshOnly=s.signalFreshMode){
   for(const [tf,bars] of signalSets)for(const candidate of scanOpportunityHistory(sym,tf,bars)){
    if(candidate.status==='HISTORICAL')continue;
    if(candidate.status!=='RUNNING'&&candidateAlreadyPastLevels(candidate,bars))continue;
+   // Hard gate: a lower-timeframe candidate cannot enter the signal log without fresh, closed, aligned higher-timeframe structure.
+   const alignment=evaluateTopDownAlignment(tf,candidate.side,barsByTf);
+   if(!alignment.allowed)continue;
+   candidate.topDownAlignment={allowed:true,reason:alignment.reason,checks:alignment.checks,verifiedAt:Date.now()};
    const key=[candidate.symbol,candidate.tf,candidate.side,candidate.time].join('|');
    if(seen.has(key)||openTf.has(tf))continue;
    seen.add(key);openTf.add(tf);openCount++;additions.push(candidate);
