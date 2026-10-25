@@ -712,7 +712,7 @@ async function refreshTopDown(force=false,freshOnly=s.signalFreshMode){
  if(!force&&s.lastTopDownAt&&Date.now()-s.lastTopDownAt<60000)return;
  if(s.topDownBusy)return;s.topDownBusy=true;
  const host=$('topDownRows'),statusEl=$('topDownStatus');if(!host||!statusEl){s.topDownBusy=false;return}
- statusEl.textContent='Collecting independent timeframe candles and calculating context…';
+ statusEl.textContent='Collecting closed candles and checking the top-down signal gate…';
  try{
   const sym=s.symbol;
   const load=async(tf,limit)=>{let cached=[];try{cached=await dbGet(sym,tf)}catch{}try{const fresh=await getBars(sym,tf,limit);if(fresh.length)await dbPut(fresh,sym,tf);const map=new Map(cached.map(b=>[b.time,b]));fresh.forEach(b=>map.set(b.time,b));return [...map.values()].sort((a,b)=>a.time-b.time).slice(-2000)}catch(e){return cached.slice(-2000)}};
@@ -749,7 +749,7 @@ async function refreshTopDown(force=false,freshOnly=s.signalFreshMode){
   if(additions.length){if(sym===s.symbol)draw();else renderOverlay()}
   const votes=rows.slice(0,5).filter(x=>x.score!==0),net=votes.reduce((a,x)=>a+x.score,0);
   const agreement=net>0?'Higher-timeframe tilt bullish':net<0?'Higher-timeframe tilt bearish':'Higher-timeframe context mixed';
-  host.innerHTML=rows.map(x=>'<div style="padding:8px 0;border-bottom:1px solid #1e2b38"><div class="row"><span><b>'+x.tf+'</b></span><b style="color:'+(x.score>0?'var(--g)':x.score<0?'var(--r)':'var(--m)')+'">'+x.bias+'</b></div><div class="fine">'+x.detail+'</div><div class="fine">'+x.volume+'</div></div>').join('')+'<div class="note" style="margin-top:9px"><b>'+agreement+'</b><br>Directional votes: '+net+' across '+votes.length+' timeframes with readable structure. This is context, not an entry signal.</div>';
+  host.innerHTML=rows.map(x=>'<div style="padding:8px 0;border-bottom:1px solid #1e2b38"><div class="row"><span><b>'+x.tf+'</b></span><b style="color:'+(x.score>0?'var(--g)':x.score<0?'var(--r)':'var(--m)')+'">'+x.bias+'</b></div><div class="fine">'+x.detail+'</div><div class="fine">'+x.volume+'</div></div>').join('')+'<div class="note" style="margin-top:9px"><b>'+agreement+'</b><br>Directional votes: '+net+' across '+votes.length+' timeframes with readable structure. Higher-timeframe context is a mandatory candidate filter; it does not trigger entries by itself.</div>';
   let otherPairNew=0;if(Date.now()-s.lastOtherPairScan>=300000){s.lastOtherPairScan=Date.now();const others=Object.keys(symbolConfig).filter(market=>market!==sym);for(const other of others){try{otherPairNew+=await scanBackgroundPair(other)}catch(e){console.warn('Background market scan unavailable for '+other,e)}}}
   const hd=historyDiagnostics[sym]||{},coverage=hd.oldest?'oldest daily '+new Date(hd.oldest*1000).toISOString().slice(0,10):'oldest daily date unavailable';
   const backfill=hd.reason||'history backfill status unavailable';
