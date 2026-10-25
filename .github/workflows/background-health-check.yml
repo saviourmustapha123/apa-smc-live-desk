@@ -72,6 +72,10 @@ jobs:
         if: github.event_name != 'schedule'
         run: node --test scripts/book-strategy-registry.test.mjs
 
+      - name: Test deterministic LowKey book-rule primitives
+        if: github.event_name != 'schedule'
+        run: node --test scripts/book-rule-detectors.test.mjs
+
       - name: Replay actual production scanner against deterministic candle fixtures
         if: github.event_name != 'schedule'
         run: node --test scripts/production-scanner-replay.test.mjs
