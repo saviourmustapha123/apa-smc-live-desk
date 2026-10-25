@@ -72,6 +72,21 @@ test('production admission loop invokes the top-down gate before admitting a sig
     'admitted candidate must retain its alignment audit trail');
 });
 
+test('background market scanner builds timeframe map before applying the production gate', () => {
+  const scanStart = html.indexOf('async function scanBackgroundPair(');
+  const scanEnd = html.indexOf('\\nasync function refreshTopDown(', scanStart);
+  assert.ok(scanStart >= 0 && scanEnd > scanStart, 'background market scanner must exist');
+  const scan = html.slice(scanStart, scanEnd);
+  const mapAt = scan.indexOf('const barsByTf=Object.fromEntries(sets)');
+  const gateAt = scan.indexOf('evaluateTopDownAlignment(tf,candidate.side,barsByTf)');
+  assert.ok(mapAt >= 0, 'background scanner must construct timeframe map');
+  assert.ok(gateAt > mapAt, 'background scanner must build context before checking alignment');
+  assert.match(scan, /if\(!alignment\.allowed\)[\\s\\S]*continue;/,
+    'background scanner must reject candidates with failed alignment');
+  assert.match(scan, /strategyScanDiagnostics\.get\(symbol\+'\\|'\+tf\)/,
+    'background diagnostics must use the scanner symbol');
+});
+
 test('the top-down gate does not replace the independent minimum 1:3 risk-reward gate', () => {
   const refreshStart = html.indexOf('async function refreshTopDown(');
   const refreshEnd = html.indexOf('\nasync function ', refreshStart + 30);
