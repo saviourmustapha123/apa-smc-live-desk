@@ -87,3 +87,7 @@ jobs:
       - name: Replay actual production scanner against deterministic candle fixtures
         if: github.event_name != 'schedule'
         run: node --test scripts/production-scanner-replay.test.mjs
+
+      - name: Replay production trade outcomes against fresh historical market candles
+        if: github.event_name != 'schedule'
+        run: node scripts/production-scanner-live-replay.mjs
