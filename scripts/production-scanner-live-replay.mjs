@@ -1,30 +1,30 @@
 import { createProductionScannerReplay } from './production-scanner-replay.mjs';
 
-const BASE = 'https://fapi.binance.com/fapi/v1/klines';
-const LIMIT = 1500;
+const BYBIT = 'https://api.bybit.com/v5/market/kline';
+const LIMIT = 1000;
 const symbols = [
-  { appSymbol: 'BTCUSD', marketSymbol: 'BTCUSDT', sourceNote: 'BTCUSDT perpetual proxy; not the app BTCUSD feed' },
-  { appSymbol: 'QQQUSDT', marketSymbol: 'QQQUSDT', sourceNote: 'QQQUSDT perpetual; Binance public feed' }
+  { appSymbol: 'BTCUSD', marketSymbol: 'BTCUSDT', sourceNote: 'Bybit BTCUSDT perpetual proxy; not the app BTCUSD feed' },
+  { appSymbol: 'QQQUSDT', marketSymbol: 'QQQUSDT', sourceNote: 'Bybit QQQUSDT linear perpetual feed' }
 ];
 const now = Date.now();
 const nowSeconds = Math.floor(now / 1000);
 const duration = { '5m': 300 };
-const toBars = rows => rows.map(row => ({
-  time: Math.floor(Number(row[0]) / 1000),
-  open: Number(row[1]), high: Number(row[2]), low: Number(row[3]), close: Number(row[4]),
-  volume: Number(row[5]), closeTime: Math.floor(Number(row[6]) / 1000),
-  ...(Number(row[6]) >= now ? { isOpen: true } : {})
-}));
+const toBars = rows => rows.slice().reverse().map(row => {
+  const time = Math.floor(Number(row[0]) / 1000);
+  const closeTime = time + 300;
+  return { time, open: Number(row[1]), high: Number(row[2]), low: Number(row[3]), close: Number(row[4]), volume: Number(row[5]), closeTime, ...(closeTime >= nowSeconds ? { isOpen: true } : {}) };
+});
 async function fetchBars(symbol) {
-  const url = BASE + '?symbol=' + encodeURIComponent(symbol) + '&interval=5m&limit=' + LIMIT;
+  const url = BYBIT + '?category=linear&symbol=' + encodeURIComponent(symbol) + '&interval=5&limit=' + LIMIT;
   const response = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'APA-SMC-Historical-Replay/1.0' } });
   if (!response.ok) throw new Error(symbol + ' candles HTTP ' + response.status);
-  const rows = await response.json();
-  if (!Array.isArray(rows) || rows.length < 100) throw new Error(symbol + ' returned insufficient candle history');
+  const payload = await response.json();
+  const rows = payload?.result?.list;
+  if (payload?.retCode !== 0 || !Array.isArray(rows) || rows.length < 100) throw new Error(symbol + ' returned insufficient Bybit candle history');
   return toBars(rows);
 }
 const engine = createProductionScannerReplay({ now });
-const summary = { generatedAt: new Date(now).toISOString(), timeframe: '5m', rrMinimum: 3, source: 'Binance USD-M futures public klines', markets: [] };
+const summary = { generatedAt: new Date(now).toISOString(), timeframe: '5m', rrMinimum: 3, source: 'Bybit linear perpetual public klines', markets: [] };
 for (const item of symbols) {
   const bars = await fetchBars(item.marketSymbol);
   const scanned = engine.scan(item.appSymbol, '5m', bars);
