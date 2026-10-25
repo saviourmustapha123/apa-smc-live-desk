@@ -101,8 +101,13 @@ export function passesCandidateGate(candidate, gates = STRATEGY_GATES) {
   const risk = Math.abs(entry - stop);
   const reward = Math.abs(target - entry);
   if (!(risk > 0) || !(reward > 0)) return false;
+  const direction = String(candidate.direction ?? '').toLowerCase();
+  if (['buy', 'long', 'bullish'].includes(direction) && !(stop < entry && target > entry)) return false;
+  if (['sell', 'short', 'bearish'].includes(direction) && !(stop > entry && target < entry)) return false;
+
+  // Never trust a cached/displayed RR field. Recalculate from the actual
+  // entry, stop and target prices so stale metadata cannot reject or admit
+  // a candidate incorrectly.
   const calculatedRR = reward / risk;
-  const declaredRR = Number(candidate.rr);
-  if (Number.isFinite(declaredRR) && declaredRR + 1e-9 < gates.minimumRewardRisk) return false;
   return calculatedRR + 1e-9 >= gates.minimumRewardRisk;
 }
