@@ -18,13 +18,16 @@ const functionNames = [
   'pivots', 'atr', 'detectPatternRetest', 'detectRecentBlockRetest',
   'latestInducementProxy', 'targetLevelUnreached', 'structuralTarget',
   'signalHorizonForTf', 'estimateTargetHorizon', 'pendingOrderBlockOpportunity',
-  'scanOpportunityHistory'
+  'scanOpportunityHistory', 'realizedSignalR', 'resolveSignalOutcomes'
 ];
 
 export function createProductionScannerReplay({ now = Date.now(), k = 3, displacement = 1 } = {}) {
   class ReplayDate extends Date { static now() { return now; } }
   const context = createContext({
-    s: { k, disp: displacement },
+    s: { k, disp: displacement, log: [] },
+    save() {},
+    persistSignals() {},
+    renderLog() {},
     MIN_REWARD_RISK: 3,
     marketHealthBySymbol: new Map(),
     Date: ReplayDate,
@@ -34,6 +37,7 @@ export function createProductionScannerReplay({ now = Date.now(), k = 3, displac
     '\nconst strategyScanDiagnostics = new Map();' +
     '\nthis.__scan = scanOpportunityHistory;' +
     '\nthis.__targetLevelUnreached = targetLevelUnreached;' +
+    '\nthis.__resolveOutcomes = resolveSignalOutcomes;' +
     '\nthis.__diagnostics = () => strategyScanDiagnostics;';
   new Script(source, { filename: 'production-scanner-replay.vm.js' }).runInContext(context);
   return {
@@ -44,6 +48,21 @@ export function createProductionScannerReplay({ now = Date.now(), k = 3, displac
     },
     targetLevelUnreached(side, target, bars, targetIndex) {
       return context.__targetLevelUnreached(side, target, bars, targetIndex);
+    },
+    resolveOutcomes(symbol, tf, bars, signals) {
+      const results = [];
+      for (const signal of signals) {
+        context.s.log = [{
+          ...signal,
+          symbol,
+          tf,
+          status: signal.status === 'HISTORICAL' ? 'PENDING' : (signal.status || 'PENDING'),
+          outcome: 'PENDING'
+        }];
+        context.__resolveOutcomes(symbol, tf, bars);
+        results.push({ ...context.s.log[0] });
+      }
+      return results;
     }
   };
 }
