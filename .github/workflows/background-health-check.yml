@@ -80,6 +80,10 @@ jobs:
         if: github.event_name != 'schedule'
         run: node --test scripts/shared-market-events.test.mjs
 
+      - name: Test production top-down timeframe alignment gate
+        if: github.event_name != 'schedule'
+        run: node --test scripts/top-down-alignment.test.mjs
+
       - name: Replay actual production scanner against deterministic candle fixtures
         if: github.event_name != 'schedule'
         run: node --test scripts/production-scanner-replay.test.mjs
