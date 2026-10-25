@@ -3,6 +3,7 @@ name: APA SMC background health check
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
   schedule:
     - cron: "*/5 * * * *"
@@ -67,7 +68,10 @@ jobs:
         if: github.event_name != 'schedule'
         run: node --test scripts/chart-signal-parity.test.mjs
 
+      - name: Test uploaded-book strategy registry and RR gate
+        if: github.event_name != 'schedule'
+        run: node --test scripts/book-strategy-registry.test.mjs
+
       - name: Replay actual production scanner against deterministic candle fixtures
         if: github.event_name != 'schedule'
         run: node --test scripts/production-scanner-replay.test.mjs
-
