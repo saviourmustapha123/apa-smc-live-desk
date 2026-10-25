@@ -673,6 +673,7 @@ async function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode){
  const [m1,m5,m15,h1,h4,h8,h12,d1]=await Promise.all([load('1m',1000),load('5m',1000),load('15m',1000),load('1h',1000),load('4h',1000),load('8h',300),load('12h',300),load('1d',1000)]);
  const weekly=await load('1W',1300),monthly=await load('1M',300),yearly=await load('1Y',25);
  const sets=[['1m',m1],['5m',m5],['15m',m15],['1h',h1],['4h',h4],['8h',h8],['12h',h12],['1d',d1],['1W',weekly],['1M',monthly],['1Y',yearly]];
+ const barsByTf=Object.fromEntries(sets);
  // Chart analysis still covers across 11 timeframes; only actionable alerts are restricted below.
  // Higher/lower context frames remain available on the chart, but manual-entry alerts
  // are limited to practical execution frames to avoid eleven overlapping alerts per pair.
@@ -685,7 +686,7 @@ async function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode){
   if(candidate.status==='HISTORICAL')continue;
   const alignment=evaluateTopDownAlignment(tf,candidate.side,barsByTf);
   if(!alignment.allowed){
-   const d=strategyScanDiagnostics.get(sym+'|'+tf);
+   const d=strategyScanDiagnostics.get(symbol+'|'+tf);
    if(d){d.latestRejection='Top-down gate: '+alignment.reason;d.topDownChecks=alignment.checks}
    continue;
   }
