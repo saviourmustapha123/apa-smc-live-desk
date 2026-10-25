@@ -18,7 +18,7 @@ const functionNames = [
   'pivots', 'atr', 'detectPatternRetest', 'detectRecentBlockRetest',
   'latestInducementProxy', 'targetLevelUnreached', 'structuralTarget',
   'signalHorizonForTf', 'estimateTargetHorizon', 'pendingOrderBlockOpportunity',
-  'scanOpportunityHistory', 'realizedSignalR', 'resolveSignalOutcomes'
+  'scanOpportunityHistory', 'realizedSignalR', 'resolveSignalOutcomes', 'evaluateTopDownAlignment', 'summarizeTf', 'volumeContext'
 ];
 
 export function createProductionScannerReplay({ now = Date.now(), k = 3, displacement = 1 } = {}) {
@@ -38,6 +38,10 @@ export function createProductionScannerReplay({ now = Date.now(), k = 3, displac
     '\nthis.__scan = scanOpportunityHistory;' +
     '\nthis.__targetLevelUnreached = targetLevelUnreached;' +
     '\nthis.__resolveOutcomes = resolveSignalOutcomes;' +
+    '\nconst symbolConfig = {};' +
+    '\nconst priceFor = (n, sym) => Number.isFinite(+n) ? (+n).toFixed(5) : "—";' +
+    '\nconst stamp = t => new Date(t * 1000).toISOString().replace("T", " ").slice(0, 16);' +
+    '\nthis.__align = evaluateTopDownAlignment;' +
     '\nthis.__diagnostics = () => strategyScanDiagnostics;';
   new Script(source, { filename: 'production-scanner-replay.vm.js' }).runInContext(context);
   return {
@@ -48,6 +52,17 @@ export function createProductionScannerReplay({ now = Date.now(), k = 3, displac
     },
     targetLevelUnreached(side, target, bars, targetIndex) {
       return context.__targetLevelUnreached(side, target, bars, targetIndex);
+    },
+    evaluateHistoricalAlignment(candidateTf, signal, barsByTf) {
+      const duration = { '1m':60, '5m':300, '15m':900, '30m':1800, '1h':3600, '2h':7200, '4h':14400, '6h':21600, '8h':28800, '12h':43200, '1d':86400, '1W':604800, '1M':2678400, '1Y':31622400 };
+      const signalTime = Number(signal.time);
+      if (!Number.isFinite(signalTime)) return { allowed:false, reason:'Signal timestamp is invalid', checks:[] };
+      const closedAtSignal = {};
+      for (const [tf, bars] of Object.entries(barsByTf || {})) {
+        const seconds = duration[tf] || 0;
+        closedAtSignal[tf] = (bars || []).filter(bar => !bar.isOpen && Number(bar.time) + seconds <= signalTime);
+      }
+      return context.__align(candidateTf, signal.side, closedAtSignal, signalTime * 1000);
     },
     resolveOutcomes(symbol, tf, bars, signals) {
       const results = [];
