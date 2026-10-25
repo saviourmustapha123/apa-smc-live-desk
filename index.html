@@ -227,6 +227,41 @@ function volumeContext(bars){
  const target=total*.7;let used=profile[maxIdx],left=maxIdx-1,right=maxIdx+1;while(used<target&&(left>=0||right<bins)){const lv=left>=0?profile[left]:-1,rv=right<bins?profile[right]:-1;if(rv>lv){used+=Math.max(0,rv);right++}else{used+=Math.max(0,lv);left--}}const val=lo+(Math.max(0,left+1)+.5)*step,vah=lo+(Math.min(bins-1,right-1)+.5)*step;
  return (ratio===null?'Relative volume unavailable':'Last bar '+ratio.toFixed(2)+'× 100-bar average')+' · '+kind+' POC '+priceFor(poc,s.symbol)+' · approximate 70% value area '+priceFor(val,s.symbol)+'–'+priceFor(vah,s.symbol);
 }
+// Conservative top-down admission gate. A lower timeframe is not a standalone signal:
+// every required higher timeframe must have enough closed candles, fresh data, and
+// a clear structure bias aligned with the candidate. Neutral/conflicting context blocks.
+function evaluateTopDownAlignment(candidateTf,side,barsByTf,nowMs=Date.now()){
+ const hierarchy={
+  '1m':['5m','15m','1h','4h'],
+  '5m':['15m','1h','4h'],
+  '15m':['1h','4h','1d'],
+  '1h':['4h','1d','1W'],
+  '4h':['1d','1W','1M'],
+  '8h':['1d','1W','1M'],
+  '12h':['1d','1W','1M'],
+  '1d':['1W','1M','1Y']
+ };
+ const durations={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'8h':28800,'12h':43200,'1d':86400,'1W':604800,'1M':2678400,'1Y':31622400};
+ const required=hierarchy[candidateTf];
+ if(!required)return {allowed:false,reason:'No approved top-down hierarchy for '+candidateTf,checks:[]};
+ const wanted=side==='BUY'?1:side==='SELL'?-1:0;
+ if(!wanted)return {allowed:false,reason:'Candidate direction is unknown',checks:[]};
+ const checks=[];
+ for(const tf of required){
+  const bars=(barsByTf[tf]||[]).filter(x=>!x.isOpen);
+  if(bars.length<20)return {allowed:false,reason:'Blocked: insufficient closed '+tf+' candles',checks:[...checks,{tf,ok:false,reason:'insufficient closed candles'}]};
+  const last=bars.at(-1),age=(nowMs/1000)-Number(last.time),maxAge=(durations[tf]||86400)*3;
+  if(!Number.isFinite(age)||age < -60||age>maxAge)
+   return {allowed:false,reason:'Blocked: stale or invalid '+tf+' data',checks:[...checks,{tf,ok:false,reason:'stale/invalid data'}]};
+  const summary=summarizeTf(tf,bars);
+  if(summary.score===0)
+   return {allowed:false,reason:'Blocked: '+tf+' structure is unclear or ranging',checks:[...checks,{tf,ok:false,reason:'unclear/ranging structure'}]};
+  if(summary.score!==wanted)
+   return {allowed:false,reason:'Blocked: '+tf+' structure conflicts with '+side,checks:[...checks,{tf,ok:false,reason:'conflicting structure'}]};
+  checks.push({tf,ok:true,reason:summary.bias});
+ }
+ return {allowed:true,reason:'Higher-timeframe structure aligned',checks};
+}
 function summarizeTf(tf,bars){
  const b=(bars||[]).filter(x=>!x.isOpen);if(b.length<20)return {tf,bias:'Insufficient data',detail:b.length+' closed bars',score:0,volume:'Unavailable'};
  const p=pivots(b,Math.max(2,Math.min(+s.k,4))),h=p.h,l=p.l,sh=h.at(-1),sh2=h.at(-2),sl=l.at(-1),sl2=l.at(-2);let bias='Range / unclear',score=0;
@@ -648,6 +683,13 @@ async function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode){
  const openTf=new Set(alreadyOpen.map(t=>t.tf));let openCount=alreadyOpen.length;
  for(const [tf,bars] of signalSets)for(const candidate of scanOpportunityHistory(symbol,tf,bars)){
   if(candidate.status==='HISTORICAL')continue;
+  const alignment=evaluateTopDownAlignment(tf,candidate.side,barsByTf);
+  if(!alignment.allowed){
+   const d=strategyScanDiagnostics.get(sym+'|'+tf);
+   if(d){d.latestRejection='Top-down gate: '+alignment.reason;d.topDownChecks=alignment.checks}
+   continue;
+  }
+  candidate.topDownAlignment={required:alignment.checks.map(x=>x.tf),checks:alignment.checks,verifiedAt:Date.now()};
   // Do not publish a pending limit setup if the latest confirmed candle has
   // already crossed its structural stop or target before the setup was admitted.
   // That prevents a just-created card from appearing and immediately closing
@@ -683,6 +725,7 @@ async function refreshTopDown(force=false,freshOnly=s.signalFreshMode){
   ];
   const scanSets=[['1m',m1],['5m',m5],['15m',m15],['1h',h1],['4h',h4],['8h',h8],['12h',h12],['1d',d1],['1W',weekly],['1M',monthly],['1Y',yearly]];
   rebuildUnifiedAnnotations(scanSets);
+  const barsByTf=Object.fromEntries(scanSets);
   const additions=[],seen=new Set(s.log.map(t=>[t.symbol,t.tf,t.side,t.time].join('|')));
   const signalSets=scanSets.filter(([tf])=>['1m','5m','15m','1h','4h','8h','12h','1d'].includes(tf));
   const openStatuses=new Set(['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED','RUNNING','TRIGGERED','ACTIVE']);
