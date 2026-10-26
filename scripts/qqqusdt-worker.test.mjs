@@ -30,6 +30,23 @@ test('Bybit ticker request falls back to actual Binance ticker data and preserve
   assert.match(calls[1], /api\.bytick\.com/);
 });
 
+
+test('Bytick alternate host can provide real-shaped Bybit candle data when the primary hostname is blocked', async () => {
+  const calls = [];
+  const worker = makeWorker(async url => {
+    const u = new URL(String(url)); calls.push(u.hostname);
+    if (u.hostname === 'api.bybit.com') throw new Error('simulated regional block');
+    if (u.hostname === 'api.bytick.com') return jsonResponse({ retCode: 0, retMsg: 'OK', result: { category: 'linear', list: [bybitKline] } });
+    throw new Error('unexpected host ' + u.hostname);
+  });
+  const response = await worker.fetch(new Request('https://worker.test/v5/market/kline?category=linear&symbol=QQQUSDT&interval=60&limit=1'));
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls, ['api.bybit.com', 'api.bytick.com']);
+  assert.equal(body.retCode, 0);
+  assert.equal(body.result.list[0][4], '101');
+});
+
 test('Bybit candle request maps 60-minute interval to Binance 1h and returns real OHLC rows', async () => {
   let fallbackUrl = '';
   const worker = makeWorker(async url => {
