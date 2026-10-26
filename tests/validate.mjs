@@ -8,7 +8,7 @@ const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
 assert.ok(scripts.length > 0, 'HTML must contain inline application JavaScript');
 for (const [, attrs, body] of scripts) {
   try { new vm.Script(body, { filename: 'index.html inline script' }); }
-  catch (error) { throw new Error('Inline JavaScript syntax error: ' + error.message); }
+  catch (error) { throw new Error('Inline JavaScript syntax error in script #' + (scripts.indexOf(scripts.find(x => x[2] === body)) + 1) + ': ' + (error.stack || error.message)); }
 }
 
 const mustHaveTimeframes = ['1m','5m','15m','1h','4h','8h','12h','1d','1W','1M','1Y'];
