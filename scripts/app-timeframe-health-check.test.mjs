@@ -161,9 +161,12 @@ test('order block qualification requires displacement and a close-confirmed stru
   assert.match(html, /qualifiedZones=recentQualifiedZones/);
 });
 
-test('signal scanner can create a pending, unmitigated order block setup before entry is touched', () => {
+test('pending order-block setup is created only after its linked IDM/liquidity sweep and FVG', () => {
   assert.match(html, /function pendingOrderBlockOpportunity\(symbol,tf,bars\)/);
-  assert.match(html, /order block remains unmitigated/);
+  assert.match(html, /const latestIdm=latestInducementProxy\(b,k\)/);
+  assert.match(html, /const fvgConfirmed=i>=2&&\(bullish\?impulse\.low>b\[i-2\]\.high:impulse\.high<b\[i-2\]\.low\)/);
+  assert.match(html, /latestIdm\.status!=='SWEPT'[\s\S]*?latestIdm\.bosTime!==impulse\.time/);
+  assert.match(html, /fresh and unmitigated/);
   assert.match(html, /Pending midpoint retest entry/);
   assert.match(html, /status:'NOT RUNNING',outcome:'PENDING'/);
   assert.match(html, /const pending=pendingOrderBlockOpportunity\(symbol,tf,b\)/);
@@ -403,7 +406,7 @@ test('multi-trigger signal reasons are retained as structured explanations', () 
 
 test('order blocks and breaker blocks use separate, causally ordered detection rules in the signal scanner', () => {
   assert.match(html, /function detectRecentBlockRetest\(bars,k,dispMult\)/);
-  assert.match(html, /type:'ORDER BLOCK RETEST'/);
+  assert.match(html, /type:'ORDER BLOCK RETEST · IDM \+ LIQUIDITY SWEPT'/);
   assert.match(html, /type:'BREAKER BLOCK RETEST'/);
   assert.match(html, /const reject=flipped==='SELL'\?current\.close<zone\.low&&current\.close<current\.open:current\.close>zone\.high&&current\.close>current\.open/);
   assert.match(html, /const blockRetest=detectRecentBlockRetest\(hist,\+s\.k,s\.disp\)/);
@@ -417,14 +420,15 @@ test('equal highs/lows and premium/discount contribute context without acting as
 });
 
 
-test('QML retests its protected swing level while head-and-shoulders retests its projected neckline', () => {
+test('QML requires a head sweep, close-confirmed leg break, and left-shoulder retest', () => {
+  assert.match(html, /function detectQmlStructure\(bars,k\)/);
+  assert.match(html, /const level=z\[0\]\.p/);
+  assert.match(html, /const sweptHead=z\[2\]\.p>z\[0\]\.p,brokenLeg=z\[3\]\.p<z\[1\]\.p/);
+  assert.match(html, /prior\[j\]\.close<z\[1\]\.p/);
+  assert.match(html, /status:rejected\?'RETEST_CONFIRMED':'WAITING_RETEST'/);
   assert.match(html, /function detectPatternRetest\(bars,k\)/);
-  assert.match(html, /QML level retest/);
-  assert.match(html, /Inverse QML level retest/);
-  assert.match(html, /Head-and-shoulders neckline retest/);
-  assert.match(html, /Inverse head-and-shoulders neckline retest/);
-  assert.match(html, /const level=bearishQml\?z\[1\]\.p:neckline/);
-  assert.match(html, /const level=bullishQml\?z\[1\]\.p:neckline/);
+  assert.match(html, /QML shoulder retest/);
+  assert.doesNotMatch(html, /Head-and-shoulders neckline retest|Inverse head-and-shoulders neckline retest/);
   assert.match(html, /const patternRetest=detectPatternRetest\(hist,\+s\.k\)/);
 });
 
