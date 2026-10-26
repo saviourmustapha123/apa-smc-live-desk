@@ -928,10 +928,11 @@ function addAdvancedAnnotations(b,marks){
   structureEvents.push({i,bullish,change,level});
   direction=bullish?1:-1;
  }
- for(const ev of structureEvents.slice(-4)){
-  let ob=null;for(let j=ev.i-1;j>=Math.max(0,ev.i-10);j--){if(ev.bullish?b[j].close<b[j].open:b[j].close>b[j].open){ob=b[j];break}}
-  if(ob)zone(ob.time,b[last].time,ob.high,ob.low,(ev.bullish?'BULLISH':'BEARISH')+' BREAKER BLOCK','#818cf8','#818cf830','breaker',true);
- }
+ // IMPORTANT: do not infer a breaker from an arbitrary opposing candle before a BOS/CHoCH.
+ // A breaker is drawn only by the validated recentQualifiedZones() sequence below:
+ // original OB -> close through far edge -> opposite close-confirmed structure break -> opposite-side retest.
+ // Keep structure events mapped as BOS/CHoCH only; never relabel their origin candle as a breaker.
+
  // Liquidity map: equal highs/lows (potential stop pools) and confirmed sweeps.
  // These are price-structure proxies; a chart cannot reveal the actual orders sitting at a level.
  const liquidityPivH=confirmedH.filter(p=>p.i>=Math.max(0,last-100)),liquidityPivL=confirmedL.filter(p=>p.i>=Math.max(0,last-100));
