@@ -39,6 +39,19 @@ if (start < 0 || next < 0) {
     'Rejects missing targets and targets below 3R');
   requireScanner('Pending order-block setup path', /pendingOrderBlockOpportunity\(symbol,tf,b\)/,
     'Can represent a pending setup before entry is triggered');
+
+  requireScanner('QML requires confirmed four-pivot structure', /function detectQmlStructure\([\s\S]*?z\[2\]\.p>z\[0\]\.p[\s\S]*?z\[3\]\.p<z\[1\]\.p[\s\S]*?prior\[j\]\.close<z\[1\]\.p/,
+    'Bearish QML requires head sweep and a close-confirmed break of the protected leg before the shoulder retest');
+  requireScanner('QML entry level maps to left shoulder', /const level=z\[0\]\.p[\s\S]*?status:rejected\?'RETEST_CONFIRMED':'WAITING_RETEST'/,
+    'QML is armed only after the structural shift and waits for a return to the left-shoulder level');
+  requireScanner('QML physical chart zone is drawn', /kind:'qml'[\s\S]*?QML shoulder level/,
+    'The live chart maps the QML shoulder zone, shift marker and confirmed retest');
+  requireScanner('Separate head-and-shoulders signal removed', !/Head-and-shoulders neckline retest|Inverse head-and-shoulders|bearishHs|bullishHs/.test(scanner) && !/Head-and-shoulders neckline retest|Inverse head-and-shoulders|bearishHs|bullishHs/.test(app),
+    'QML is validated by its own structural sequence, not by a separate generic head-and-shoulders label');
+  requireScanner('Order-block retest requires an FVG-backed displacement', /const hasFvg=i>=2&&\(bullish\?impulse\.low>b\[i-2\]\.high:impulse\.high<b\[i-2\]\.low\);[\s\S]*?if\(!hasFvg\)continue;/,
+    'Trade-grade order-block retests require displacement, close-confirmed structure break, a three-candle FVG and a first fresh retest');
+  requireScanner('Fresh order-block first retest is enforced', /let invalidAt=-1,previousTouch=false;[\s\S]*?if\(invalidAt<0&&!previousTouch&&touched/,
+    'An already mitigated zone cannot be reused as a fresh order-block entry');
 }
 
 const proxy = await readFile(new URL('./proxy-backtest.mjs', import.meta.url), 'utf8');
