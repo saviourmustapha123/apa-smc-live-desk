@@ -349,6 +349,19 @@ function detectRecentBlockRetest(bars,k,dispMult){
  return events.at(-1)||null;
 }
 
+function lastStructuralBias(b,k,endExclusive){
+ const history=(b||[]).slice(0,Number.isInteger(endExclusive)?endExclusive:b.length);
+ if(history.length<Math.max(8,2*k+3))return 'UNKNOWN';
+ const pp=pivots(history,k);let trend='UNKNOWN',hiIndex=0,loIndex=0,high=null,low=null;
+ for(let i=1;i<history.length;i++){
+  while(hiIndex<pp.h.length&&pp.h[hiIndex].i+k<i)high=pp.h[hiIndex++];
+  while(loIndex<pp.l.length&&pp.l[loIndex].i+k<i)low=pp.l[loIndex++];
+  const up=!!(high&&history[i-1].close<=high.p&&history[i].close>high.p);
+  const down=!!(low&&history[i-1].close>=low.p&&history[i].close<low.p);
+  if(up)trend='BULLISH';else if(down)trend='BEARISH';
+ }
+ return trend;
+}
 function pendingOrderBlockOpportunity(symbol,tf,bars){
  const b=(bars||[]).filter(x=>!x.isOpen).slice(-1000);
  const minimum=tf==='1Y'?10:tf==='1M'?20:35;
@@ -364,8 +377,11 @@ function pendingOrderBlockOpportunity(symbol,tf,bars){
   const bullish=impulse.close>impulse.open&&!!high&&prev.close<=high.p&&impulse.close>high.p;
   const bearish=impulse.close<impulse.open&&!!low&&prev.close>=low.p&&impulse.close<low.p;
   if(!bullish&&!bearish)continue;
-  const priorBullTrend=known.h.length>=2&&known.l.length>=2&&known.h.at(-1).p>known.h.at(-2).p&&known.l.at(-1).p>known.l.at(-2).p;
-  const priorBearTrend=known.h.length>=2&&known.l.length>=2&&known.h.at(-1).p<known.h.at(-2).p&&known.l.at(-1).p<known.l.at(-2).p;
+  const swingBullTrend=known.h.length>=2&&known.l.length>=2&&known.h.at(-1).p>known.h.at(-2).p&&known.l.at(-1).p>known.l.at(-2).p;
+  const swingBearTrend=known.h.length>=2&&known.l.length>=2&&known.h.at(-1).p<known.h.at(-2).p&&known.l.at(-1).p<known.l.at(-2).p;
+  const priorBias=lastStructuralBias(b,k,i);
+  const priorBullTrend=priorBias==='BULLISH'||(priorBias==='UNKNOWN'&&swingBullTrend);
+  const priorBearTrend=priorBias==='BEARISH'||(priorBias==='UNKNOWN'&&swingBearTrend);
   const structureEvent=bullish?(priorBearTrend?'CHoCH':'BOS'):(priorBullTrend?'CHoCH':'BOS');
   let contextMode='BOS / TREND UNCONFIRMED';if(structureEvent==='CHoCH')contextMode='TREND SHIFT';else if(priorBullTrend||priorBearTrend)contextMode='CONTINUATION';
   const fvgConfirmed=i>=2&&(bullish?impulse.low>b[i-2].high:impulse.high<b[i-2].low);
@@ -445,8 +461,11 @@ function scanOpportunityHistory(symbol,tf,bars){
   const downBreak=!!(ll&&prev.close>=ll.p&&cur.close<ll.p),upBreak=!!(hh&&prev.close<=hh.p&&cur.close>hh.p);
   const trendBull=pp.h.length>=2&&pp.l.length>=2&&pp.h.at(-1).p>pp.h.at(-2).p&&pp.l.at(-1).p>pp.l.at(-2).p;
   const trendBear=pp.h.length>=2&&pp.l.length>=2&&pp.h.at(-1).p<pp.h.at(-2).p&&pp.l.at(-1).p<pp.l.at(-2).p;
-  const bullStructureEvent=upBreak?(trendBear?'CHoCH':'BOS'):null;
-  const bearStructureEvent=downBreak?(trendBull?'CHoCH':'BOS'):null;
+  const priorBias=lastStructuralBias(hist,+s.k,hist.length-1);
+  const priorBullTrend=priorBias==='BULLISH'||(priorBias==='UNKNOWN'&&trendBull);
+  const priorBearTrend=priorBias==='BEARISH'||(priorBias==='UNKNOWN'&&trendBear);
+  const bullStructureEvent=upBreak?(priorBearTrend?'CHoCH':'BOS'):null;
+  const bearStructureEvent=downBreak?(priorBullTrend?'CHoCH':'BOS'):null;
   const reasons=[];
   let side=null;
   if(shSweep&&dn){side='SELL';reasons.push('Buy-side liquidity sweep and reclaim')}
