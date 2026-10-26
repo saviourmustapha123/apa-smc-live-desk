@@ -555,10 +555,12 @@ test('signal candidates expose scalp, intraday, swing, or position horizon with 
   assert.match(html, /const timing=estimateTargetHorizon\(tf,hist,entry,target\.tp\)/);
   assert.match(html, /const timing=estimateTargetHorizon\(tf,b,entry,target\.tp\)/);
 });
-test('qualified order blocks are clearly labelled and prioritised in the chart overlay', () => {
-  assert.match(html, /BULLISH DEMAND':'BEARISH SUPPLY'\)\+' ORDER BLOCK · DISPLACEMENT \+ BOS'/);
-  assert.match(html, /text:obBullish\?'BULLISH OB':'BEARISH OB'/);
-  assert.match(html, /const priority=\{'order-block':0/);
+test('qualified Order Blocks show fresh versus mitigated state and remain unified across timeframes', () => {
+  assert.match(html, /ORDER BLOCK · '\+\(obFresh\?'FRESH':'MITIGATED'\)\+' · FVG \+ BOS/);
+  assert.match(html, /FRESH OB|MITIGATED OB/);
+  assert.match(html, /const qualified=recentQualifiedZones\(b,k,s\.disp\)/);
+  assert.match(html, /for\(const ob of \(qualified\.blocks\|\|\[\]\)\.slice\(-4\)\)/);
+  assert.match(html, /const priority=\{'order-block':0,'breaker':1/);
   assert.match(html, /kind:'order-block'/);
 });
 test('BTCUSD and QQQUSDT perpetual use 24/7 market-session logic while EURUSD follows forex hours', () => {
