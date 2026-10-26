@@ -7,7 +7,7 @@ import { createContext, Script } from 'node:vm';
 // not a parallel test-only implementation. If the function moves or disappears,
 // the suite fails and requires the integration to be reviewed.
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
-const start = html.indexOf('function resolveSignalOutcomes(');
+const start = html.indexOf('function signalBarEndMs(tf,timeSeconds)');
 const end = html.indexOf('\nfunction signalDayStamp(', start);
 assert.ok(start >= 0 && end > start, 'production signal lifecycle function must exist');
 const admissionStart = html.indexOf('function dailySignalAdmission(');
