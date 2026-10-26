@@ -65,6 +65,26 @@ try {
     }
   } catch (e) { if (/HTTP (403|451)/.test(e.message)) warn('Bybit public market-data endpoint is region-restricted from this CI runner', e.message); else fail('Bybit QQQUSDT market feed', e.message); }
 
+  const QQQ_PROXY = process.env.QQQ_PROXY_URL || 'https://apa-smc-qqqusdt-proxy.saviourmustapha123.workers.dev';
+  try {
+    const proxyTicker = await (await get(QQQ_PROXY + '/v5/market/tickers?category=linear&symbol=QQQUSDT')).json();
+    const ticker = proxyTicker.result?.list?.[0];
+    if (Number(proxyTicker.retCode) !== 0 || ticker?.symbol !== 'QQQUSDT' || !(Number(ticker.lastPrice) > 0)) {
+      throw new Error(proxyTicker.retMsg || 'Worker returned no valid QQQUSDT ticker');
+    }
+    pass('Configured Cloudflare QQQUSDT proxy ticker', ticker.lastPrice);
+    for (const [tf, interval] of [['1m','1'],['5m','5'],['15m','15'],['1h','60'],['4h','240'],['8h','480'],['12h','720'],['1d','D']]) {
+      const data = await (await get(QQQ_PROXY + '/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + interval + '&limit=3')).json();
+      const rows = data.result?.list;
+      const valid = Number(data.retCode) === 0 && Array.isArray(rows) && rows.length > 0 &&
+        rows.every(r => Array.isArray(r) && [0,1,2,3,4,5].every(i => Number.isFinite(Number(r[i]))));
+      if (!valid) throw new Error(tf + ' interval returned invalid candles: ' + (data.retMsg || 'no valid OHLCV rows'));
+      pass('Cloudflare QQQUSDT ' + tf + ' candles', rows.length + ' valid OHLCV rows');
+    }
+  } catch (e) {
+    fail('Configured Cloudflare QQQUSDT proxy and eight execution intervals', e.message);
+  }
+
   const checks = [
     ['minimum 1:3 reward/risk gate', /(?:rr\s*<\s*3|rr\s*<\s*MIN_REWARD_RISK)/.test(source)],
     ['EURUSD, BTCUSD and QQQUSDT supported', /EURUSD/.test(source) && /BTCUSD/.test(source) && /QQQUSDT/.test(source) && /fapi\.binance\.com/.test(source) && /api\.bybit\.com/.test(source) && /qqqProvider/.test(source)],
