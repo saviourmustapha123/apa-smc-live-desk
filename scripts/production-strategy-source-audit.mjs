@@ -33,8 +33,8 @@ if (start < 0 || next < 0) {
     'Pattern and recent block retest helpers are invoked');
   requireScanner('Inducement sweep is directionally constrained', /latestInducementProxy[\s\S]*inducementSweep[\s\S]*eventIndex===hist\.length-1/,
     'Inducement proxy must be swept on the current candle and align with direction');
-  requireScanner('Structure, displacement, POI and liquidity sequence gate', /validatedSequence=hasEntryZone&&recentStructuralDisplacement&&hasLiquidityConfluence[\s\S]*if\(!validatedSequence\)[\s\S]*continue;/,
-    'A candidate must pass the explicit confluence sequence and record a rejection reason when it fails');
+  requireScanner('Structure, displacement, POI and liquidity sequence gate', /const sameDirectionBreak=side==='BUY'\?upBreak:downBreak;[\s\S]*const breakoutEntry=sameDirectionBreak&&recentStructuralDisplacement&&recentDirectionalSweep;[\s\S]*const validatedSequence=\(hasEntryZone&&recentStructuralDisplacement&&hasLiquidityConfluence\)\|\|breakoutEntry[\s\S]*if\(!validatedSequence\)[\s\S]*continue;/,
+    'A candidate must pass a POI retest with displacement/liquidity, or a same-direction displaced structure break after a directional sweep; rejected candidates record why');
     requireScanner('Hard minimum 1:3 structural target gate', /structuralTarget\(side,entry,stop,hh,ll,hist\)[\s\S]*target\.rr<MIN_REWARD_RISK/,
     'Rejects missing targets and targets below 3R');
   requireScanner('Market-close candidates are distinct from limit retests', /const entryType=selectedGapRetest\|\|blockRetest\|\|patternRetest\?'LIMIT_RETEST':'MARKET_CLOSE'/,
