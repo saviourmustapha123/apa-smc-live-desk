@@ -1245,7 +1245,7 @@ function latestInducementProxy(b,k){
   // must clear and reclaim the whole relevant cluster, not only one arbitrary pivot.
   const nearby=candidates.filter(q=>q.i<pivot.i&&Math.abs(q.p-pivot.p)<=tol).map(q=>q.p);
   const levels=[pivot.p,...nearby],floor=Math.min(...levels),ceiling=Math.max(...levels);
-  let state='CANDIDATE',eventIndex=null,sweptLevels=[pivot.p];
+  let state='CANDIDATE',eventIndex=null,sweptLevels=levels;
   for(let j=pivot.i+k+1;j<b.length;j++){
    const bar=b[j];
    const swept=event.side==='BULLISH'?bar.low<floor&&bar.close>ceiling:bar.high>ceiling&&bar.close<floor;
@@ -1360,7 +1360,12 @@ function analyse(){
   }
   for(const z of sbrMatches.slice(-3)){s.zoneDefs.push({start:z.start,end:z.end,high:z.level+a*.08,low:z.level-a*.08,label:'SBR · HISTORICAL RETEST',color:'#fb923c',fill:'#fb923c28',extendRight:false});marks.push({time:z.end,position:'aboveBar',color:'#fb923c',shape:'circle',text:'SBR'})}
   for(const z of rbsMatches.slice(-3)){s.zoneDefs.push({start:z.start,end:z.end,high:z.level+a*.08,low:z.level-a*.08,label:'RBS · HISTORICAL RETEST',color:'#facc15',fill:'#facc1528',extendRight:false});marks.push({time:z.end,position:'belowBar',color:'#facc15',shape:'circle',text:'RBS'})}
-  if(inducementMatch){const im=inducementMatch;marks.push({time:im.time,position:im.side==='BEARISH'?'aboveBar':'belowBar',color:'#a3e635',shape:'diamond',text:'IDM '+im.status});s.zoneDefs.push({start:im.time,end:im.eventIndex!=null?b[im.eventIndex].time:x.time,high:im.level+a*.03,low:im.level-a*.03,label:'IDM '+im.status+' · proxy',color:'#a3e635',fill:'#a3e63520',extendRight:false})}if(swH)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:'BSL sweep'});if(swL)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:'SSL sweep'});if(bearBreak)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:bias==='Bullish structure'?'CHoCH?':'BOS↓'});if(bullBreak)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:bias==='Bearish structure'?'CHoCH?':'BOS↑'});if(fvgBear)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'square',text:'FVG'});if(fvgBull)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'square',text:'FVG'});if(sbr)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'circle',text:'SBR'});if(rbs)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'circle',text:'RBS'});
+  if(inducementMatch){
+  const im=inducementMatch,levels=[...new Set((im.liquidityLevels||[im.level]).map(Number).filter(Number.isFinite))].slice(0,5),endTime=im.eventIndex!=null?b[im.eventIndex].time:x.time;
+  marks.push({time:im.time,position:im.side==='BEARISH'?'aboveBar':'belowBar',color:'#a3e635',shape:'diamond',text:'IDM LEVEL'});
+  if(im.eventIndex!=null)marks.push({time:endTime,position:im.side==='BEARISH'?'aboveBar':'belowBar',color:'#a3e635',shape:'diamond',text:'IDM + LIQUIDITY '+im.status});
+  for(const level of levels){const pad=Math.max(a*.03,Math.abs(level)*1e-7),isIdm=Math.abs(level-im.level)<=Math.max(1e-10,Math.abs(im.level)*1e-9);s.zoneDefs.push({start:im.time,end:endTime,high:level+pad,low:level-pad,label:isIdm?'IDM '+im.status+' · proxy':'NEARBY LIQUIDITY POOL · IDM SEQUENCE',color:isIdm?'#a3e635':'#f59e0b',fill:isIdm?'#a3e63520':'#f59e0b18',extendRight:im.status==='CANDIDATE',kind:'inducement'})}
+ }if(swH)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:'BSL sweep'});if(swL)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:'SSL sweep'});if(bearBreak)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:bias==='Bullish structure'?'CHoCH?':'BOS↓'});if(bullBreak)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:bias==='Bearish structure'?'CHoCH?':'BOS↑'});if(fvgBear)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'square',text:'FVG'});if(fvgBull)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'square',text:'FVG'});if(sbr)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'circle',text:'SBR'});if(rbs)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'circle',text:'RBS'});
  addAdvancedAnnotations(b,marks);
  // Actionable levels on the chart come from the same production signal journal as the live desk.
  const chartSignal=chartSignalFor([...(s.log||[]),...(s.backgroundLog||[])],s.symbol,s.tf);
