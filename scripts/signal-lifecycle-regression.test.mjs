@@ -8,7 +8,7 @@ import { createContext, Script } from 'node:vm';
 // the suite fails and requires the integration to be reviewed.
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const start = html.indexOf('function signalBarEndMs(tf,timeSeconds)');
-const end = html.indexOf('\nfunction signalDayStamp(', start);
+const end = html.indexOf('\nfunction realizedSignalR(', start);
 assert.ok(start >= 0 && end > start, 'production signal lifecycle function must exist');
 const admissionStart = html.indexOf('function dailySignalAdmission(');
 const admissionEnd = html.indexOf('\nasync function scanBackgroundPair(', admissionStart);
