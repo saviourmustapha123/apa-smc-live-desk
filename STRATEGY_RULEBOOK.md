@@ -106,6 +106,16 @@ A valid signal candidate should be backed by a named entry model and the relevan
 Continuation OBs do not require inducement. In an established uptrend, after a confirmed higher high/BOS, the last opposing candle before a qualifying bullish impulse may form a bullish continuation OB. In a downtrend, after a confirmed lower low/BOS, the last opposing candle before a qualifying bearish impulse may form a bearish continuation OB. A first pullback can mitigate a fresh OB for the next move. Mitigation is not invalidation: a decisive close through the distal boundary invalidates the block. The first confirmed structural break against the prior trend may be a CHoCH/trend shift; later breaks aligned with the new direction are continuation BOS events. Do not require QML or inducement for every block. Never emit an entry as newly pending after its entry has already traded.
 
 
+### Continuation after BOS: new extreme, OB retest, next leg
+
+For both bullish and bearish continuation, the order of events matters:
+
+- **Bullish continuation:** established bullish structure → candle closes above the confirmed swing high (BOS, creating the new high) with qualifying displacement and an associated FVG → identify the last opposing candle as the candidate bullish OB → price extends or establishes the new high, then pulls back to the still-valid OB → the first retest/mitigation may set up the next bullish leg if the zone holds and the entry candle confirms.
+- **Bearish continuation:** established bearish structure → candle closes below the confirmed swing low (BOS, creating the new low) with qualifying displacement and an associated FVG → identify the last opposing candle as the candidate bearish OB → price extends or establishes the new low, then rallies back to the still-valid OB → the first retest/mitigation may set up the next bearish leg if the zone holds and the entry candle confirms.
+- **Do not confuse “unmitigated” with “must stay untouched forever.”** Before first touch, the zone can be displayed as a fresh pending OB. On first touch, record the mitigation time and stop describing that same zone as unmitigated. It can still be a valid retest setup if it has not been invalidated and the required directional confirmation occurs.
+- **Do not wait for inducement or QML by default.** They are optional contextual confirmations, not universal prerequisites for the continuation sequence. If they are present, record them only when their actual structure and direction match.
+- **Do not backdate the retest.** If the scanner learns of the retest only after the candle closes, it must not create a pending limit order as if it had existed before that touch. Classify the event as a retest/confirmation candidate, then apply the normal trigger, SL/TP, RR and chronological outcome rules.
+
 ### Continuation OB lifecycle: formation, fresh pending, first retest
 
 Treat these as distinct states and never collapse them into one signal:
