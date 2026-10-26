@@ -34,6 +34,23 @@ async function fetchJson(url) {
     alternate.hostname = "api.bytick.com";
     candidates.push(alternate);
   }
+  // Binance futures REST is geo-restricted from some edge regions. Try the
+  // documented alternate public hostnames without changing path or parameters.
+  if (original.hostname === "fapi.binance.com") {
+    for (const hostname of ["api.binance.com", "api-gcp.binance.com"]) {
+      const alternate = new URL(original);
+      alternate.hostname = hostname;
+      candidates.push(alternate);
+    }
+  } else if (original.hostname === "api.binance.com" && original.pathname.startsWith("/fapi/")) {
+    const alternate = new URL(original);
+    alternate.hostname = "api-gcp.binance.com";
+    candidates.push(alternate);
+  } else if (original.hostname === "api-gcp.binance.com" && original.pathname.startsWith("/fapi/")) {
+    const alternate = new URL(original);
+    alternate.hostname = "fapi.binance.com";
+    candidates.push(alternate);
+  }
   let lastError;
   for (const candidate of candidates) {
     try {
