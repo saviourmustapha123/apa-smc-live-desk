@@ -29,7 +29,7 @@ test('an entry already crossed on the signal candle is marked missed, not filled
 });
 
 test('a pending order invalidated by the stop before entry is not counted as a trade', () => {
-  const bars = [signalBar, bar(120, 100, 101, 94, 96), bar(180, 100, 102, 99, 101)];
+  const bars = [signalBar, bar(120, 94, 101, 93, 96), bar(180, 100, 102, 99, 101)];
   const result = executeSignal(signal(), bars, 0);
   assert.equal(result.outcome, 'INVALIDATED BEFORE ENTRY');
   assert.equal(result.triggered, false);
