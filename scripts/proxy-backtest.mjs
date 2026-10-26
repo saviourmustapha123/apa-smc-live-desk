@@ -16,7 +16,7 @@ const failures = [];
 const reports = [];
 
 async function fetchBars(symbol, interval) {
-  const aggregateHours = interval === '8h' ? 2 : interval === '12h' ? 3 : 1;
+  const aggregateHours = interval === '4h' ? 4 : interval === '8h' ? 2 : interval === '12h' ? 3 : 1;
   const sourceInterval = aggregateHours > 1 ? '4h' : interval;
   const sourceSeconds = TIMEFRAME_SECONDS[sourceInterval];
   let rows;
