@@ -427,7 +427,7 @@ test('QML requires a head sweep, close-confirmed leg break, and left-shoulder re
   assert.match(html, /prior\[j\]\.close<z\[1\]\.p/);
   assert.match(html, /status:rejected\?'RETEST_CONFIRMED':'WAITING_RETEST'/);
   assert.match(html, /function detectPatternRetest\(bars,k\)/);
-  assert.match(html, /QML shoulder retest/);
+  assert.match(html, /structural shift \\+ shoulder retest/);
   assert.doesNotMatch(html, /Head-and-shoulders neckline retest|Inverse head-and-shoulders neckline retest/);
   assert.match(html, /const patternRetest=detectPatternRetest\(hist,\+s\.k\)/);
 });
