@@ -392,7 +392,7 @@ function pendingOrderBlockOpportunity(symbol,tf,bars){
   const targetAlreadyConsumed=b.slice(i+1).some(c=>bullish?c.high>=target.tp:c.low<=target.tp);
   if((bullish?target.tp<=current.close:target.tp>=current.close)||targetAlreadyConsumed)continue;
   const reasons=[
-   (bullish?'Bullish':'Bearish')+' close-confirmed BOS',
+   (bullish?'Bullish':'Bearish')+' close-confirmed '+structureEvent,
    'ATR-qualified displacement + three-candle FVG',
    'Close-confirmed BOS + ATR-qualified displacement + FVG',
    (bullish?'Demand':'Supply')+' order block remains fresh and unmitigated',
