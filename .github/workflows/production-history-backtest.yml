@@ -33,6 +33,9 @@ jobs:
       - name: Run production scanner replay tests
         run: node --test scripts/production-scanner-replay.test.mjs
 
+      - name: Run APA SMC strategy-rule regression tests
+        run: node --test scripts/strategy-rule-regression.test.mjs
+
       - name: Run 1-minute entry and trade-outcome regression tests
         run: node --test scripts/trade-entry-replay.test.mjs
 
