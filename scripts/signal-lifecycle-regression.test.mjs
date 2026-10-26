@@ -7,13 +7,15 @@ import { createContext, Script } from 'node:vm';
 // not a parallel test-only implementation. If the function moves or disappears,
 // the suite fails and requires the integration to be reviewed.
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
-const start = html.indexOf('function signalBarEndMs(tf,timeSeconds)');
-const end = html.indexOf('\nfunction realizedSignalR(', start);
-assert.ok(start >= 0 && end > start, 'production signal lifecycle function must exist');
+const helperStart = html.indexOf('function signalBarEndMs(tf,timeSeconds)');
+const start = html.indexOf('function resolveSignalOutcomes(');
+const end = html.indexOf('\nfunction signalDayStamp(', start);
+assert.ok(helperStart >= 0 && start > helperStart && end > start, 'production signal lifecycle and calendar helper must exist');
 const admissionStart = html.indexOf('function dailySignalAdmission(');
 const admissionEnd = html.indexOf('\nasync function scanBackgroundPair(', admissionStart);
 assert.ok(admissionStart >= 0 && admissionEnd > admissionStart, 'production signal admission guards must exist');
-const lifecycleSource = html.slice(start, end) + '\n' +
+const lifecycleSource = html.slice(helperStart, start) + '\n' +
+  html.slice(start, end) + '\n' +
   html.slice(admissionStart, admissionEnd) + '\n' +
   'this.signalBarEndMs = signalBarEndMs; this.resolveSignalOutcomes = resolveSignalOutcomes; this.dailySignalAdmission = dailySignalAdmission; this.candidateAlreadyPastLevels = candidateAlreadyPastLevels;';
 const context = {
