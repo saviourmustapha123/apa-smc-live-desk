@@ -57,7 +57,7 @@
 (()=>{'use strict';
 const $=id=>document.getElementById(id), DB='apa-smc-live-db', STORE='bars', SIGNALS='signals';
 const MIN_REWARD_RISK=3;
-const DEFAULT_QQQ_PROXY='https://apa-smc-qqqusdt-proxy.saviourmustapha123.workers.dev';
+const DEFAULT_QQQ_PROXY='';
 const s={symbol:'EURUSD',tf:'5m',api:'https://biquote.io/api',qqqProxy:DEFAULT_QQQ_PROXY,qqqProvider:'bybit',initial:600,refresh:5,k:3,disp:1,db:null,chart:null,series:null,bars:[],data:[],minute:[],log:[],timer:null,stopLoad:false,busy:false,candleFeedOk:false,lines:[],trendSeries:[],markers:null,lastKey:'',didFit:false,overlay:null,zoneDefs:[],globalZones:[],globalMarks:[],globalAnnotationAt:0,overlaySignal:null,overlayDensity:'balanced',dailyTarget:6,topDownBusy:false,lastTopDownAt:0,lastOtherPairScan:0,topDownTimer:null,lastCandlePollAt:0,candlePollBusy:false,signalFreshMode:true,signalRefreshBusy:false,backgroundQuoteBusy:false};
 const symbolConfig={EURUSD:{label:'EUR/USD',type:'forex',precision:5},BTCUSD:{label:'BTC/USD',type:'crypto',precision:2},QQQUSDT:{label:'QQQUSDT · ETF perpetual',type:'equity-perp',precision:2}};
 const marketHealthBySymbol=new Map();
