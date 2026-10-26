@@ -56,6 +56,11 @@ function normalizeBybit(rows) {
   return rows.map(r => ({ time: Math.floor(num(r[0]) / 1000), open: num(r[1]), high: num(r[2]), low: num(r[3]), close: num(r[4]), volume: num(r[5]) }))
     .filter(validOHLC).sort((a,b)=>a.time-b.time);
 }
+function normalizeCoinbase(rows) {
+  // Coinbase candle shape: [timeSeconds, low, high, open, close, volume].
+  return rows.map(r => ({ time: num(r[0]), low: num(r[1]), high: num(r[2]), open: num(r[3]), close: num(r[4]) }))
+    .filter(validOHLC).sort((a,b)=>a.time-b.time);
+}
 function normalizeGate(rows) {
   // Gate futures candle shape: [timestamp, volume, close, high, low, open, ...]
   return rows.map(r => ({ time: num(r[0]), open: num(r[5]), high: num(r[3]), low: num(r[4]), close: num(r[2]), volume: num(r[1]) }))
@@ -122,7 +127,7 @@ async function fetchBars(symbol, tf) {
   let best = null;
   if (symbol === 'EURUSD' || symbol === 'BTCUSD') {
     const consider = (bars, provider, exact) => {
-      if (bars.length >= 100 && (!best || bars.length > best.bars.length)) best = { bars, provider, exact };
+      if (bars.length >= 100 && (!best || (exact && !best.exact) || (exact === best.exact && bars.length > best.bars.length))) best = { bars, provider, exact };
     };
     try {
       const json = await getJson('https://biquote.io/api/' + symbol + '/ohlc?interval=' + tf + '&limit=1000');
@@ -142,6 +147,12 @@ async function fetchBars(symbol, tf) {
         const rows = await getJson('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=' + tf + '&limit=1000');
         consider(normalizeBinance(rows), 'Binance BTCUSDT proxy for BTCUSD (symbol differs)', false);
       } catch (e) { errors.push('Binance BTCUSDT fallback: ' + e.message); }
+      try {
+        const granularity = ({'1m':60,'5m':300,'15m':900,'1h':3600})[tf];
+        if (!granularity) throw new Error('Unsupported Coinbase granularity for ' + tf);
+        const rows = await getJson('https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=' + granularity);
+        consider(normalizeCoinbase(rows), 'Coinbase Exchange BTC-USD spot (matching BTC/USD pair)', true);
+      } catch (e) { errors.push('Coinbase BTC-USD fallback: ' + e.message); }
     }
     if (best) return best;
   } else {
