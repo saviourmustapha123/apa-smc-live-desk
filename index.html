@@ -236,35 +236,44 @@ function summarizeTf(tf,bars){
  const ageMinutes=Math.max(0,Math.floor((Date.now()/1000-last.time)/60));
  return {tf,bias,score,detail:pd+' · '+b.length+' closed bars · last '+stamp(last.time)+' UTC ('+ageMinutes+'m old) · close '+priceFor(last.close,s.symbol),volume:volumeContext(b)};
 }
-function detectPatternRetest(bars,k){
- const b=(bars||[]).filter(x=>!x.isOpen),n=b.length;if(n<Math.max(20,k*6))return null;
- const prior=b.slice(0,-1),cur=b[n-1],pp=pivots(prior,k);
+function detectQmlStructure(bars,k){
+ const b=(bars||[]).filter(x=>!x.isOpen),n=b.length;
+ if(n<Math.max(16,k*6))return null;
+ const prior=b.slice(0,-1),cur=b.at(-1),pp=pivots(prior,k);
  const raw=[...pp.h.map(p=>({...p,type:'H'})),...pp.l.map(p=>({...p,type:'L'}))].sort((a,b)=>a.i-b.i);
  const swings=[];
  for(const p of raw){const last=swings.at(-1);if(!last||last.type!==p.type)swings.push(p);else if((p.type==='H'&&p.p>last.p)||(p.type==='L'&&p.p<last.p))swings[swings.length-1]=p}
- const z=swings.slice(-5);if(z.length!==5)return null;
- const tolerance=(atr(prior)||Math.max(cur.high-cur.low,1e-8))*0.35;
- if(z.every((p,i)=>p.type===['H','L','H','L','H'][i])){
-  const bearishQml=z[2].p>z[0].p&&z[2].p>z[4].p&&z[3].p<z[1].p;
-  const bearishHs=z[2].p>z[0].p&&z[2].p>z[4].p&&Math.abs(z[0].p-z[4].p)<=tolerance;
-  const neckline=z[1].p+((z[3].p-z[1].p)/(z[3].i-z[1].i||1))*(prior.length-z[1].i);
-  // QML retests the prior protected swing level (z[1]), not the newly formed
-  // break extreme at z[3]. Head-and-shoulders uses its projected neckline.
-  const level=bearishQml?z[1].p:neckline;
-  if(cur.high>=level&&cur.close<level&&cur.close<cur.open&&(bearishQml||bearishHs))return {side:'SELL',type:bearishQml?'QML level retest':'Head-and-shoulders neckline retest',level};
+ const atrNow=atr(prior)||Math.max(cur.high-cur.low,1e-8),tol=Math.max(atrNow*.08,Math.abs(cur.close)*1e-7);
+ const candidates=[];
+ for(let i=0;i<=swings.length-4;i++){
+  const z=swings.slice(i,i+4),priorSwings=swings.slice(0,i);
+  const previousHigh=priorSwings.filter(p=>p.type==='H').at(-1),previousLow=priorSwings.filter(p=>p.type==='L').at(-1);
+  if(z[0].type==='H'&&z[1].type==='L'&&z[2].type==='H'&&z[3].type==='L'){
+   const priorUptrend=!!previousHigh&&!!previousLow&&z[0].p>previousHigh.p&&z[1].p>previousLow.p;
+   const sweptHead=z[2].p>z[0].p,brokenLeg=z[3].p<z[1].p;
+   let breakIndex=-1;for(let j=z[2].i+1;j<=z[3].i;j++)if(prior[j].close<z[1].p){breakIndex=j;break}
+   if(priorUptrend&&sweptHead&&brokenLeg&&breakIndex>=0){
+    const level=z[0].p,touched=cur.high>=level-tol,rejected=touched&&cur.close<level&&cur.close<cur.open;
+    candidates.push({side:'SELL',type:'BEARISH QML',level,zoneLow:level-tol,zoneHigh:level+tol,pivots:z,breakIndex,head:z[2],status:rejected?'RETEST_CONFIRMED':'WAITING_RETEST',retestAt:rejected?n-1:null,invalidated:cur.close>z[2].p});
+   }
+  }
+  if(z[0].type==='L'&&z[1].type==='H'&&z[2].type==='L'&&z[3].type==='H'){
+   const priorDowntrend=!!previousHigh&&!!previousLow&&z[0].p<previousLow.p&&z[1].p<previousHigh.p;
+   const sweptHead=z[2].p<z[0].p,brokenLeg=z[3].p>z[1].p;
+   let breakIndex=-1;for(let j=z[2].i+1;j<=z[3].i;j++)if(prior[j].close>z[1].p){breakIndex=j;break}
+   if(priorDowntrend&&sweptHead&&brokenLeg&&breakIndex>=0){
+    const level=z[0].p,touched=cur.low<=level+tol,rejected=touched&&cur.close>level&&cur.close>cur.open;
+    candidates.push({side:'BUY',type:'BULLISH QML',level,zoneLow:level-tol,zoneHigh:level+tol,pivots:z,breakIndex,head:z[2],status:rejected?'RETEST_CONFIRMED':'WAITING_RETEST',retestAt:rejected?n-1:null,invalidated:cur.close<z[2].p});
+   }
+  }
  }
- if(z.every((p,i)=>p.type===['L','H','L','H','L'][i])){
-  const bullishQml=z[2].p<z[0].p&&z[2].p<z[4].p&&z[3].p>z[1].p;
-  const bullishHs=z[2].p<z[0].p&&z[2].p<z[4].p&&Math.abs(z[0].p-z[4].p)<=tolerance;
-  const neckline=z[1].p+((z[3].p-z[1].p)/(z[3].i-z[1].i||1))*(prior.length-z[1].i);
-  // Inverse QML retests its prior protected swing high (z[1]); the inverse
-  // head-and-shoulders model retests the projected neckline.
-  const level=bullishQml?z[1].p:neckline;
-  if(cur.low<=level&&cur.close>level&&cur.close>cur.open&&(bullishQml||bullishHs))return {side:'BUY',type:bullishQml?'Inverse QML level retest':'Inverse head-and-shoulders neckline retest',level};
- }
- return null;
+ return candidates.filter(x=>!x.invalidated).sort((a,b)=>b.pivots[3].i-a.pivots[3].i).at(0)||null;
 }
-
+function detectPatternRetest(bars,k){
+ const qml=detectQmlStructure(bars,Math.max(1,Math.floor(Number(k)||3)));
+ if(!qml||qml.status!=='RETEST_CONFIRMED')return null;
+ return {side:qml.side,type:qml.type+' structural shift + shoulder retest',level:qml.level,zoneLow:qml.zoneLow,zoneHigh:qml.zoneHigh,head:qml.head.p,breakIndex:qml.breakIndex};
+}
 function detectRecentBlockRetest(bars,k,dispMult){
  const b=(bars||[]).filter(x=>!x.isOpen),n=b.length;if(n<12)return null;
  const start=Math.max(4,n-55),current=b[n-1],events=[],allPivots=pivots(b,k);
@@ -1281,24 +1290,10 @@ function analyse(){
  }
  const sbr=sbrMatches.length>0,rbs=rbsMatches.length>0;
 
- // Build an alternating swing sequence first. Raw pivot lists can contain adjacent highs or lows,
- // which previously prevented many real five-swing shapes from ever being considered.
- const rawPiv=[...h.map(z=>({...z,type:'H'})),...l.map(z=>({...z,type:'L'}))].sort((u,v)=>u.i-v.i);
- const piv=[];
- for(const v of rawPiv){const prev=piv.at(-1);if(!prev||prev.type!==v.type)piv.push(v);else if((v.type==='H'&&v.p>prev.p)||(v.type==='L'&&v.p<prev.p))piv[piv.length-1]=v;}
- let qml='Not detected',qmlMatch=null;
- const qmlMatches=[];
- for(let i=0;i<=piv.length-5;i++){
-  const z=piv.slice(i,i+5);
-  if(z[0].type==='H'&&z[1].type==='L'&&z[2].type==='H'&&z[3].type==='L'&&z[4].type==='H'){
-   if(z[2].p>z[0].p&&z[2].p>z[4].p&&z[3].p<z[1].p)qmlMatches.push({pivots:z,label:'Possible bearish QML structure'});
-  }
-  if(z[0].type==='L'&&z[1].type==='H'&&z[2].type==='L'&&z[3].type==='H'&&z[4].type==='L'){
-   if(z[2].p<z[0].p&&z[2].p<z[4].p&&z[3].p>z[1].p)qmlMatches.push({pivots:z,label:'Possible bullish QML structure'});
-  }
- }
- qmlMatch=qmlMatches.at(-1)||null;
- if(qmlMatch)qml=qmlMatch.label;
+ // QML uses four confirmed pivots plus the current return to the left-shoulder level.
+ // It is not a separate head-and-shoulders detector; the structural break must precede the retest.
+ const qmlMatch=detectQmlStructure(b,+s.k);
+ const qml=qmlMatch?(qmlMatch.status==='RETEST_CONFIRMED'?qmlMatch.type+' · retest confirmed':qmlMatch.type+' · shift confirmed, waiting for shoulder retest'):'No valid QML sequence / shift confirmed';
  const internalHigh=h.length>=2?h.at(-2):null,internalLow=l.length>=2?l.at(-2):null;
  // Inducement is tied to a post-BOS pullback pivot; no candle shape can prove deliberate manipulation.
  const inducementMatch=latestInducementProxy(b,+s.k),inducement=inducementMatch?(inducementMatch.side==='BULLISH'?'Possible bullish IDM '+inducementMatch.status.toLowerCase():'Possible bearish IDM '+inducementMatch.status.toLowerCase()):'No confirmed post-BOS inducement proxy';
@@ -1333,7 +1328,14 @@ function analyse(){
  if(fvgBear){levelLines.push(['Bearish FVG upper',b.at(-3).low,'#ff9c69']);levelLines.push(['Bearish FVG lower',x.high,'#ff9c69']);s.zoneDefs.push({start:b.at(-3).time,end:x.time,high:b.at(-3).low,low:x.high,label:'SMC BEARISH FVG',color:'#ff9c69',fill:'#ff9c6926'})}if(fvgBull){levelLines.push(['Bullish FVG upper',x.low,'#35d39a']);levelLines.push(['Bullish FVG lower',b.at(-3).high,'#35d39a']);s.zoneDefs.push({start:b.at(-3).time,end:x.time,high:x.low,low:b.at(-3).high,label:'SMC BULLISH FVG',color:'#35d39a',fill:'#35d39a26'})}
  if(sbr)levelLines.push(['SBR retest',priorSupport,'#ff9c69']);if(rbs)levelLines.push(['RBS retest',priorResistance,'#35d39a']);
  for(const z of h.slice(-8))marks.push({time:z.t,position:'aboveBar',color:'#d1d5db',shape:'circle',text:'SH'});for(const z of l.slice(-8))marks.push({time:z.t,position:'belowBar',color:'#c4b5fd',shape:'circle',text:'SL'});
-  for(const match of qmlMatches.slice(-3)){const z=match.pivots,top=Math.max(...z.map(v=>v.p)),bottom=Math.min(...z.map(v=>v.p));s.zoneDefs.push({start:z[0].t,end:z[4].t,high:top,low:bottom,label:match.label.toUpperCase(),color:'#22d3ee',fill:'#22d3ee20',extendRight:false});for(const v of z)marks.push({time:v.t,position:v.type==='H'?'aboveBar':'belowBar',color:'#22d3ee',shape:'square',text:'QML'});}
+  if(qmlMatch){
+   const z=qmlMatch.pivots,level=qmlMatch.level,qmlColor=qmlMatch.side==='BUY'?'#35d39a':'#22d3ee',zonePad=Math.max(a*.08,Math.abs(level)*1e-7);
+   s.zoneDefs.push({start:z[0].t,end:x.time,high:level+zonePad,low:level-zonePad,label:qmlMatch.type+' · '+(qmlMatch.status==='RETEST_CONFIRMED'?'RETEST CONFIRMED':'WAITING FOR RETEST'),color:qmlColor,fill:qmlColor+'24',extendRight:qmlMatch.status!=='RETEST_CONFIRMED',kind:'qml'});
+   for(let qi=0;qi<z.length;qi++){const v=z[qi];marks.push({time:v.t,position:v.type==='H'?'aboveBar':'belowBar',color:'#22d3ee',shape:'square',text:['LEFT SHOULDER','LEG','HEAD','BREAK SWING'][qi]});}
+   levelLines.push(['QML shoulder level',level,qmlColor]);
+   marks.push({time:b[qmlMatch.breakIndex].time,position:qmlMatch.side==='BUY'?'belowBar':'aboveBar',color:'#60a5fa',shape:'arrow',text:'QML STRUCTURE SHIFT'});
+   if(qmlMatch.status==='RETEST_CONFIRMED')marks.push({time:x.time,position:qmlMatch.side==='BUY'?'belowBar':'aboveBar',color:qmlColor,shape:qmlMatch.side==='BUY'?'arrowUp':'arrowDown',text:'QML RETEST'});
+  }
   for(const z of sbrMatches.slice(-3)){s.zoneDefs.push({start:z.start,end:z.end,high:z.level+a*.08,low:z.level-a*.08,label:'SBR · HISTORICAL RETEST',color:'#fb923c',fill:'#fb923c28',extendRight:false});marks.push({time:z.end,position:'aboveBar',color:'#fb923c',shape:'circle',text:'SBR'})}
   for(const z of rbsMatches.slice(-3)){s.zoneDefs.push({start:z.start,end:z.end,high:z.level+a*.08,low:z.level-a*.08,label:'RBS · HISTORICAL RETEST',color:'#facc15',fill:'#facc1528',extendRight:false});marks.push({time:z.end,position:'belowBar',color:'#facc15',shape:'circle',text:'RBS'})}
   if(inducementMatch){const im=inducementMatch;marks.push({time:im.time,position:im.side==='BEARISH'?'aboveBar':'belowBar',color:'#a3e635',shape:'diamond',text:'IDM '+im.status});s.zoneDefs.push({start:im.time,end:im.eventIndex!=null?b[im.eventIndex].time:x.time,high:im.level+a*.03,low:im.level-a*.03,label:'IDM '+im.status+' · proxy',color:'#a3e635',fill:'#a3e63520',extendRight:false})}if(swH)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:'BSL sweep'});if(swL)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:'SSL sweep'});if(bearBreak)marks.push({time:x.time,position:'aboveBar',color:'#ff657a',shape:'arrowDown',text:bias==='Bullish structure'?'CHoCH?':'BOS↓'});if(bullBreak)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'arrowUp',text:bias==='Bearish structure'?'CHoCH?':'BOS↑'});if(fvgBear)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'square',text:'FVG'});if(fvgBull)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'square',text:'FVG'});if(sbr)marks.push({time:x.time,position:'aboveBar',color:'#ff9c69',shape:'circle',text:'SBR'});if(rbs)marks.push({time:x.time,position:'belowBar',color:'#35d39a',shape:'circle',text:'RBS'});
