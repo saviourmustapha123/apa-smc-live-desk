@@ -36,8 +36,34 @@ async function fetchBars(symbol, interval) {
         break;
       } catch (error) { lastError = error; }
     }
-    if (lastError) throw new Error('Bybit and Bytick providers unavailable: ' + lastError.message);
-    normalise = b => ({ time: Number(b[0]) / 1000, open: Number(b[1]), high: Number(b[2]), low: Number(b[3]), close: Number(b[4]) });
+    if (lastError) {
+      // Retry an alternate exact-contract provider before falling back to the
+      // underlying QQQ ETF. The report must retain the proxy disclaimer.
+      try {
+        const response = await fetch('https://fapi.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + sourceInterval + '&limit=1000', { signal: AbortSignal.timeout(12000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
+        if (!response.ok) throw new Error('Binance futures HTTP ' + response.status);
+        const data = await response.json();
+        if (!Array.isArray(data) || !data.length) throw new Error('Binance futures returned no OHLC rows');
+        rows = data;
+        normalise = b => ({ time: Number(b[0]) / 1000, open: Number(b[1]), high: Number(b[2]), low: Number(b[3]), close: Number(b[4]) });
+        lastError = null;
+      } catch (error) { lastError = error; }
+    }
+    if (lastError) {
+      try {
+        const range = sourceInterval === '1m' ? '7d' : sourceInterval === '5m' ? '14d' : '60d';
+        const response = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/QQQ?range=' + range + '&interval=' + sourceInterval, { signal: AbortSignal.timeout(15000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
+        if (!response.ok) throw new Error('Yahoo QQQ ETF HTTP ' + response.status);
+        const json = await response.json(), result = json.chart?.result?.[0];
+        if (!result || !Array.isArray(result.timestamp)) throw new Error(json.chart?.error?.description || 'Yahoo returned no chart rows');
+        const q = result.indicators?.quote?.[0];
+        rows = result.timestamp.map((time,i) => ({ time, open: Number(q?.open?.[i]), high: Number(q?.high?.[i]), low: Number(q?.low?.[i]), close: Number(q?.close?.[i]), isOpen: time + sourceSeconds > Math.floor(Date.now()/1000) }));
+        normalise = b => b;
+        lastError = null;
+      } catch (error) { lastError = error; }
+    }
+    if (lastError) throw new Error('QQQUSDT exchange providers and Yahoo ETF fallback unavailable: ' + lastError.message);
+    if (!normalise) normalise = b => ({ time: Number(b[0]) / 1000, open: Number(b[1]), high: Number(b[2]), low: Number(b[3]), close: Number(b[4]) });
   } else {
     const url = API + '/' + symbol + '/ohlc?interval=' + sourceInterval + '&limit=1000';
     const response = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
