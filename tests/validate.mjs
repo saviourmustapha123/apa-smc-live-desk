@@ -39,6 +39,8 @@ assert.ok(blockStart >= 0 && blockEnd > blockStart, 'OB retest detector not foun
 const blockFn = html.slice(blockStart, blockEnd);
 assert.ok(blockFn.includes('const linkedIdm='), 'OB retest must record optional linked inducement');
 assert.ok(blockFn.includes("'ORDER BLOCK RETEST · FVG + BOS'"), 'valid OB retest must be admitted without fabricated inducement');
+assert.ok(blockFn.includes('const structureEvent=') && blockFn.includes('const contextMode=') && blockFn.includes("mitigation:'FIRST_RETEST'"), 'first OB mitigation must carry BOS/CHoCH context and a distinct lifecycle phase');
+assert.ok(html.includes("first retest/mitigation of the FVG-backed OB after the structural break"), 'scanner must describe the OB retest as a post-structure event');
 assert.ok(!blockFn.includes('if(idm&&idm.status===\'SWEPT\''), 'OB retest must not hard-require inducement');
 const rulebook = readFileSync(new URL('../STRATEGY_RULEBOOK.md', import.meta.url), 'utf8');
 assert.ok(rulebook.includes('Continuation OBs do not require inducement') && rulebook.includes('first pullback can mitigate a fresh OB'), 'rulebook must preserve continuation OBs without inducement and valid first mitigation');
