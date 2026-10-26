@@ -99,3 +99,8 @@ A valid signal candidate should be backed by a named entry model and the relevan
 - Verify every overlay's source candle/time and price bounds against the same OHLC series shown.
 - Replay historical sequences without look-ahead, including failed setups and cases where a zone is never retested.
 - Report signal count, entry-trigger count, TP/SL/invalidation/expiry counts, R results, drawdown, and sample size. Do not claim profitability without reproducible out-of-sample results.
+
+
+## Continuation order blocks and trend shifts
+
+Continuation OBs do not require inducement. In an established uptrend, after a confirmed higher high/BOS, the last opposing candle before a qualifying bullish impulse may form a bullish continuation OB. In a downtrend, after a confirmed lower low/BOS, the last opposing candle before a qualifying bearish impulse may form a bearish continuation OB. A first pullback can mitigate a fresh OB for the next move. Mitigation is not invalidation: a decisive close through the distal boundary invalidates the block. The first confirmed structural break against the prior trend may be a CHoCH/trend shift; later breaks aligned with the new direction are continuation BOS events. Do not require QML or inducement for every block. Never emit an entry as newly pending after its entry has already traded.
