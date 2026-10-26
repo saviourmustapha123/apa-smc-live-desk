@@ -15,7 +15,7 @@ const admissionEnd = html.indexOf('\nasync function scanBackgroundPair(', admiss
 assert.ok(admissionStart >= 0 && admissionEnd > admissionStart, 'production signal admission guards must exist');
 const lifecycleSource = html.slice(start, end) + '\n' +
   html.slice(admissionStart, admissionEnd) + '\n' +
-  'this.resolveSignalOutcomes = resolveSignalOutcomes; this.dailySignalAdmission = dailySignalAdmission; this.candidateAlreadyPastLevels = candidateAlreadyPastLevels;';
+  'this.signalBarEndMs = signalBarEndMs; this.resolveSignalOutcomes = resolveSignalOutcomes; this.dailySignalAdmission = dailySignalAdmission; this.candidateAlreadyPastLevels = candidateAlreadyPastLevels;';
 const context = {
   s: { log: [] },
   save() {},
@@ -25,6 +25,15 @@ const context = {
 };
 const vmContext = createContext(context);
 new Script(lifecycleSource).runInContext(vmContext);
+
+test('calendar timeframe freshness uses candle close boundaries rather than candle open timestamps', () => {
+  const monthlyStart = Date.UTC(2026, 8, 1) / 1000;
+  const yearlyStart = Date.UTC(2026, 0, 1) / 1000;
+  const mondayStart = Date.UTC(2026, 9, 19) / 1000;
+  assert.equal(vmContext.signalBarEndMs('1M', monthlyStart), Date.UTC(2026, 9, 1));
+  assert.equal(vmContext.signalBarEndMs('1Y', yearlyStart), Date.UTC(2027, 0, 1));
+  assert.equal(vmContext.signalBarEndMs('1W', mondayStart), Date.UTC(2026, 9, 26));
+});
 
 function evaluate({ side = 'BUY', bar, status = 'PENDING' }) {
   const signal = {
