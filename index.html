@@ -357,6 +357,7 @@ function pendingOrderBlockOpportunity(symbol,tf,bars){
   if(!bullish&&!bearish)continue;
   const fvgConfirmed=i>=2&&(bullish?impulse.low>b[i-2].high:impulse.high<b[i-2].low);
   if(!fvgConfirmed)continue;
+  // Continuation rule: after a confirmed new high/new low in an established trend, a fresh FVG-backed OB may be mitigated for the next move without inducement. After a CHoCH, later aligned breaks may be continuation BOS; never require QML/inducement on every block.
   // Inducement is contextual, not a mandatory feature of every valid OB/FVG entry.
   // If present, it is recorded only when its direction and BOS linkage agree.
   const expectedIdmSide=bullish?'BULLISH':'BEARISH';
