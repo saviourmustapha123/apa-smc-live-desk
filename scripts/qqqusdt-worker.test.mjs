@@ -17,7 +17,7 @@ test('Bybit ticker request falls back to actual Binance ticker data and preserve
   const calls = [];
   const worker = makeWorker(async url => {
     calls.push(String(url));
-    if (String(url).includes('api.bybit.com')) throw new Error('simulated Bybit network block');
+    if (String(url).includes('api.bybit.com') || String(url).includes('api.bytick.com')) throw new Error('simulated Bybit network block');
     return jsonResponse({ symbol: 'QQQUSDT', price: '123.45' });
   });
   const response = await worker.fetch(new Request('https://worker.test/v5/market/tickers?category=linear&symbol=QQQUSDT'));
@@ -51,7 +51,7 @@ test('Bybit candle request maps 60-minute interval to Binance 1h and returns rea
   let fallbackUrl = '';
   const worker = makeWorker(async url => {
     const u = new URL(String(url));
-    if (u.hostname === 'api.bybit.com') throw new Error('simulated Bybit network block');
+    if (u.hostname === 'api.bybit.com' || u.hostname === 'api.bytick.com') throw new Error('simulated Bybit network block');
     fallbackUrl = u.toString();
     return jsonResponse([binanceKline]);
   });
