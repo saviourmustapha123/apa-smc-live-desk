@@ -151,6 +151,18 @@ test('bullish continuation retest requires BOS, a fresh high, then first OB miti
   push(103.4,104.4,103.1,104.1);
   push(104.0,104.2,103.0,103.4); push(103.4,103.8,102.6,103.0);
   push(100.3,100.7,100.2,100.6);
+  const noExtension = bars.map(c=>({...c}));
+  const extensionIndex = noExtension.length - 4;
+  noExtension[extensionIndex] = {...noExtension[extensionIndex], high:103.6, close:103.5};
+  assert.equal(engine.blockRetest(noExtension), null, 'a retest without a post-BOS new high must be rejected');
+
+  const prematureTouch = bars.slice();
+  prematureTouch.splice(prematureTouch.length - 4, 0, {
+    time: prematureTouch.at(-1).time - 3*300,
+    open:100.3, high:100.7, low:100.2, close:100.6
+  });
+  assert.equal(engine.blockRetest(prematureTouch), null, 'an OB touched before the new high cannot be counted as a fresh first mitigation');
+
   const result = engine.blockRetest(bars);
   assert.ok(result, 'qualifying first retest should be recognised');
   assert.equal(result.side, 'BUY');
