@@ -34,6 +34,7 @@ export function createProductionScannerReplay({ now = Date.now(), k = 3, displac
     '\nconst strategyScanDiagnostics = new Map();' +
     '\nthis.__scan = scanOpportunityHistory;' +
     '\nthis.__pending = pendingOrderBlockOpportunity;' +
+    '\nthis.__blockRetest = detectRecentBlockRetest;' +
     '\nthis.__targetLevelUnreached = targetLevelUnreached;' +
     '\nthis.__diagnostics = () => strategyScanDiagnostics;';
   new Script(source, { filename: 'production-scanner-replay.vm.js' }).runInContext(context);
@@ -45,6 +46,9 @@ export function createProductionScannerReplay({ now = Date.now(), k = 3, displac
     },
     pending(symbol, tf, bars) {
       return context.__pending(symbol, tf, bars);
+    },
+    blockRetest(bars) {
+      return context.__blockRetest(bars, k, displacement);
     },
     targetLevelUnreached(side, target, bars, targetIndex) {
       return context.__targetLevelUnreached(side, target, bars, targetIndex);
