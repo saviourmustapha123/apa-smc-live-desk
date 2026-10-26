@@ -287,7 +287,7 @@ function detectRecentBlockRetest(bars,k,dispMult){
   const hasFvg=i>=2&&(bullish?impulse.low>b[i-2].high:impulse.high<b[i-2].low);
   if(!hasFvg)continue;
   let origin=-1;
-  for(let j=i-1;j>=Math.max(0,i-3);j--){if(bullish?b[j].close<b[j].open:b[j].close>b[j].open){origin=j;break}}
+  for(let j=i-1;j>=Math.max(0,i-4);j--){if(bullish?b[j].close<b[j].open:b[j].close>b[j].open){origin=j;break}}
   if(origin<0)continue;
   const candle=b[origin],zone={low:candle.low,high:candle.high,side:bullish?'BUY':'SELL',formedAt:i};
   let invalidAt=-1,previousTouch=false;
