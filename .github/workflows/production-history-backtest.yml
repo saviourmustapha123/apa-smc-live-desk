@@ -36,6 +36,15 @@ jobs:
       - name: Run APA SMC strategy-rule regression tests
         run: node --test scripts/strategy-rule-regression.test.mjs
 
+      - name: Run production strategy source coverage audit
+        run: node scripts/production-strategy-source-audit.mjs
+
+      - name: Run internal engineering regression audit
+        run: node scripts/engineering-audit.mjs
+
+      - name: Run complete deterministic test suite
+        run: node --test scripts/*.test.mjs
+
       - name: Run 1-minute entry and trade-outcome regression tests
         run: node --test scripts/trade-entry-replay.test.mjs
 
