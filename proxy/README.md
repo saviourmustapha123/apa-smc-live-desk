@@ -12,7 +12,7 @@ The GitHub Pages app requests public exchange data directly from the visitor's b
 6. Open the APA SMC Live Desk website, go to **Settings**, paste the URL into **QQQUSDT CORS proxy**, and select **Save & reconnect**.
 7. Select QQQUSDT and use **Settings → Test feed**. The test must return a valid quote and candles before treating the feed as live.
 
-The app routes Bybit requests through the Worker when a proxy URL is configured and routes Binance requests through it as well. The Worker validates the allowed paths, QQQUSDT symbol, category, intervals and limits. It contains no API keys and does not place trades. Upstream errors are forwarded rather than replaced with invented prices.
+The app routes Bybit requests through the Worker when a proxy URL is configured and routes Binance requests through it as well. The Worker validates the allowed paths, QQQUSDT symbol, category, intervals and limits. It contains no API keys and does not place trades. If the selected exchange route is unavailable, the updated Worker tries the other public exchange and converts the response into the requested API shape. It returns HTTP 502 with both upstream errors if neither route works; it never generates synthetic prices. Run `node --test scripts/qqqusdt-worker.test.mjs` to verify the fallback mappings locally in CI.
 
 ## Important
 
