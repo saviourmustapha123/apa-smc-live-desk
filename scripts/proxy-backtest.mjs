@@ -150,7 +150,7 @@ const summaryLines=[
   '# APA · SMC proxy strategy backtest',
   '',
   `- Run time (UTC): ${new Date().toISOString()}`,
-  '- Market data: Biquote public OHLC for EURUSD/BTCUSD and Bybit linear perpetual OHLC for QQQUSDT; only closed candles included.',
+  '- Market data: Biquote OHLC for EURUSD/BTCUSD. QQQUSDT attempts Bybit/Binance perpetual candles; if both fail, Yahoo QQQ ETF candles are used only as an explicitly non-equivalent proxy. Only closed candles included.',
   `- Rules: current website proxy trigger, swing sensitivity ${K}, displacement ${DISPLACEMENT_ATR}×ATR, minimum target ratio ${MIN_RR}:1.`,
   '- Execution: enter at the next candle open; skip the entry if the open invalidates the stop or leaves less than 3R; same-candle stop/target ambiguity is a stop-first loss; gap-through-stop losses use the next open.',
   '- Gross proxy only, **not** validation of the complete proprietary LOWKEY FX APA strategy. Cost sensitivity subtracts explicit illustrative assumptions of 0.05R, 0.10R and 0.20R per resolved trade; these are not measured historical spread, commission, slippage, latency or financing. A true net backtest requires venue-specific historical cost data.',
