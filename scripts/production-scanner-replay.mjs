@@ -17,7 +17,7 @@ const functionNames = [
   'fxSessionOpenAt', 'marketSessionOpen', 'signalEligibilityReason',
   'pivots', 'atr', 'detectQmlStructure', 'detectPatternRetest', 'detectRecentBlockRetest',
   'latestInducementProxy', 'targetLevelUnreached', 'structuralTarget',
-  'signalHorizonForTf', 'estimateTargetHorizon', 'pendingOrderBlockOpportunity',
+  'signalHorizonForTf', 'estimateTargetHorizon', 'lastStructuralBias', 'pendingOrderBlockOpportunity',
   'scanOpportunityHistory'
 ];
 
@@ -34,6 +34,7 @@ export function createProductionScannerReplay({ now = Date.now(), k = 3, displac
     '\nconst strategyScanDiagnostics = new Map();' +
     '\nthis.__scan = scanOpportunityHistory;' +
     '\nthis.__pending = pendingOrderBlockOpportunity;' +
+    '\nthis.__structuralBias = lastStructuralBias;' +
     '\nthis.__blockRetest = detectRecentBlockRetest;' +
     '\nthis.__targetLevelUnreached = targetLevelUnreached;' +
     '\nthis.__diagnostics = () => strategyScanDiagnostics;';
@@ -46,6 +47,9 @@ export function createProductionScannerReplay({ now = Date.now(), k = 3, displac
     },
     pending(symbol, tf, bars) {
       return context.__pending(symbol, tf, bars);
+    },
+    structuralBias(bars, endExclusive) {
+      return context.__structuralBias(bars, k, endExclusive);
     },
     blockRetest(bars) {
       return context.__blockRetest(bars, k, displacement);
