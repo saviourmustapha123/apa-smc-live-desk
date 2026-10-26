@@ -1,6 +1,6 @@
 import { assessAt, simulate } from './strategy-core.mjs';
 const API = 'https://biquote.io/api';
-const BYBIT_HOSTS = ['https://api.bybit.com', 'https://api.bytick.com'];
+const BYBIT_HOSTS = [process.env.QQQ_PROXY_URL || 'https://apa-smc-qqqusdt-proxy.saviourmustapha123.workers.dev', 'https://api.bybit.com', 'https://api.bytick.com'];
 const SYMBOLS = ['EURUSD', 'BTCUSD', 'QQQUSDT'];
 const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '8h', '12h', '1d'];
 const TIMEFRAME_SECONDS = { '1m':60, '5m':300, '15m':900, '1h':3600, '4h':14400, '8h':28800, '12h':43200, '1d':86400 };
