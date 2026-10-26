@@ -39,8 +39,8 @@ test('admits a fresh continuation OB without inducement', () => {
   trend.forEach((c,i)=>{const j=bars.length-trend.length+i;bars[j]={time:bars[j].time,open:c[0],high:c[1],low:c[2],close:c[3]};});
   const push = (open, high, low, close) => bars.push({ time: bars.at(-1).time + 300, open, high, low, close });
   push(100.2,100.4,99.3,99.6); push(99.6,100.1,99.5,100.0);
-  push(100.5,103.7,101.2,103.4); push(103.0,103.2,102.6,102.8);
-  push(102.8,103.0,102.4,102.6); push(102.6,102.8,102.2,102.4);
+  push(100.5,103.7,101.2,103.4); push(103.4,104.4,103.1,104.1);
+  push(103.0,103.2,102.6,102.8); push(102.8,103.0,102.4,102.6); push(102.6,102.8,102.2,102.4);
   push(102.4,102.7,102.1,102.5); push(102.5,102.6,102.2,102.4);
   const signal = engine.pending('BTCUSD','5m',bars);
   assert.ok(signal);
@@ -127,8 +127,8 @@ test('admits a fresh bearish continuation OB without inducement after bearish BO
   trend.forEach((c,i)=>{const j=source.length-trend.length+i;source[j]={time:source[j].time,open:c[0],high:c[1],low:c[2],close:c[3]};});
   const push = (open, high, low, close) => source.push({ time: source.at(-1).time + 300, open, high, low, close });
   push(100.2,100.4,99.3,99.6); push(99.6,100.1,99.5,100.0);
-  push(100.5,103.7,101.2,103.4); push(103.0,103.2,102.6,102.8);
-  push(102.8,103.0,102.4,102.6); push(102.6,102.8,102.2,102.4);
+  push(100.5,103.7,101.2,103.4); push(103.4,104.4,103.1,104.1);
+  push(103.0,103.2,102.6,102.8); push(102.8,103.0,102.4,102.6); push(102.6,102.8,102.2,102.4);
   push(102.4,102.7,102.1,102.5); push(102.5,102.6,102.2,102.4);
   const bars = source.map(c => ({time:c.time,open:200-c.open,high:200-c.low,low:200-c.high,close:200-c.close}));
   const signal = engine.pending('BTCUSD','5m',bars);
@@ -150,7 +150,7 @@ test('bullish continuation retest requires BOS, a fresh high, then first OB miti
   push(100.5,103.7,101.2,103.4);
   push(103.4,104.4,103.1,104.1);
   push(104.0,104.2,103.0,103.4); push(103.4,103.8,102.6,103.0);
-  push(103.0,103.3,100.2,100.6);
+  push(100.3,100.7,100.2,100.6);
   const result = engine.blockRetest(bars);
   assert.ok(result, 'qualifying first retest should be recognised');
   assert.equal(result.side, 'BUY');
@@ -167,7 +167,7 @@ test('bearish continuation retest requires BOS, a fresh low, then first OB mitig
   push(100.5,103.7,101.2,103.4); push(103.4,104.4,103.1,104.1);
   push(104.0,104.2,103.0,103.4); push(103.4,103.8,102.6,103.0);
   push(103.0,103.3,100.2,100.6);
-  const bars = source.map(c=>({time:c.time,open:200-c.close,high:200-c.low,low:200-c.high,close:200-c.open}));
+  const bars = source.map(c=>({time:c.time,open:200-c.open,high:200-c.low,low:200-c.high,close:200-c.close}));
   const result = engine.blockRetest(bars);
   assert.ok(result, 'qualifying bearish first retest should be recognised');
   assert.equal(result.side, 'SELL');
