@@ -56,6 +56,8 @@ if (start < 0 || next < 0) {
   }
   requireApp('Order-block retest requires an FVG-backed displacement', /const hasFvg=i>=2&&\(bullish\?impulse\.low>b\[i-2\]\.high:impulse\.high<b\[i-2\]\.low\);[\s\S]*?if\(!hasFvg\)continue;/,
     'Trade-grade OB retests require displacement, a close-confirmed structure break, a three-candle FVG and a first fresh retest');
+  requireApp('Chart does not relabel every structure origin candle as a breaker', /IMPORTANT: do not infer a breaker from an arbitrary opposing candle[\\s\\S]*?original OB -> close through far edge -> opposite close-confirmed structure break -> opposite-side retest/,
+    'The generic BOS/CHoCH renderer must not draw a breaker; only the validated failed-OB sequence may do so');
   requireApp('Fresh order-block first retest is enforced', /let invalidAt=-1,previousTouch=false;[\s\S]*?if\(invalidAt<0&&!previousTouch&&touched/,
     'An already mitigated zone cannot be reused as a fresh order-block entry');
 
