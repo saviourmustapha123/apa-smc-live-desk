@@ -305,6 +305,12 @@ function detectRecentBlockRetest(bars,k,dispMult){
   const bullish=impulse.close>impulse.open&&high&&prev.close<=high.p&&impulse.close>high.p;
   const bearish=impulse.close<impulse.open&&low&&prev.close>=low.p&&impulse.close<low.p;
   if(!bullish&&!bearish)continue;
+  // Classify the BOS against structure confirmed before the impulse. A break
+  // against the prior trend is a potential CHoCH; an aligned break is continuation.
+  const priorBullTrend=pp.h.length>=2&&pp.l.length>=2&&pp.h.at(-1).p>pp.h.at(-2).p&&pp.l.at(-1).p>pp.l.at(-2).p;
+  const priorBearTrend=pp.h.length>=2&&pp.l.length>=2&&pp.h.at(-1).p<pp.h.at(-2).p&&pp.l.at(-1).p<pp.l.at(-2).p;
+  const structureEvent=bullish?(priorBearTrend?'CHoCH':'BOS'):(priorBullTrend?'CHoCH':'BOS');
+  const contextMode=structureEvent==='CHoCH'?'TREND SHIFT':(bullish?priorBullTrend:priorBearTrend)?'CONTINUATION':'BOS / TREND UNCONFIRMED';
   const hasFvg=i>=2&&(bullish?impulse.low>b[i-2].high:impulse.high<b[i-2].low);
   if(!hasFvg)continue;
   let origin=-1;
@@ -323,7 +329,7 @@ function detectRecentBlockRetest(bars,k,dispMult){
    // BOS-linked sweep sequence is actually present; never fabricate it.
    const idm=latestInducementProxy(b.slice(0,n-1),k),idmSide=zone.side==='BUY'?'BULLISH':'BEARISH';
    const linkedIdm=!!(idm&&idm.status==='SWEPT'&&idm.side===idmSide&&idm.bosTime===impulse.time&&idm.eventIndex>i);
-   events.push({...zone,type:linkedIdm?'ORDER BLOCK RETEST · IDM + LIQUIDITY SWEPT':'ORDER BLOCK RETEST · FVG + BOS',...(linkedIdm?{inducementSweepAt:idm.eventIndex,inducementLevel:idm.level,liquidityLevels:idm.liquidityLevels||[idm.level]}:{})});
+   events.push({...zone,type:linkedIdm?'ORDER BLOCK RETEST · IDM + LIQUIDITY SWEPT':'ORDER BLOCK RETEST · FVG + BOS',structureEvent,contextMode,originTime:candle.time,impulseTime:impulse.time,mitigation:'FIRST_RETEST',...(linkedIdm?{inducementSweepAt:idm.eventIndex,inducementLevel:idm.level,liquidityLevels:idm.liquidityLevels||[idm.level]}:{})});
    continue;
   }
   if(invalidAt>=0&&touched){
@@ -502,6 +508,7 @@ function scanOpportunityHistory(symbol,tf,bars){
   if(blockRetest&&(!side||side===blockRetest.side)&&((blockRetest.side==='BUY'&&up)||(blockRetest.side==='SELL'&&dn))){
    side=blockRetest.side;
    reasons.push(blockRetest.type);
+   reasons.push((blockRetest.structureEvent||'BOS')+' · '+(blockRetest.contextMode||'STRUCTURE UNCONFIRMED')+' · first retest/mitigation of the FVG-backed OB after the structural break');
    if(blockRetest.inducementSweepAt!=null)reasons.push('BOS-linked inducement and nearby liquidity swept before first OB mitigation');
   }
   // Inducement becomes a trade input only when a post-BOS liquidity probe is swept
@@ -575,7 +582,7 @@ function scanOpportunityHistory(symbol,tf,bars){
   }
   const uniqueReasons=[...new Set(reasons)];
   const timing=estimateTargetHorizon(tf,hist,entry,target.tp);
-  found.push({symbol,tf,side,entry,sl:stop,tp:target.tp,rr:target.rr,reason:uniqueReasons,...timing,time:cur.time,confidence:'provisional-sequence-filtered',setupType:patternRetest?.type||blockRetest?.type||(ifvgRetest?'IFVG retest':fvgRetest?'FVG retest':hasRoleReversal?'SBR/RBS retest':'BOS/CHoCH retest'),status:ageBars===0?'NOT RUNNING':'HISTORICAL',movePct:null,rNow:null,ageBars,scanEngine:'APA-SMC strict sequence heuristic; unvalidated'});
+  found.push({symbol,tf,side,entry,sl:stop,tp:target.tp,rr:target.rr,reason:uniqueReasons,...timing,time:cur.time,confidence:'provisional-sequence-filtered',setupType:patternRetest?.type||(blockRetest?(blockRetest.type+' · '+(blockRetest.contextMode||'BOS / TREND UNCONFIRMED')):null)||(ifvgRetest?'IFVG retest':fvgRetest?'FVG retest':hasRoleReversal?'SBR/RBS retest':'BOS/CHoCH retest'),status:ageBars===0?'NOT RUNNING':'HISTORICAL',movePct:null,rNow:null,ageBars,scanEngine:'APA-SMC strict sequence heuristic; unvalidated'});
   if(ageBars===0){diag.candidateFound=true;diag.latestRejection='Production scanner accepted a provisional candidate';}
  }
  // Create an actionable pending setup after a confirmed BOS even before price returns to the order block.
