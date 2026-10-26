@@ -297,7 +297,12 @@ function detectRecentBlockRetest(bars,k,dispMult){
   }
   const touched=current.low<=zone.high&&current.high>=zone.low;
   if(invalidAt<0&&!previousTouch&&touched&&((zone.side==='BUY'&&current.close>current.open&&current.close>=(zone.low+zone.high)/2)||(zone.side==='SELL'&&current.close<current.open&&current.close<=(zone.low+zone.high)/2))){
-   events.push({...zone,type:'ORDER BLOCK RETEST'});
+   // APA entry model: BOS-linked inducement and nearby equal-level liquidity must
+   // be swept before the first mitigation of this order block.
+   const idm=latestInducementProxy(b.slice(0,n-1),k),idmSide=zone.side==='BUY'?'BULLISH':'BEARISH';
+   if(idm&&idm.status==='SWEPT'&&idm.side===idmSide&&idm.bosTime===impulse.time&&idm.eventIndex>i){
+    events.push({...zone,type:'ORDER BLOCK RETEST · IDM + LIQUIDITY SWEPT',inducementSweepAt:idm.eventIndex,inducementLevel:idm.level,liquidityLevels:idm.liquidityLevels||[idm.level]});
+   }
    continue;
   }
   if(invalidAt>=0&&touched){
@@ -319,6 +324,7 @@ function pendingOrderBlockOpportunity(symbol,tf,bars){
  const minimum=tf==='1Y'?10:tf==='1M'?20:35;
  if(b.length<minimum)return null;
  const current=b.at(-1),k=Math.max(2,+s.k||3),dispMult=Math.max(.1,Number(s.disp)||1.2);
+ const latestIdm=latestInducementProxy(b,k);
  const start=Math.max(k+4,b.length-80);
  // Work backwards from the newest candle and use only structure confirmed before each impulse.
  for(let i=b.length-2;i>=start;i--){
@@ -328,6 +334,10 @@ function pendingOrderBlockOpportunity(symbol,tf,bars){
   const bullish=impulse.close>impulse.open&&!!high&&prev.close<=high.p&&impulse.close>high.p;
   const bearish=impulse.close<impulse.open&&!!low&&prev.close>=low.p&&impulse.close<low.p;
   if(!bullish&&!bearish)continue;
+  const fvgConfirmed=i>=2&&(bullish?impulse.low>b[i-2].high:impulse.high<b[i-2].low);
+  if(!fvgConfirmed)continue;
+  const expectedIdmSide=bullish?'BULLISH':'BEARISH';
+  if(!latestIdm||latestIdm.status!=='SWEPT'||latestIdm.side!==expectedIdmSide||latestIdm.bosTime!==impulse.time||!(latestIdm.eventIndex>i))continue;
   const side=bullish?'BUY':'SELL';
   let origin=-1;
   for(let j=i-1;j>=Math.max(0,i-4);j--){
@@ -352,8 +362,9 @@ function pendingOrderBlockOpportunity(symbol,tf,bars){
   if(!target||target.rr<MIN_REWARD_RISK)continue;
   const reasons=[
    (bullish?'Bullish':'Bearish')+' close-confirmed BOS',
-   'ATR-qualified displacement',
-   (bullish?'Demand':'Supply')+' order block remains unmitigated',
+   'ATR-qualified displacement + three-candle FVG',
+   'BOS-linked inducement and nearby equal-level liquidity swept',
+   (bullish?'Demand':'Supply')+' order block remains fresh and unmitigated',
    'Pending midpoint retest entry',
    'Structural target supports 1:'+target.rr.toFixed(2)
   ];
@@ -459,6 +470,7 @@ function scanOpportunityHistory(symbol,tf,bars){
   if(blockRetest&&(!side||side===blockRetest.side)&&((blockRetest.side==='BUY'&&up)||(blockRetest.side==='SELL'&&dn))){
    side=blockRetest.side;
    reasons.push(blockRetest.type);
+   if(blockRetest.inducementSweepAt!=null)reasons.push('BOS-linked inducement and nearby liquidity swept before first OB mitigation');
   }
   // Inducement becomes a trade input only when a post-BOS liquidity probe is swept
   // and reclaimed on the current closed candle in the same direction as the setup.
@@ -498,7 +510,7 @@ function scanOpportunityHistory(symbol,tf,bars){
   }
   const hasPatternOrRole=!!patternRetest||hasRoleReversal;
   const hasEntryZone=hasZoneRetest||hasPatternOrRole;
-  const hasLiquidityConfluence=recentDirectionalSweep||inducementSweep||hasPatternOrRole;
+  const hasLiquidityConfluence=recentDirectionalSweep||inducementSweep||!!(blockRetest&&blockRetest.inducementSweepAt!=null)||hasPatternOrRole;
   const validatedSequence=hasEntryZone&&recentStructuralDisplacement&&hasLiquidityConfluence;
   if(!validatedSequence){rejectLatest('Confluence incomplete: requires POI/pattern retest, recent same-direction displacement, and liquidity/pattern confirmation');continue;}
   if(disp)reasons.push('Displacement confirmed (ATR filter)');
@@ -1223,13 +1235,18 @@ function latestInducementProxy(b,k){
   if(!pivot)continue;
   const opposite=events.find(e=>e.i>event.i&&e.side!==event.side);
   if(opposite&&opposite.i<=pivot.i+k)continue;
-  let state='CANDIDATE',eventIndex=null;
+  let state='CANDIDATE',eventIndex=null,sweptLevels=[pivot.p];
   for(let j=pivot.i+k+1;j<b.length;j++){
-   const bar=b[j],swept=event.side==='BULLISH'?bar.low<pivot.p&&bar.close>pivot.p:bar.high>pivot.p&&bar.close<pivot.p;
+   const bar=b[j],a=atr(b.slice(0,j))||Math.max(bar.high-bar.low,1e-8),tol=a*.12;
+   // If near-equal swing liquidity sits beside the inducement, clear the pool's
+   // outer edge and close back beyond all included levels before marking SWEPT.
+   const nearby=candidates.filter(q=>q.i<pivot.i&&Math.abs(q.p-pivot.p)<=tol).map(q=>q.p);
+   const levels=[pivot.p,...nearby],floor=Math.min(...levels),ceiling=Math.max(...levels);
+   const swept=event.side==='BULLISH'?bar.low<floor&&bar.close>ceiling:bar.high>ceiling&&bar.close<floor;
    const broken=event.side==='BULLISH'?bar.close<pivot.p:bar.close>pivot.p;
-   if(swept){state='SWEPT';eventIndex=j;break}if(broken){state='INVALIDATED';eventIndex=j;break}
+   if(swept){state='SWEPT';eventIndex=j;sweptLevels=levels;break}if(broken){state='INVALIDATED';eventIndex=j;break}
   }
-  return {side:event.side,level:pivot.p,time:b[pivot.i].time,bosTime:b[event.i].time,status:state,eventIndex};
+  return {side:event.side,level:pivot.p,liquidityLevels:sweptLevels,time:b[pivot.i].time,bosTime:b[event.i].time,status:state,eventIndex};
  }
  return null
 }
