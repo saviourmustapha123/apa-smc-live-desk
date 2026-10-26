@@ -178,11 +178,12 @@ test('structural targets select the nearest confirmed opposing swing that satisf
   assert.match(html, /return \{tp:candidates\[0\]\.tp,rr:candidates\[0\]\.rr,targetSwingIndex:candidates\[0\]\.index\}/);
 });
 
-test('live chart distinguishes breaker blocks from order blocks and requires a retest', () => {
-  assert.match(html, /oppositeBreak<0\)continue/);
-  assert.match(html, /retestIndex:j,retestTime:bar\.time/);
-  assert.match(html, /Breaker block/);
-  assert.match(html, /text:breaker\.side\+' BREAKER'/);
+test('live chart maps qualified order blocks without separate breaker-block visuals', () => {
+  assert.match(html, /kind:'order-block'/);
+  assert.match(html, /BULLISH OB|BEARISH OB/);
+  assert.doesNotMatch(html, /text:breaker\.side\+' BREAKER'/);
+  assert.doesNotMatch(html, /label:\s*[^,\n]*BREAKER BLOCK/);
+  assert.doesNotMatch(html, /kind:\s*['\"]breaker-block['\"]/);
 });
 
 test('live inducement proxy is tied to a post-BOS pullback and exposes status', () => {
