@@ -84,18 +84,23 @@ async function fetchBars(symbol, interval) {
         break;
       } catch (error) { lastError = error; }
     }
-    if (lastError) {
-      // Retry an alternate exact-contract provider before falling back to the
-      // underlying QQQ ETF. The report must retain the proxy disclaimer.
-      try {
-        const response = await fetch('https://fapi.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + sourceInterval + '&limit=1000&startTime=' + startMs + '&endTime=' + nowMs, { signal: AbortSignal.timeout(12000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
-        if (!response.ok) throw new Error('Binance futures HTTP ' + response.status);
-        const data = await response.json();
-        if (!Array.isArray(data) || !data.length) throw new Error('Binance futures returned no OHLC rows');
-        rows = data;
-        normalise = b => ({ time: Number(b[0]) / 1000, open: Number(b[1]), high: Number(b[2]), low: Number(b[3]), close: Number(b[4]) });
-        lastError = null;
-      } catch (error) { lastError = error; }
+    if (lastError || (sourceInterval === '4h' && (!rows || rows.length < 100))) {
+      // Retry alternate exact-contract Binance futures hosts even when a primary
+      // host returned a short response. Do not mistake a partial history for coverage.
+      let exchangeError = lastError;
+      for (const host of ['https://fapi.binance.com','https://fapi1.binance.com','https://fapi2.binance.com','https://fapi3.binance.com','https://fapi4.binance.com','https://api-gcp.binance.com']) {
+        try {
+          const response = await fetch(host + '/fapi/v1/klines?symbol=QQQUSDT&interval=' + sourceInterval + '&limit=1000&startTime=' + startMs + '&endTime=' + nowMs, { signal: AbortSignal.timeout(12000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
+          if (!response.ok) throw new Error(host + ' HTTP ' + response.status);
+          const data = await response.json();
+          if (!Array.isArray(data) || data.length < 100) throw new Error(host + ' returned fewer than 100 OHLC rows');
+          rows = data;
+          normalise = b => ({ time: Number(b[0]) / 1000, open: Number(b[1]), high: Number(b[2]), low: Number(b[3]), close: Number(b[4]) });
+          exchangeError = null;
+          break;
+        } catch (error) { exchangeError = error; }
+      }
+      lastError = exchangeError;
     }
     if (lastError || (sourceInterval === '4h' && (!rows || rows.length < 100))) {
       // For 4h, use exact QQQUSDT archives before substituting the QQQ ETF.
