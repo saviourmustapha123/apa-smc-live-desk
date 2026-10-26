@@ -69,3 +69,13 @@ test('historical replay reports setup-type outcomes separately and preserves sig
   assert.match(source, /evidence:.*s\.reason\.join/);
   assert.match(source, /Expectancy R/);
 });
+
+
+test('confirmed retest signals use a post-close market entry; only untouched OB ideas remain limit orders', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(source, /const entry=cur\.close;/);
+  assert.match(source, /const entryType='MARKET_CLOSE';/);
+  assert.match(source, /entryType:'LIMIT_RETEST',reason:reasons/);
+  assert.match(source, /Untouched order-block limit ideas are emitted separately by pendingOrderBlockOpportunity/);
+});
