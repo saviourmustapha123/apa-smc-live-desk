@@ -404,7 +404,7 @@ function pendingOrderBlockOpportunity(symbol,tf,bars){
   return {
    symbol,tf,side,entry,sl:stop,tp:target.tp,rr:target.rr,reason:reasons,...timing,
    time:current.time,confidence:'provisional-confluence-pending',
-   setupType:(bullish?'Bullish':'Bearish')+' order block retest',
+   setupType:(bullish?'Bullish':'Bearish')+' order block retest',structureEvent:structureEvent,contextMode:contextMode,
    status:'NOT RUNNING',outcome:'PENDING',movePct:null,rNow:null,ageBars:0,
    orderBlock:{low:zone.low,high:zone.high,formedAt:impulse.time,originTime:ob.time},
    scanEngine:'APA-SMC pending structural setup; provisional and not yet performance-validated'
