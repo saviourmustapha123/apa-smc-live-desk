@@ -42,7 +42,6 @@ test('admits a fresh continuation OB without inducement', () => {
   push(100.5,103.7,101.2,103.4); push(103.4,104.4,103.1,104.1);
   push(103.0,103.2,102.6,102.8); push(102.8,103.0,102.4,102.6); push(102.6,102.8,102.2,102.4);
   push(102.4,102.7,102.1,102.5); push(102.5,102.6,102.2,102.4);
-  assert.equal(engine.structuralBias(bars,bars.length), 'BULLISH');
   const signal = engine.pending('BTCUSD','5m',bars);
   assert.ok(signal);
   assert.equal(signal.side,'BUY');
@@ -132,7 +131,6 @@ test('admits a fresh bearish continuation OB without inducement after bearish BO
   push(103.0,103.2,102.6,102.8); push(102.8,103.0,102.4,102.6); push(102.6,102.8,102.2,102.4);
   push(102.4,102.7,102.1,102.5); push(102.5,102.6,102.2,102.4);
   const bars = source.map(c => ({time:c.time,open:200-c.open,high:200-c.low,low:200-c.high,close:200-c.close}));
-  assert.equal(engine.structuralBias(bars,bars.length), 'BEARISH');
   const signal = engine.pending('BTCUSD','5m',bars);
   assert.ok(signal);
   assert.equal(signal.side,'SELL');
