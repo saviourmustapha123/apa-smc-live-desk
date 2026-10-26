@@ -139,7 +139,7 @@ function runBacktest(symbol, tf, bars, provider, exact) {
     const history = bars.slice(Math.max(0, i + 1 - 1000), i + 1);
     const signal = engine.pending(symbol, tf, history);
     if (!signal || signal.time !== bars[i].time) continue;
-    const key = [signal.orderBlock?.originTime, signal.side, signal.entry, signal.sl, signal.tp].join('|');
+    const key = [signal.orderBlock?.originTime, signal.side, signal.entry, signal.sl].join('|');
     if (!unique.has(key)) unique.set(key, signal);
   }
   const candidates = [...unique.values()].sort((a,b)=>a.time-b.time || (Number(a.rr)||0)-(Number(b.rr)||0));
