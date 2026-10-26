@@ -77,3 +77,10 @@ test('the replay VM exposes the same explicit minimum reward-risk configuration 
   assert.ok(result.diagnostic);
   for (const signal of result.signals) assert.ok(signal.rr >= 3);
 });
+
+test('rejects a stop that is implausibly small relative to recent ATR', () => {
+  const engine = createProductionScannerReplay({ now: NOW });
+  const bars = candles(120);
+  const result = engine.structuralTarget('BUY', 100, 99.999, null, null, bars);
+  assert.equal(result, null, 'micro-stop must be rejected before calculating an inflated RR');
+});
