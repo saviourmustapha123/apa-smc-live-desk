@@ -42,9 +42,9 @@ async function fetchBinanceVisionDaily(symbol, interval, days = 35) {
         const path = join(directory, file);
         await writeFile(path, Buffer.from(await response.arrayBuffer()));
         const csv = execFileSync('unzip', ['-p', path], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
-        return csv.split(/\\r?\\n/).map(line => {
+        return csv.split(/\r?\n/).map(line => {
           const row = line.split(',');
-          if (!/^\\d+$/.test(row[0] || '') || row.length < 6) return null;
+          if (!/^\d+$/.test(row[0] || '') || row.length < 6) return null;
           const bar = { time: Math.floor(Number(row[0]) / 1000), open: Number(row[1]), high: Number(row[2]), low: Number(row[3]), close: Number(row[4]) };
           return Number.isFinite(bar.time) && [bar.open,bar.high,bar.low,bar.close].every(Number.isFinite) &&
             bar.high >= Math.max(bar.open,bar.close,bar.low) && bar.low <= Math.min(bar.open,bar.close,bar.high) ? bar : null;
