@@ -56,20 +56,17 @@ if (start < 0 || next < 0) {
   }
   requireApp('Order-block retest requires an FVG-backed displacement', /const hasFvg=i>=2&&\(bullish\?impulse\.low>b\[i-2\]\.high:impulse\.high<b\[i-2\]\.low\);[\s\S]*?if\(!hasFvg\)continue;/,
     'Trade-grade OB retests require displacement, a close-confirmed structure break, a three-candle FVG and a first fresh retest');
-  if (!/label:\s*[^,\n]*BREAKER|kind:\s*['\"]breaker-block['\"]|text:\s*[^\n]*BREAKER|row\(['\"]Breaker block/.test(app)) {
-    pass('Chart maps order blocks only; no breaker-block mapping', 'The chart must not display breaker-block labels, markers, or separate breaker-block zones');
-  } else {
-    fail('Chart maps order blocks only; no breaker-block mapping', 'Remove remaining breaker-block chart labels, markers, or separate zones');
-  }
+  requireApp('Breaker blocks have their own qualified chart zone', /BREAKER BLOCK · FAILED OB \\+ OPPOSITE SHIFT \\+ RETEST/,
+    'A breaker is drawn separately only after an FVG-backed OB fails, opposite structural displacement occurs, and price returns to reject the failed zone');
   requireApp('Fresh order-block first retest is enforced', /let invalidAt=-1,previousTouch=false;[\s\S]*?if\(invalidAt<0&&!previousTouch&&touched/,
     'An already mitigated zone cannot be reused as a fresh order-block entry');
 
-  requireApp('Pending OB waits for its matching BOS-linked IDM sweep', /const latestIdm=latestInducementProxy\(b,k\)[\s\S]*?latestIdm\.status!=='SWEPT'[\s\S]*?latestIdm\.bosTime!==impulse\.time/,
-    'A pending OB is not published until its own BOS-linked inducement has swept and reclaimed');
+  requireApp('Pending OB requires FVG-backed BOS and fresh zone while inducement remains optional', /const linkedIdm=!![\\s\\S]*?Inducement not present in this setup; not assumed or fabricated/,
+    'A pending OB needs its own FVG-backed displacement and a fresh zone; linked IDM is recorded when present but absence alone does not suppress the setup');
   requireApp('Inducement sweep clears nearby equal-level liquidity', /const nearby=candidates\.filter[\s\S]*?bar\.low<floor&&bar\.close>ceiling[\s\S]*?bar\.high>ceiling&&bar\.close<floor/,
     'Where nearby equal-level liquidity exists, the sweep must clear the outer pool and reclaim the cluster');
-  requireApp('OB retest is sequenced after IDM sweep', /idm\.bosTime===impulse\.time[\s\S]*?idm\.eventIndex>i[\s\S]*?ORDER BLOCK RETEST · IDM \+ LIQUIDITY SWEPT/,
-    'The live OB entry path requires the linked inducement/liquidity sweep before first mitigation');
+  requireApp('OB retest records inducement only when its full sequence is linked', /const linkedIdm=!![\\s\\S]*?ORDER BLOCK RETEST · IDM \\+ LIQUIDITY SWEPT[\\s\\S]*?ORDER BLOCK RETEST · FVG \\+ BOS/,
+    'A linked IDM sweep is recorded when it exists; otherwise the valid FVG-backed BOS retest remains distinct and is not mislabeled as IDM');
   requireApp('IDM and nearby liquidity have separate physical chart zones', /NEARBY LIQUIDITY POOL · IDM SEQUENCE[\s\S]*?kind:'inducement'/,
     'The map distinguishes the inducement level from nearby liquidity that must be cleared and reclaimed');
 }
