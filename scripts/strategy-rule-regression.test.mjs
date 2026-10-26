@@ -44,3 +44,12 @@ test('QQQ ETF fallback uses Yahoo-supported intraday history windows', async () 
   const source = await readFile(new URL('./production-history-backtest.mjs', import.meta.url), 'utf8');
   assert.match(source, /const range = tf === '1m' \? '7d' : tf === '5m' \? '14d' : '60d'/);
 });
+
+test('production scanner permits a displaced same-direction BOS entry only after directional liquidity sweep', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(source, /const sameDirectionBreak=side==='BUY'\?upBreak:downBreak;/);
+  assert.match(source, /const breakoutEntry=sameDirectionBreak&&recentStructuralDisplacement&&recentDirectionalSweep;/);
+  assert.match(source, /const validatedSequence=\(hasEntryZone&&recentStructuralDisplacement&&hasLiquidityConfluence\)\|\|breakoutEntry;/);
+  assert.match(source, /target\.rr<MIN_REWARD_RISK/);
+});
