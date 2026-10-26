@@ -1,0 +1,47 @@
+name: Deploy QQQUSDT Cloudflare Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'proxy/qqqusdt-worker.js'
+      - '.github/workflows/deploy-qqqusdt-worker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apa-smc-qqqusdt-cloudflare-worker
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy proxy or clearly report missing credentials
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check whether Cloudflare deployment credentials are configured
+        id: credentials
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [[ -n "$CLOUDFLARE_API_TOKEN" && -n "$CLOUDFLARE_ACCOUNT_ID" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare deployment credentials are configured."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Cloudflare Worker source is in GitHub, but deployment was skipped because CLOUDFLARE_API_TOKEN and/or CLOUDFLARE_ACCOUNT_ID secrets are missing."
+          fi
+
+      - name: Deploy updated QQQUSDT worker
+        if: steps.credentials.outputs.available == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy proxy/qqqusdt-worker.js --name apa-smc-qqqusdt-proxy --compatibility-date 2026-10-27
