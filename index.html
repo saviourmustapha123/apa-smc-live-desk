@@ -1392,7 +1392,13 @@ function analyse(){
  if(ob){const obBullish=ob.side==='BULLISH',obColor=obBullish?'#35d39a':'#ff9c69';levelLines.push([(obBullish?'Demand':'Supply')+' OB high',ob.high,obColor]);levelLines.push([(obBullish?'Demand':'Supply')+' OB low',ob.low,obColor]);s.zoneDefs.push({start:ob.time,end:x.time,high:ob.high,low:ob.low,label:(obBullish?'BULLISH DEMAND':'BEARISH SUPPLY')+' ORDER BLOCK · DISPLACEMENT + BOS',color:obColor,fill:obColor+'32',extendRight:true,kind:'order-block'});marks.push({time:ob.time,position:obBullish?'belowBar':'aboveBar',color:obColor,shape:'square',text:obBullish?'BULLISH OB':'BEARISH OB'})}
  // Draw a breaker only after the FVG-backed OB failed, the opposite structural displacement occurred,
  // and price returned to reject the original zone. Crossing an OB alone is never a breaker.
- if(breaker){const breakerColor=breaker.side==='BULLISH'?'#a78bfa':'#f97316';s.zoneDefs.push({start:breaker.time,end:x.time;s.zoneDefs.push({start:b.at(-3).time,end:x.time,high:b.at(-3).low,low:x.high,label:'SMC BEARISH FVG',color:'#ff9c69',fill:'#ff9c6926'})}if(fvgBull){levelLines.push(['Bullish FVG upper',x.low,'#35d39a']);levelLines.push(['Bullish FVG lower',b.at(-3).high,'#35d39a']);s.zoneDefs.push({start:b.at(-3).time,end:x.time,high:x.low,low:b.at(-3).high,label:'SMC BULLISH FVG',color:'#35d39a',fill:'#35d39a26'})}
+ if(breaker){
+  const breakerColor=breaker.side==='BULLISH'?'#a78bfa':'#f97316';
+  s.zoneDefs.push({start:breaker.time,end:x.time,high:breaker.high,low:breaker.low,label:(breaker.side==='BULLISH'?'BULLISH':'BEARISH')+' BREAKER BLOCK · FAILED OB + OPPOSITE SHIFT + RETEST',color:breakerColor,fill:breakerColor+'30',extendRight:true,kind:'breaker'});
+  if(breaker.retestTime)marks.push({time:breaker.retestTime,position:breaker.side==='BULLISH'?'belowBar':'aboveBar',color:breakerColor,shape:'square',text:'BREAKER RETEST'});
+ }
+ if(fvgBear){levelLines.push(['Bearish FVG lower',b.at(-3).low,'#ff9c69']);levelLines.push(['Bearish FVG upper',x.high,'#ff9c69']);s.zoneDefs.push({start:b.at(-3).time,end:x.time,high:b.at(-3).low,low:x.high,label:'SMC BEARISH FVG',color:'#ff9c69',fill:'#ff9c6926'})}
+ if(fvgBull){levelLines.push(['Bullish FVG upper',x.low,'#35d39a']);levelLines.push(['Bullish FVG lower',b.at(-3).high,'#35d39a']);s.zoneDefs.push({start:b.at(-3).time,end:x.time,high:x.low,low:b.at(-3).high,label:'SMC BULLISH FVG',color:'#35d39a',fill:'#35d39a26'})}
  if(sbr)levelLines.push(['SBR retest',priorSupport,'#ff9c69']);if(rbs)levelLines.push(['RBS retest',priorResistance,'#35d39a']);
  for(const z of h.slice(-8))marks.push({time:z.t,position:'aboveBar',color:'#d1d5db',shape:'circle',text:'SH'});for(const z of l.slice(-8))marks.push({time:z.t,position:'belowBar',color:'#c4b5fd',shape:'circle',text:'SL'});
   if(qmlMatch){
