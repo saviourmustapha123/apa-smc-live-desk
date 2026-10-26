@@ -44,6 +44,7 @@ assert.ok(html.includes("first retest/mitigation of the FVG-backed OB after the 
 assert.ok(!blockFn.includes('if(idm&&idm.status===\'SWEPT\''), 'OB retest must not hard-require inducement');
 const rulebook = readFileSync(new URL('../STRATEGY_RULEBOOK.md', import.meta.url), 'utf8');
 assert.ok(rulebook.includes('Continuation OBs do not require inducement') && rulebook.includes('first pullback can mitigate a fresh OB'), 'rulebook must preserve continuation OBs without inducement and valid first mitigation');
+assert.ok(rulebook.includes('Continuation after BOS: new extreme, OB retest, next leg') && rulebook.includes('Bullish continuation: established bullish structure') && rulebook.includes('Bearish continuation: established bearish structure'), 'rulebook must cover both directional BOS → new extreme → OB retest → continuation sequences');
 
 console.log('PASS: inline JavaScript syntax');
 console.log('PASS: 3 markets × 11 timeframe UI/scan contract');
