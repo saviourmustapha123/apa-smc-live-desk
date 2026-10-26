@@ -24,6 +24,14 @@ test('replays the actual production scanner source, not the proxy strategy', () 
   }
 });
 
+
+test('replay exposes the production pending-order-block detector separately from retrospective candidates', () => {
+  const engine = createProductionScannerReplay({ now: NOW });
+  const bars = candles(120);
+  assert.equal(typeof engine.pending, 'function');
+  assert.equal(engine.pending('BTCUSD', '5m', bars), null, 'ordinary oscillating candles should not fabricate a pending OB setup');
+});
+
 test('excludes open candles and reports insufficient closed history', () => {
   const engine = createProductionScannerReplay({ now: NOW });
   const result = engine.scan('BTCUSD', '5m', candles(35, { openLast: true }));
