@@ -1059,6 +1059,11 @@ function structuralTarget(side,entry,stop,highPivot,lowPivot,bars){
  const lastIndex=bars.length-1,confirmBefore=lastIndex-Math.max(2,+s.k||3);
  const risk=Math.abs(entry-stop);
  if(!(Number.isFinite(risk)&&risk>0))return null;
+ // Reject structurally implausible micro-stops: an RR number is not meaningful
+ // when the stop is smaller than 0.20 ATR of recent closed-candle volatility.
+ // This is a conservative risk-quality floor, not a promise of profitability.
+ const recentAtr=atr((bars||[]).filter(bar=>!bar.isOpen).slice(-40));
+ if(Number.isFinite(recentAtr)&&recentAtr>0&&risk<recentAtr*0.20)return null;
  // Choose the nearest confirmed opposing swing that actually permits 3R, but only if it remains ahead of price.
  // A broken target is behind price, not a valid future take-profit level.
  const candidates=(side==='BUY'
