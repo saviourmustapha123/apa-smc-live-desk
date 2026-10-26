@@ -103,3 +103,23 @@ test('the replay VM exposes the same explicit minimum reward-risk configuration 
   assert.ok(result.diagnostic);
   for (const signal of result.signals) assert.ok(signal.rr >= 3);
 });
+
+
+test('admits a fresh bearish continuation OB without inducement after bearish BOS', () => {
+  const engine = createProductionScannerReplay({ now: NOW });
+  const source = candles(60, { lastTime: Math.floor(NOW / 1000) - 9 * 300 });
+  const trend = [[100.1,100.6,99.9,100.4],[100.4,100.8,100.2,100.7],[100.7,100.9,100.4,100.8],[100.8,100.8,100.2,100.3],[100.3,100.6,100.0,100.2],[100.2,101.0,100.1,100.8],[100.8,101.2,100.6,101.0],[101.0,101.3,100.8,101.2],[101.2,101.1,100.6,100.8],[100.8,100.9,100.4,100.7],[100.7,101.4,100.6,101.2],[101.2,101.6,101.0,101.4],[101.4,101.7,101.2,101.6],[101.6,101.5,101.0,101.2],[101.2,101.4,100.9,101.1]];
+  trend.forEach((c,i)=>{const j=source.length-trend.length+i;source[j]={time:source[j].time,open:c[0],high:c[1],low:c[2],close:c[3]};});
+  const push = (open, high, low, close) => source.push({ time: source.at(-1).time + 300, open, high, low, close });
+  push(100.2,100.4,99.3,99.6); push(99.6,100.1,99.5,100.0);
+  push(100.5,103.7,101.2,103.4); push(103.0,103.2,102.6,102.8);
+  push(102.8,103.0,102.4,102.6); push(102.6,102.8,102.2,102.4);
+  push(102.4,102.7,102.1,102.5); push(102.5,102.6,102.2,102.4);
+  const bars = source.map(c => ({time:c.time,open:200-c.open,high:200-c.low,low:200-c.high,close:200-c.close}));
+  const signal = engine.pending('BTCUSD','5m',bars);
+  assert.ok(signal);
+  assert.equal(signal.side,'SELL');
+  assert.ok(signal.rr >= 3);
+  assert.match(signal.setupType,/continuation/);
+  assert.ok(signal.reason.some(reason=>reason.includes('Inducement not present')));
+});
