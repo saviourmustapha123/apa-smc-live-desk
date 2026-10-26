@@ -60,6 +60,6 @@ test('historical replay reports setup-type outcomes separately and preserves sig
   assert.match(source, /Outcome analysis by setup type/);
   assert.match(source, /patternGroups/);
   assert.match(source, /exact-versus-proxy feed/);
-  assert.match(source, /evidence: '\+s\.reason\.join/);
+  assert.match(source, /evidence: '\s*\+s\.reason\.join/);
   assert.match(source, /Expectancy R/);
 });
