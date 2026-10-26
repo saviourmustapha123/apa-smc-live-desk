@@ -143,12 +143,20 @@ test('QQQUSDT supports Bybit and Binance venue-specific quotes, candles, and cac
   assert.match(html, /v5\/market\/tickers\?category=linear&symbol=QQQUSDT/);
   assert.match(html, /id="qqqProvider"/);
   assert.match(html, /function qqqCacheSymbol\(/);
-  assert.match(html, /qqqUrl\('\/fapi\/v1\/klines\?'\+q\)/);
-  assert.match(html, /qqqUrl\('\/fapi\/v1\/ticker\/price\?symbol=QQQUSDT'\)/);
+  assert.match(html, /qqqJson\('\/fapi\/v1\/klines\?'\+q\)/);
+  assert.match(html, /qqqJson\('\/fapi\/v1\/ticker\/price\?symbol=QQQUSDT'\)/);
   assert.match(html, /connect-src 'self' https:\/\/biquote\.io https:\/\/fapi\.binance\.com https:\/\/api\.bybit\.com/);
   assert.match(html, /if\(sym==='QQQUSDT'\)/);
   assert.match(html, /if\(sym==='QQQUSDT'\)return fetchBarsRaw\(sym,tf/);
 });
+test('QQQUSDT proxy failures fall back to direct exchange endpoints and report both failures', () => {
+  assert.match(html, /async function qqqJson\(path\)/);
+  assert.match(html, /QQQUSDT proxy failed; falling back to direct Binance feed/);
+  assert.match(html, /QQQUSDT proxy failed; trying direct Bybit endpoints/);
+  assert.match(html, /direct Binance feed failed/);
+  assert.match(html, /Bybit feed unavailable via proxy and direct endpoints/);
+});
+
 test('QQQUSDT risk sizing uses linear contract units instead of labelling the quantity as BTC', () => {
   assert.match(html, /QQQUSDT contract units \(linear USDT-margined estimate\)/);
 });
