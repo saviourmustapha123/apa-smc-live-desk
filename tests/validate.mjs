@@ -24,6 +24,7 @@ assert.ok(html.includes('const signalSets=scanSets;'), 'top-down scan must inspe
 assert.ok(html.includes('if(!hasFvg)continue;'), 'unqualified OBs without FVG must be rejected');
 assert.ok(html.includes('if(!fvgConfirmed)continue;'), 'pending OB setups must require associated FVG');
 assert.ok(html.includes('targetAlreadyConsumed'), 'pending target freshness guard must exist');
+assert.ok(html.includes('const structureEvent=bullish?') && html.includes('contextMode') && html.includes('post-CHoCH'), 'pending OBs must distinguish trend-shift context from continuation context');
 assert.ok(html.includes('Entry already touched before pending order activation') && html.includes('entryTouchedBeforeOrderActive'), 'a retest discovered after candle close must not become a false pending entry');
 assert.ok(html.includes('BREAKER BLOCK · FAILED OB + OPPOSITE SHIFT + RETEST'), 'breaker zones must be explicitly mapped');
 assert.ok(html.includes('function signalBarEndMs(tf,timeSeconds)'), 'calendar timeframe outcome timing must be handled');
