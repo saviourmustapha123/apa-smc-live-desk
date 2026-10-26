@@ -19,6 +19,9 @@ test('breaker block requires original OB invalidation, movement fully away, oppo
   assert.match(detector, /if\(!movedAway\)continue/);
   assert.ok(detector.indexOf('if(fullyAway)movedAway=true;') < detector.indexOf('if(!movedAway)continue') && detector.indexOf('if(!movedAway)continue') < detector.indexOf('if(swing&&(flipped==='));
   assert.match(detector, /if\(swing&&\(flipped==='SELL'\?/);
+  assert.match(detector, /const previous=b\[n-2\]/);
+  assert.match(detector, /previous\.close<zone\.low&&current\.high>=zone\.low:previous\.close>zone\.high&&current\.low<=zone\.high/);
+  assert.match(detector, /oppositeBreakAt>movedAwayAt/);
   assert.match(detector, /returnedFromFarSide/);
   assert.match(detector, /const reject=flipped==='SELL'\?current\.close<zone\.low&&current\.close<current\.open:current\.close>zone\.high&&current\.close>current\.open/);
   assert.match(detector, /if\(movedAway&&oppositeBreak&&returnedFromFarSide&&reject\)events\.push/);
