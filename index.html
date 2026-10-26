@@ -421,6 +421,7 @@ function pendingOrderBlockOpportunity(symbol,tf,bars){
   const reasons=[
    (bullish?'Bullish':'Bearish')+' close-confirmed '+structureEvent,
    'ATR-qualified displacement + three-candle FVG',
+   (bullish?'Post-BOS higher high':'Post-BOS lower low')+' confirmed before first OB mitigation',
    'Inducement is optional for a valid FVG-backed OB; do not fabricate it',
    'Close-confirmed '+structureEvent+' + ATR-qualified displacement + FVG',
    (bullish?'Demand':'Supply')+' order block remains fresh and unmitigated',
@@ -533,7 +534,7 @@ function scanOpportunityHistory(symbol,tf,bars){
   if(blockRetest&&(!side||side===blockRetest.side)&&((blockRetest.side==='BUY'&&up)||(blockRetest.side==='SELL'&&dn))){
    side=blockRetest.side;
    reasons.push(blockRetest.type);
-   reasons.push((blockRetest.structureEvent||'BOS')+' · '+(blockRetest.contextMode||'STRUCTURE UNCONFIRMED')+' · first retest/mitigation of the FVG-backed OB after the structural break');
+   reasons.push((blockRetest.structureEvent||'BOS')+' · '+(blockRetest.contextMode||'STRUCTURE UNCONFIRMED')+' · post-BOS '+(blockRetest.side==='BUY'?'higher high':'lower low')+' confirmed before first OB retest/mitigation');
    if(blockRetest.inducementSweepAt!=null)reasons.push('BOS-linked inducement and nearby liquidity swept before first OB mitigation');
   }
   // Inducement becomes a trade input only when a post-BOS liquidity probe is swept
