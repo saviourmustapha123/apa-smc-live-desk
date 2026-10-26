@@ -47,6 +47,18 @@ For a bullish OB, locate the last bearish candle (or defined opposing candle clu
 - If price has already mitigated the zone, do not issue a fresh first-retest pending signal from it.
 - A valid OB does not have to be called an inducement. If an inducement model is present, show the relationship rather than merging the labels.
 
+### Continuation sequence: BOS → new high/low → first OB mitigation
+
+For a continuation setup, the scanner must distinguish the structural break from the later extension and the later return to the originating OB. The qualifying sequence is:
+
+1. A close-confirmed BOS in the direction of the established trend, with the displacement and same-impulse FVG required by the OB rule. A first break against the prior trend may be a CHoCH/trend shift; subsequent aligned breaks can qualify as continuation BOS.
+2. Price extends beyond the BOS impulse extreme to establish a fresh high for bullish continuation or a fresh low for bearish continuation.
+3. Only after that extension, price returns to the still-unmitigated originating OB. The first valid touch/mitigation is recorded as such, with a directional rejection/confirmation before a retest entry can qualify.
+4. If price touches the OB before the required extension, the sequence is not a fresh-high/low-before-mitigation continuation setup. If the zone was touched earlier, do not relabel a later touch as the first mitigation.
+5. A pending untouched-OB plan may remain pending only while the zone is unmitigated, uninvalidated, the target remains ahead of price, and the required post-BOS extension has already occurred. After first mitigation, evaluate the retest/trigger lifecycle rather than emitting the same untouched pending setup again.
+
+Apply the sequence symmetrically to bullish and bearish structure. A pullback may contain inducement, but inducement is not mandatory unless a specific inducement entry model is being evaluated. QML is separate and optional. The first break after a trend shift must not be mislabeled as continuation BOS without subsequent aligned structure evidence.
+
 ## Fair Value Gap (FVG) and inverse FVG (iFVG)
 
 - Bullish FVG: candle 3 low is above candle 1 high; the gap is between those prices.
