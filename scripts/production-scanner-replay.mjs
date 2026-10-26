@@ -34,6 +34,7 @@ export function createProductionScannerReplay({ now = Date.now(), k = 3, displac
     '\nconst strategyScanDiagnostics = new Map();' +
     '\nthis.__scan = scanOpportunityHistory;' +
     '\nthis.__targetLevelUnreached = targetLevelUnreached;' +
+    '\nthis.__structuralTarget = structuralTarget;' +
     '\nthis.__diagnostics = () => strategyScanDiagnostics;';
   new Script(source, { filename: 'production-scanner-replay.vm.js' }).runInContext(context);
   return {
@@ -44,6 +45,9 @@ export function createProductionScannerReplay({ now = Date.now(), k = 3, displac
     },
     targetLevelUnreached(side, target, bars, targetIndex) {
       return context.__targetLevelUnreached(side, target, bars, targetIndex);
+    },
+    structuralTarget(side, entry, stop, highPivot, lowPivot, bars) {
+      return context.__structuralTarget(side, entry, stop, highPivot, lowPivot, bars);
     }
   };
 }
