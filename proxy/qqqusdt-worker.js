@@ -25,12 +25,27 @@ function validIntegerParam(url, key, min, max) {
   return Number.isSafeInteger(n) && n >= min && n <= max;
 }
 async function fetchJson(url) {
-  const res = await fetch(url, { method: "GET", headers: { "Accept": "application/json" }, redirect: "follow" });
-  const body = await res.text();
-  if (!res.ok) throw new Error("HTTP " + res.status + " from " + new URL(url).hostname);
-  let data;
-  try { data = JSON.parse(body); } catch { throw new Error("Non-JSON response from " + new URL(url).hostname); }
-  return { data, contentType: res.headers.get("content-type") || "application/json" };
+  const original = new URL(url);
+  const candidates = [original];
+  // Bybit's alternate public API hostname can work when the primary hostname
+  // is region-restricted. Keep the same endpoint and query; never synthesize prices.
+  if (original.hostname === "api.bybit.com") {
+    const alternate = new URL(original);
+    alternate.hostname = "api.bytick.com";
+    candidates.push(alternate);
+  }
+  let lastError;
+  for (const candidate of candidates) {
+    try {
+      const res = await fetch(candidate.toString(), { method: "GET", headers: { "Accept": "application/json" }, redirect: "follow" });
+      const body = await res.text();
+      if (!res.ok) throw new Error("HTTP " + res.status + " from " + candidate.hostname);
+      let data;
+      try { data = JSON.parse(body); } catch { throw new Error("Non-JSON response from " + candidate.hostname); }
+      return { data, contentType: res.headers.get("content-type") || "application/json" };
+    } catch (error) { lastError = error; }
+  }
+  throw lastError || new Error("All configured market data hosts failed");
 }
 function binanceKlineUrl(incoming) {
   const interval = incoming.searchParams.get("interval") || "1m";
