@@ -16,8 +16,10 @@ const failures = [];
 const reports = [];
 
 async function fetchBars(symbol, interval) {
-  const aggregateHours = interval === '4h' ? 4 : interval === '8h' ? 2 : interval === '12h' ? 3 : 1;
-  const sourceInterval = interval === '4h' ? '1h' : aggregateHours > 1 ? '4h' : interval;
+  // Prefer native 4h candles where available. Only build 8h/12h from valid
+  // 4h source bars; avoid the earlier 1h->4h double-aggregation path.
+  const aggregateHours = interval === '8h' ? 2 : interval === '12h' ? 3 : 1;
+  const sourceInterval = aggregateHours > 1 ? '4h' : interval;
   const sourceSeconds = TIMEFRAME_SECONDS[sourceInterval];
   let rows;
   let normalise;
