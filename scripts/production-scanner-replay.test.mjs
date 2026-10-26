@@ -48,6 +48,21 @@ test('admits a fresh continuation OB without inducement', () => {
   assert.ok(signal.rr >= 3);
   assert.match(signal.setupType,/continuation/);
   assert.ok(signal.reason.some(reason=>reason.includes('Inducement not present')));
+
+  // Once the entry zone has actually been touched, the same setup must not be
+  // re-issued as a fresh pending limit idea after the fact.
+  const retest = {
+    time: bars.at(-1).time + 300,
+    open: signal.entry + 0.1,
+    high: signal.entry + 0.2,
+    low: signal.entry - 0.2,
+    close: signal.entry + 0.05
+  };
+  assert.equal(
+    engine.pending('BTCUSD', '5m', [...bars, retest]),
+    null,
+    'a mitigated OB must not be backdated as a new pending entry'
+  );
 });
 
 test('excludes open candles and reports insufficient closed history', () => {
