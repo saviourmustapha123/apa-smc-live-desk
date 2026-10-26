@@ -19,16 +19,24 @@ The app routes Bybit requests through the Worker when a proxy URL is configured 
 - This is a read-only public market-data proxy, not a trading endpoint.
 - The app and Worker still require internet access.
 - Do not enter passwords, API keys or trading credentials into the Worker or website.
-- Deploying the Worker is separate from GitHub because it requires access to your Cloudflare account. The repository cannot deploy into that account automatically.
+- The Worker is a separate Cloudflare deployment. GitHub now has a deployment workflow, but it can deploy only when the repository has the required Cloudflare credentials configured.
 
+## Enable automatic Worker deployment
+
+1. In Cloudflare, create an API token with permission to edit Workers and note your Cloudflare account ID.
+2. In this GitHub repository, open **Settings → Secrets and variables → Actions → Secrets**.
+3. Add repository secrets named `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Never paste either value into source files or chat.
+4. The workflow **Deploy QQQUSDT Cloudflare Worker** deploys `proxy/qqqusdt-worker.js` when that file changes. It also supports manual runs from **Actions**.
+5. Verify the Worker endpoint and then run **APA SMC background health check**. A successful GitHub deployment alone is not proof that both upstream exchanges are reachable.
+
+If you do not want to configure GitHub secrets, use the manual Cloudflare editor steps above after every Worker source change.
 
 ## Enable the same QQQUSDT feed in background GitHub Actions
 
-The browser's saved proxy setting is local to that browser and is not visible to GitHub Actions. To let the background paper trader and historical backtest use the same exact QQQUSDT futures feed:
+The browser's saved proxy setting is local to that browser and is not visible to GitHub Actions. The production-history workflow defaults to the known Worker URL; you may override it for a different Worker:
 
-1. Deploy the latest `proxy/qqqusdt-worker.js` in Cloudflare Workers and copy its HTTPS `.workers.dev` URL.
-2. In this GitHub repository, open **Settings → Secrets and variables → Actions → Variables**.
-3. Create a repository variable named `QQQ_PROXY_URL` with the Worker URL as its value. Do not include query parameters or credentials.
-4. Run **APA SMC background paper trader** and **APA SMC production history backtest** from the Actions tab. Their reports will show whether the exact QQQUSDT feed is reachable.
+1. Open **Settings → Secrets and variables → Actions → Variables**.
+2. Create or update the repository variable `QQQ_PROXY_URL` with the Worker HTTPS URL. Do not include query parameters or credentials.
+3. Run **APA SMC background paper trader** and **APA SMC production history backtest** from the Actions tab. Their reports will show whether exact QQQUSDT futures data is reachable.
 
-The Worker proxies public market data only. It does not place orders. If the variable is absent or the Worker cannot reach the exchange, the background report marks QQQUSDT unavailable instead of substituting QQQ ETF prices.
+The Worker proxies public market data only. It does not place orders. If the Worker cannot reach an exchange, the report marks QQQUSDT unavailable instead of substituting QQQ ETF prices as exact-contract data.
