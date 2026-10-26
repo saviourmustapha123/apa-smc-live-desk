@@ -32,6 +32,22 @@ test('replay exposes the production pending-order-block detector separately from
   assert.equal(engine.pending('BTCUSD', '5m', bars), null, 'ordinary oscillating candles should not fabricate a pending OB setup');
 });
 
+test('admits a fresh continuation OB without inducement', () => {
+  const engine = createProductionScannerReplay({ now: NOW });
+  const bars = candles(60);
+  const push = (open, high, low, close) => bars.push({ time: bars.at(-1).time + 300, open, high, low, close });
+  push(100.2,100.4,99.3,99.6); push(99.6,100.1,99.5,100.0);
+  push(100.5,103.7,101.2,103.4); push(103.0,103.2,102.6,102.8);
+  push(102.8,103.0,102.4,102.6); push(102.6,102.8,102.2,102.4);
+  push(102.4,102.7,102.1,102.5); push(102.5,102.6,102.2,102.4);
+  const signal = engine.pending('BTCUSD','5m',bars);
+  assert.ok(signal);
+  assert.equal(signal.side,'BUY');
+  assert.ok(signal.rr >= 3);
+  assert.match(signal.setupType,/continuation/);
+  assert.ok(signal.reason.some(reason=>reason.includes('Inducement not present')));
+});
+
 test('excludes open candles and reports insufficient closed history', () => {
   const engine = createProductionScannerReplay({ now: NOW });
   const result = engine.scan('BTCUSD', '5m', candles(35, { openLast: true }));
