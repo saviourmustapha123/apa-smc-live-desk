@@ -43,6 +43,22 @@ if (start < 0 || next < 0) {
   const requireApp = (name, pattern, detail) =>
     pattern.test(app) ? pass(name, detail) : fail(name, detail);
 
+  const blockStart = app.indexOf('function detectRecentBlockRetest(');
+  const blockEnd = app.indexOf('\nfunction pendingOrderBlockOpportunity(', blockStart);
+  if (blockStart < 0 || blockEnd < 0) {
+    fail('Order-block and breaker detector can be isolated', 'Could not locate production block detector boundaries');
+  } else {
+    const blockDetector = app.slice(blockStart, blockEnd);
+    const requireBlock = (name, pattern, detail) =>
+      pattern.test(blockDetector) ? pass(name, detail) : fail(name, detail);
+    requireBlock('Ordinary OB retest is separate from breaker retest', /type:'ORDER BLOCK RETEST · IDM \+ LIQUIDITY SWEPT'[\s\S]*type:'BREAKER BLOCK RETEST'/,
+      'Order block and breaker block have distinct lifecycle labels');
+    requireBlock('Breaker requires invalidation and movement fully beyond the old OB', /if\(invalidAt>=0&&touched\)[\s\S]*fullyAway=flipped==='SELL'\?candleAfterBreach\.high<zone\.low:candleAfterBreach\.low>zone\.high/,
+      'A breaker is not inferred from an ordinary first-touch OB retest');
+    requireBlock('Breaker requires opposite structure break and rejection on return', /oppositeBreak[\s\S]*returnedFromFarSide[\s\S]*if\(movedAway&&oppositeBreak&&returnedFromFarSide&&reject\)/,
+      'Requires departure, opposite structural break, return and directional rejection');
+  }
+
   requireApp('QML requires confirmed four-pivot structure', /function detectQmlStructure\([\s\S]*?z\[2\]\.p>z\[0\]\.p[\s\S]*?z\[3\]\.p<z\[1\]\.p[\s\S]*?prior\[j\]\.close<z\[1\]\.p/,
     'Bearish QML requires a head sweep and a close-confirmed break of the protected leg before the shoulder retest');
   requireApp('QML entry level maps to left shoulder', /const level=z\[0\]\.p[\s\S]*?status:rejected\?'RETEST_CONFIRMED':'WAITING_RETEST'/,
