@@ -63,7 +63,7 @@ if (start < 0 || next < 0) {
     'A pending OB is not published until its own BOS-linked inducement has swept and reclaimed');
   requireApp('Inducement sweep clears nearby equal-level liquidity', /const nearby=candidates\.filter[\s\S]*?bar\.low<floor&&bar\.close>ceiling[\s\S]*?bar\.high>ceiling&&bar\.close<floor/,
     'Where nearby equal-level liquidity exists, the sweep must clear the outer pool and reclaim the cluster');
-  requireApp('OB retest is sequenced after IDM sweep', /ORDER BLOCK RETEST · IDM \+ LIQUIDITY SWEPT[\s\S]*?idm\.bosTime===impulse\.time[\s\S]*?idm\.eventIndex>i/,
+  requireApp('OB retest is sequenced after IDM sweep', /idm\.bosTime===impulse\.time[\s\S]*?idm\.eventIndex>i[\s\S]*?ORDER BLOCK RETEST · IDM \+ LIQUIDITY SWEPT/,
     'The live OB entry path requires the linked inducement/liquidity sweep before first mitigation');
 }
 
