@@ -33,7 +33,7 @@ if (start < 0 || next < 0) {
     'Pattern and recent block retest helpers are invoked');
   requireScanner('Inducement sweep is directionally constrained', /latestInducementProxy[\s\S]*inducementSweep[\s\S]*eventIndex===hist\.length-1/,
     'Inducement proxy must be swept on the current candle and align with direction');
-  requireScanner('Structure, displacement, POI and liquidity sequence gate', /const sameDirectionBreak[\\s\\S]*const breakoutEntry[\\s\\S]*const validatedSequence[\\s\\S]*if\\(!validatedSequence\\)/,
+  requireScanner('Structure, displacement, POI and liquidity sequence gate', /const sameDirectionBreak[\s\S]*const breakoutEntry[\s\S]*const validatedSequence[\s\S]*if\(!validatedSequence\)/,
     'A candidate must pass a POI retest with displacement/liquidity, or a same-direction displaced structure break after a directional sweep; rejected candidates record why');
     requireScanner('Hard minimum 1:3 structural target gate', /structuralTarget\(side,entry,stop,hh,ll,hist\)[\s\S]*target\.rr<MIN_REWARD_RISK/,
     'Rejects missing targets and targets below 3R');
