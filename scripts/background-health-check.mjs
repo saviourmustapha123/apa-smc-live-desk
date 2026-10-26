@@ -66,24 +66,42 @@ try {
   } catch (e) { if (/HTTP (403|451)/.test(e.message)) warn('Bybit public market-data endpoint is region-restricted from this CI runner', e.message); else fail('Bybit QQQUSDT market feed', e.message); }
 
   const QQQ_PROXY = process.env.QQQ_PROXY_URL || 'https://apa-smc-qqqusdt-proxy.saviourmustapha123.workers.dev';
+  let proxyProvider = null, proxyFailure = 'No provider attempted';
   try {
-    const proxyTicker = await (await get(QQQ_PROXY + '/v5/market/tickers?category=linear&symbol=QQQUSDT')).json();
-    const ticker = proxyTicker.result?.list?.[0];
-    if (Number(proxyTicker.retCode) !== 0 || ticker?.symbol !== 'QQQUSDT' || !(Number(ticker.lastPrice) > 0)) {
-      throw new Error(proxyTicker.retMsg || 'Worker returned no valid QQQUSDT ticker');
+    const tickerData = await (await get(QQQ_PROXY + '/v5/market/tickers?category=linear&symbol=QQQUSDT')).json();
+    const ticker = tickerData.result?.list?.[0];
+    if (Number(tickerData.retCode) !== 0 || ticker?.symbol !== 'QQQUSDT' || !(Number(ticker.lastPrice) > 0)) {
+      throw new Error(tickerData.retMsg || 'Worker returned no valid Bybit ticker');
     }
-    pass('Configured Cloudflare QQQUSDT proxy ticker', ticker.lastPrice);
-    for (const [tf, interval] of [['1m','1'],['5m','5'],['15m','15'],['1h','60'],['4h','240'],['8h','480'],['12h','720'],['1d','D']]) {
+    const checks = [['1m','1'],['5m','5'],['15m','15'],['1h','60'],['4h','240'],['8h','480'],['12h','720'],['1d','D']];
+    for (const [tf, interval] of checks) {
       const data = await (await get(QQQ_PROXY + '/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + interval + '&limit=3')).json();
       const rows = data.result?.list;
-      const valid = Number(data.retCode) === 0 && Array.isArray(rows) && rows.length > 0 &&
-        rows.every(r => Array.isArray(r) && [0,1,2,3,4,5].every(i => Number.isFinite(Number(r[i]))));
-      if (!valid) throw new Error(tf + ' interval returned invalid candles: ' + (data.retMsg || 'no valid OHLCV rows'));
-      pass('Cloudflare QQQUSDT ' + tf + ' candles', rows.length + ' valid OHLCV rows');
+      if (Number(data.retCode) !== 0 || !Array.isArray(rows) || !rows.length ||
+          !rows.every(r => Array.isArray(r) && [0,1,2,3,4,5].every(i => Number.isFinite(Number(r[i]))))) {
+        throw new Error('Bybit ' + tf + ' interval returned invalid candles: ' + (data.retMsg || 'no valid OHLCV rows'));
+      }
     }
-  } catch (e) {
-    fail('Configured Cloudflare QQQUSDT proxy and eight execution intervals', e.message);
+    proxyProvider = 'Bybit';
+    pass('Cloudflare QQQUSDT proxy · Bybit ticker + eight intervals', 'ticker and 1m–1d OHLCV checks passed');
+  } catch (e) { proxyFailure = e.message; }
+  if (!proxyProvider) {
+    try {
+      const tickerData = await (await get(QQQ_PROXY + '/fapi/v1/ticker/price?symbol=QQQUSDT')).json();
+      if (tickerData.symbol !== 'QQQUSDT' || !(Number(tickerData.price) > 0)) throw new Error('Worker returned no valid Binance ticker');
+      const intervals = [['1m','1m'],['5m','5m'],['15m','15m'],['1h','1h'],['4h','4h'],['8h','8h'],['12h','12h'],['1d','1d']];
+      for (const [tf, interval] of intervals) {
+        const rows = await (await get(QQQ_PROXY + '/fapi/v1/klines?symbol=QQQUSDT&interval=' + interval + '&limit=3')).json();
+        if (!Array.isArray(rows) || !rows.length ||
+            !rows.every(r => Array.isArray(r) && [0,1,2,3,4,5,6].every(i => Number.isFinite(Number(r[i]))))) {
+          throw new Error('Binance ' + tf + ' interval returned invalid candles');
+        }
+      }
+      proxyProvider = 'Binance';
+      pass('Cloudflare QQQUSDT proxy · Binance ticker + eight intervals', 'ticker and 1m–1d OHLCV checks passed');
+    } catch (e) { proxyFailure += ' | Binance proxy: ' + e.message; }
   }
+  if (!proxyProvider) fail('Configured Cloudflare QQQUSDT proxy', proxyFailure);
 
   const checks = [
     ['minimum 1:3 reward/risk gate', /(?:rr\s*<\s*3|rr\s*<\s*MIN_REWARD_RISK)/.test(source)],
