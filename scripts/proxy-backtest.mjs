@@ -106,7 +106,7 @@ async function fetchBars(symbol, interval) {
           rows = archived;
           normalise = b => b;
           lastError = null;
-        } else if (lastError) {
+        } else {
           throw new Error('Binance Vision returned only ' + archived.length + ' valid 4h bars');
         }
       } catch (error) { lastError = error; }
