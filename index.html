@@ -245,8 +245,10 @@ function detectQmlStructure(bars,k){
  for(const p of raw){const last=swings.at(-1);if(!last||last.type!==p.type)swings.push(p);else if((p.type==='H'&&p.p>last.p)||(p.type==='L'&&p.p<last.p))swings[swings.length-1]=p}
  const atrNow=atr(prior)||Math.max(cur.high-cur.low,1e-8),tol=Math.max(atrNow*.08,Math.abs(cur.close)*1e-7);
  const candidates=[];
+ const maxPatternAge=Math.max(40,k*12);
  for(let i=0;i<=swings.length-4;i++){
   const z=swings.slice(i,i+4),priorSwings=swings.slice(0,i);
+  if(n-1-z[3].i>maxPatternAge)continue;
   const previousHigh=priorSwings.filter(p=>p.type==='H').at(-1),previousLow=priorSwings.filter(p=>p.type==='L').at(-1);
   if(z[0].type==='H'&&z[1].type==='L'&&z[2].type==='H'&&z[3].type==='L'){
    const priorUptrend=!!previousHigh&&!!previousLow&&z[0].p>previousHigh.p&&z[1].p>previousLow.p;
