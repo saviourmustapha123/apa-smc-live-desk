@@ -1223,11 +1223,14 @@ function recentQualifiedZones(b,k,dispMult){
  return {ob:blocks.at(-1)||null,breaker:breakers.at(-1)||null}
 }
 function latestInducementProxy(b,k){
- const pp=pivots(b,k),events=[];let trend='UNKNOWN';
+ const pp=pivots(b,k),events=[];let trend='UNKNOWN',hiIndex=0,loIndex=0,high=null,low=null;
+ // Advance confirmed-pivot cursors instead of rescanning all pivots on every bar.
  for(let i=1;i<b.length;i++){
-  const high=pp.h.filter(p=>p.i+k<i).at(-1),low=pp.l.filter(p=>p.i+k<i).at(-1);
+  while(hiIndex<pp.h.length&&pp.h[hiIndex].i+k<i)high=pp.h[hiIndex++];
+  while(loIndex<pp.l.length&&pp.l[loIndex].i+k<i)low=pp.l[loIndex++];
   const up=high&&b[i].close>high.p&&b[i-1].close<=high.p,down=low&&b[i].close<low.p&&b[i-1].close>=low.p;
-  if(up){events.push({i,side:'BULLISH',type:trend==='BEARISH'?'CHoCH':'BOS'});trend='BULLISH'}else if(down){events.push({i,side:'BEARISH',type:trend==='BULLISH'?'CHoCH':'BOS'});trend='BEARISH'}
+  if(up){events.push({i,side:'BULLISH',type:trend==='BEARISH'?'CHoCH':'BOS'});trend='BULLISH'}
+  else if(down){events.push({i,side:'BEARISH',type:trend==='BULLISH'?'CHoCH':'BOS'});trend='BEARISH'}
  }
  for(const event of events.filter(e=>e.type==='BOS').reverse()){
   const candidates=event.side==='BULLISH'?pp.l:pp.h;
@@ -1235,23 +1238,23 @@ function latestInducementProxy(b,k){
   if(!pivot)continue;
   const opposite=events.find(e=>e.i>event.i&&e.side!==event.side);
   if(opposite&&opposite.i<=pivot.i+k)continue;
+  const confirmIndex=Math.min(b.length,pivot.i+k+1),confirmAtr=atr(b.slice(0,confirmIndex))||Math.max(b[pivot.i].high-b[pivot.i].low,1e-8),tol=confirmAtr*.12;
+  // Keep a nearby equal-high/low pool attached to the inducement so the sweep
+  // must clear and reclaim the whole relevant cluster, not only one arbitrary pivot.
+  const nearby=candidates.filter(q=>q.i<pivot.i&&Math.abs(q.p-pivot.p)<=tol).map(q=>q.p);
+  const levels=[pivot.p,...nearby],floor=Math.min(...levels),ceiling=Math.max(...levels);
   let state='CANDIDATE',eventIndex=null,sweptLevels=[pivot.p];
   for(let j=pivot.i+k+1;j<b.length;j++){
-   const bar=b[j],a=atr(b.slice(0,j))||Math.max(bar.high-bar.low,1e-8),tol=a*.12;
-   // If near-equal swing liquidity sits beside the inducement, clear the pool's
-   // outer edge and close back beyond all included levels before marking SWEPT.
-   const nearby=candidates.filter(q=>q.i<pivot.i&&Math.abs(q.p-pivot.p)<=tol).map(q=>q.p);
-   const levels=[pivot.p,...nearby],floor=Math.min(...levels),ceiling=Math.max(...levels);
+   const bar=b[j];
    const swept=event.side==='BULLISH'?bar.low<floor&&bar.close>ceiling:bar.high>ceiling&&bar.close<floor;
    const broken=event.side==='BULLISH'?bar.close<pivot.p:bar.close>pivot.p;
-   if(swept){state='SWEPT';eventIndex=j;sweptLevels=levels;break}if(broken){state='INVALIDATED';eventIndex=j;break}
+   if(swept){state='SWEPT';eventIndex=j;sweptLevels=levels;break}
+   if(broken){state='INVALIDATED';eventIndex=j;break}
   }
   return {side:event.side,level:pivot.p,liquidityLevels:sweptLevels,time:b[pivot.i].time,bosTime:b[event.i].time,status:state,eventIndex};
  }
- return null
+ return null;
 }
-
-
 function chartSignalFor(log,symbol,tf){
  // One source of truth: the visible chart never promotes its own proxy trigger
  // into an actionable signal independent of production scanner admission.
