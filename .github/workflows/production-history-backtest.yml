@@ -39,7 +39,7 @@ jobs:
 
       - name: Run historical replay using the actual production scanner
         env:
-          QQQ_PROXY_URL: ${{ vars.QQQ_PROXY_URL }}
+          QQQ_PROXY_URL: ${{ vars.QQQ_PROXY_URL || 'https://apa-smc-qqqusdt-proxy.saviourmustapha123.workers.dev' }}
         run: node scripts/production-history-backtest.mjs
 
       - name: Upload production scanner trade-outcome report
