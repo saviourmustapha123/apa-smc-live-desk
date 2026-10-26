@@ -169,6 +169,10 @@ test('bullish continuation retest requires BOS, a fresh high, then first OB miti
   assert.ok(result, 'qualifying first retest should be recognised');
   assert.equal(result.side, 'BUY');
   assert.match(result.type, /ORDER BLOCK RETEST/);
+  assert.ok(['BOS','CHoCH'].includes(result.structureEvent));
+  assert.ok(['CONTINUATION','TREND SHIFT','BOS / TREND UNCONFIRMED'].includes(result.contextMode));
+  assert.equal(result.mitigation, 'FIRST_RETEST');
+  assert.ok(Number.isFinite(result.originTime) && Number.isFinite(result.impulseTime));
 });
 
 test('bearish continuation retest requires BOS, a fresh low, then first OB mitigation', () => {
@@ -186,4 +190,8 @@ test('bearish continuation retest requires BOS, a fresh low, then first OB mitig
   assert.ok(result, 'qualifying bearish first retest should be recognised');
   assert.equal(result.side, 'SELL');
   assert.match(result.type, /ORDER BLOCK RETEST/);
+  assert.ok(['BOS','CHoCH'].includes(result.structureEvent));
+  assert.ok(['CONTINUATION','TREND SHIFT','BOS / TREND UNCONFIRMED'].includes(result.contextMode));
+  assert.equal(result.mitigation, 'FIRST_RETEST');
+  assert.ok(Number.isFinite(result.originTime) && Number.isFinite(result.impulseTime));
 });
