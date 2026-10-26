@@ -14,11 +14,11 @@ test('the complete inline browser application JavaScript parses without syntax e
 });
 
 
-test('both automatic signal scanners include the one-minute scalp timeframe', () => {
-  assert.match(html, /signalSets=sets\.filter\(\(\[tf\]\)=>\['1m','5m','15m','1h','4h','8h','12h','1d'\]\.includes\(tf\)\)/);
-  assert.match(html, /signalSets=scanSets\.filter\(\(\[tf\]\)=>\['1m','5m','15m','1h','4h','8h','12h','1d'\]\.includes\(tf\)\)/);
+test('both automatic signal scanners include all eleven supported timeframes', () => {
+  assert.match(html, /const signalSets=sets;/);
+  assert.match(html, /const signalSets=scanSets;/);
+  for (const tf of ['1m','5m','15m','1h','4h','8h','12h','1d','1W','1M','1Y']) assert.ok(html.includes("'" + tf + "'"));
 });
-
 test('live signal cards visibly disclose provisional strategy status', () => {
   assert.match(html, /PROVISIONAL STRATEGY/);
   assert.match(html, /exact owner rules still require confirmation/);
@@ -153,39 +153,34 @@ test('QQQUSDT risk sizing uses linear contract units instead of labelling the qu
   assert.match(html, /QQQUSDT contract units \(linear USDT-margined estimate\)/);
 });
 
-test('order block qualification requires displacement and a close-confirmed structure break, not a mandatory FVG', () => {
+test('qualified Order Blocks require their associated three-candle FVG', () => {
+  assert.match(html, /const candle=b\[origin\],hasFvg=i>=2&&\(bullish\?impulse\.low>b\[i-2\]\.high:impulse\.high<b\[i-2\]\.low\)/);
+  assert.match(html, /if\(!hasFvg\)continue/);
+  assert.match(html, /if\(!fvgConfirmed\)continue/);
   assert.match(html, /function recentQualifiedZones\(/);
-  assert.match(html, /const bullish=impulse\.close>impulse\.open&&high&&prev\.close<=high\.p&&impulse\.close>high\.p/);
-  assert.match(html, /const bearish=impulse\.close<impulse\.open&&low&&prev\.close>=low\.p&&impulse\.close<low\.p/);
-  assert.match(html, /No qualified OB \(needs displacement \+ close-confirmed structure break\)/);
-  assert.match(html, /qualifiedZones=recentQualifiedZones/);
 });
-
-test('pending order-block setup is created only after its linked IDM/liquidity sweep and FVG', () => {
+test('pending Order Block setup requires FVG-backed BOS but treats inducement as optional context', () => {
   assert.match(html, /function pendingOrderBlockOpportunity\(symbol,tf,bars\)/);
   assert.match(html, /const latestIdm=latestInducementProxy\(b,k\)/);
+  assert.match(html, /const linkedIdm=!!\(latestIdm&&latestIdm\.status==='SWEPT'/);
   assert.match(html, /const fvgConfirmed=i>=2&&\(bullish\?impulse\.low>b\[i-2\]\.high:impulse\.high<b\[i-2\]\.low\)/);
-  assert.match(html, /latestIdm\.status!=='SWEPT'[\s\S]*?latestIdm\.bosTime!==impulse\.time/);
+  assert.match(html, /Inducement not present in this setup; not assumed or fabricated/);
   assert.match(html, /fresh and unmitigated/);
   assert.match(html, /Pending midpoint retest entry/);
   assert.match(html, /status:'NOT RUNNING',outcome:'PENDING'/);
-  assert.match(html, /const pending=pendingOrderBlockOpportunity\(symbol,tf,b\)/);
 });
-
 test('structural targets select the nearest confirmed opposing swing that satisfies the minimum 3R', () => {
   assert.match(html, /Choose the nearest confirmed opposing swing that actually permits 3R/);
   assert.match(html, /\.filter\(p=>Number\.isFinite\(p\.rr\)&&p\.rr>=(?:3|MIN_REWARD_RISK)\)/);
   assert.match(html, /return \{tp:candidates\[0\]\.tp,rr:candidates\[0\]\.rr,targetSwingIndex:candidates\[0\]\.index\}/);
 });
 
-test('live chart maps qualified order blocks without separate breaker-block visuals', () => {
+test('live chart maps Order Blocks and distinct qualified Breaker Blocks', () => {
   assert.match(html, /kind:'order-block'/);
   assert.match(html, /BULLISH OB|BEARISH OB/);
-  assert.doesNotMatch(html, /text:breaker\.side\+' BREAKER'/);
-  assert.doesNotMatch(html, /label:\s*[^,\n]*BREAKER BLOCK/);
-  assert.doesNotMatch(html, /kind:\s*['\"]breaker-block['\"]/);
+  assert.match(html, /BREAKER BLOCK · FAILED OB \+ OPPOSITE SHIFT \+ RETEST/);
+  assert.match(html, /const priority=\{'order-block':0,'breaker':1/);
 });
-
 test('live inducement proxy is tied to a post-BOS pullback and exposes status', () => {
   assert.match(html, /function latestInducementProxy\(/);
   assert.match(html, /Possible bullish IDM/);
@@ -589,17 +584,16 @@ test('live admission rejects setups whose latest confirmed close already crossed
   assert.match(html, /if\(candidate\.status!=='RUNNING'&&candidateAlreadyPastLevels\(candidate,bars\)\)continue/);
 });
 
-test('signal admission has no artificial daily quota and scans eight execution timeframes', () => {
+test('signal admission has no artificial daily quota and scans all eleven timeframes', () => {
   assert.match(html, /function signalDayStamp\(t\)/);
   assert.doesNotMatch(html, /daily limit of [0-9]+ new candidates reached/);
   assert.doesNotMatch(html, /daily limit of [0-9]+ candidates for/);
   assert.match(html, /function candidateAlreadyPastLevels\(candidate,bars\)/);
-  assert.match(html, /Automatic scan · '\+market\+' · 8 execution timeframes checked/);
+  assert.match(html, /Automatic scan · '\+market\+' · 11 timeframes checked/);
   assert.match(html, /setInterval\(\(\)=>runAutomaticPairScan\(\),20000\)/);
-  assert.match(html, /name="app-release" content="2026\.10\.24\.21"/);
+  assert.match(html, /name="app-release" content="2026\.10\.26\.02"/);
   assert.match(html, /t\.verificationState='PROVISIONAL-HEURISTIC'/);
 });
-
 test('daily candidate display counts by identification time rather than historical candle time', () => {
   assert.match(html, /function signalDayStamp\(t\)/);
   assert.match(html, /const d=new Date\(Number\(t\.identifiedAt\)\|\|Number\(t\.time\)\*1000\)/);
