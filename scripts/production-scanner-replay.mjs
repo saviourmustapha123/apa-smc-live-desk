@@ -15,7 +15,7 @@ function extractFunction(name) {
 
 const functionNames = [
   'fxSessionOpenAt', 'marketSessionOpen', 'signalEligibilityReason',
-  'pivots', 'atr', 'detectPatternRetest', 'detectRecentBlockRetest',
+  'pivots', 'atr', 'detectQmlStructure', 'detectPatternRetest', 'detectRecentBlockRetest',
   'latestInducementProxy', 'targetLevelUnreached', 'structuralTarget',
   'signalHorizonForTf', 'estimateTargetHorizon', 'pendingOrderBlockOpportunity',
   'scanOpportunityHistory'
