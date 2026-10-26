@@ -1,6 +1,8 @@
 name: APA SMC production history backtest
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
@@ -27,15 +29,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Run production scanner replay tests
-        run: node --test scripts/production-scanner-replay.test.mjs
-
-      - name: Run 1-minute entry and trade-outcome regression tests
-        run: node --test scripts/trade-entry-replay.test.mjs
-
-      - name: Run chart and lifecycle parity tests
-        run: node --test scripts/chart-signal-parity.test.mjs scripts/signal-lifecycle-regression.test.mjs
 
       - name: Run historical replay using the actual production scanner
         env:

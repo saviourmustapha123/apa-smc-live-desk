@@ -20,6 +20,36 @@ test('1-minute replay waits until a later candle to trigger a pending entry', ()
   assert.equal(result.r, 3);
 });
 
+test('market-close candidates fill at the next candle open, not as a missed signal-candle limit order', () => {
+  const bars = [
+    bar(60, 102, 104, 99, 103),
+    bar(120, 100, 102, 99, 101),
+    bar(180, 101, 116, 100, 114)
+  ];
+  const result = executeSignal(signal({ entryType: 'MARKET_CLOSE' }), bars, 0);
+  assert.equal(result.outcome, 'WIN');
+  assert.equal(result.triggered, true);
+  assert.equal(result.entry, 100);
+  assert.equal(result.entryTime, 120);
+  assert.equal(result.exitTime, 180);
+  assert.equal(result.r, 3);
+});
+
+test('market-close entry is rejected when the next-open gap reduces RR below 1:3', () => {
+  const bars = [signalBar, bar(120, 101, 102, 99, 100), bar(180, 100, 116, 99, 114)];
+  const result = executeSignal(signal({ entryType: 'MARKET_CLOSE' }), bars, 0);
+  assert.equal(result.outcome, 'REJECTED GAP REDUCED RR');
+  assert.equal(result.triggered, false);
+  assert.equal(result.r, null);
+});
+
+test('market-close candidates are not filled after the next open has already crossed target or stop', () => {
+  const targetGap = executeSignal(signal({ entryType: 'MARKET_CLOSE' }), [signalBar, bar(120, 116, 117, 114, 115)], 0);
+  assert.equal(targetGap.outcome, 'MISSED ENTRY (target reached before market fill)');
+  const stopGap = executeSignal(signal({ entryType: 'MARKET_CLOSE' }), [signalBar, bar(120, 94, 101, 93, 96)], 0);
+  assert.equal(stopGap.outcome, 'INVALIDATED BEFORE ENTRY');
+});
+
 test('an entry already crossed on the signal candle is marked missed, not filled retrospectively', () => {
   const bars = [bar(60, 102, 104, 99, 103), bar(120, 101, 116, 99, 114)];
   const result = executeSignal(signal(), bars, 0);

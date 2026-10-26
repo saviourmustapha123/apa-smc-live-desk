@@ -33,15 +33,34 @@ if (start < 0 || next < 0) {
     'Pattern and recent block retest helpers are invoked');
   requireScanner('Inducement sweep is directionally constrained', /latestInducementProxy[\s\S]*inducementSweep[\s\S]*eventIndex===hist\.length-1/,
     'Inducement proxy must be swept on the current candle and align with direction');
-  requireScanner('Structure, displacement, POI and liquidity sequence gate', /validatedSequence=hasEntryZone&&recentStructuralDisplacement&&hasLiquidityConfluence[\s\S]*if\(!validatedSequence\)[\s\S]*continue;/,
-    'A candidate must pass the explicit confluence sequence and record a rejection reason when it fails');
+  requireScanner('Structure, displacement, POI and liquidity sequence gate', /const sameDirectionBreak[\s\S]*const breakoutEntry[\s\S]*const validatedSequence[\s\S]*if\(!validatedSequence\)/,
+    'A candidate must pass a POI retest with displacement/liquidity, or a same-direction displaced structure break after a directional sweep; rejected candidates record why');
     requireScanner('Hard minimum 1:3 structural target gate', /structuralTarget\(side,entry,stop,hh,ll,hist\)[\s\S]*target\.rr<MIN_REWARD_RISK/,
     'Rejects missing targets and targets below 3R');
+  requireScanner('Market-close candidates are distinct from limit retests', /const entryType=selectedGapRetest\|\|blockRetest\|\|patternRetest\?'LIMIT_RETEST':'MARKET_CLOSE'/,
+    'Historical replay can distinguish a retest limit from a close-confirmed market candidate');
+
   requireScanner('Pending order-block setup path', /pendingOrderBlockOpportunity\(symbol,tf,b\)/,
     'Can represent a pending setup before entry is triggered');
 
   const requireApp = (name, pattern, detail) =>
     pattern.test(app) ? pass(name, detail) : fail(name, detail);
+
+  const blockStart = app.indexOf('function detectRecentBlockRetest(');
+  const blockEnd = app.indexOf('\nfunction pendingOrderBlockOpportunity(', blockStart);
+  if (blockStart < 0 || blockEnd < 0) {
+    fail('Order-block and breaker detector can be isolated', 'Could not locate production block detector boundaries');
+  } else {
+    const blockDetector = app.slice(blockStart, blockEnd);
+    const requireBlock = (name, pattern, detail) =>
+      pattern.test(blockDetector) ? pass(name, detail) : fail(name, detail);
+    requireBlock('Ordinary OB retest is separate from breaker retest', /type:'ORDER BLOCK RETEST · IDM \+ LIQUIDITY SWEPT'[\s\S]*type:'BREAKER BLOCK RETEST'/,
+      'Order block and breaker block have distinct lifecycle labels');
+    requireBlock('Breaker requires invalidation and movement fully beyond the old OB', /if\(invalidAt>=0&&touched\)[\s\S]*fullyAway=flipped==='SELL'\?candleAfterBreach\.high<zone\.low:candleAfterBreach\.low>zone\.high/,
+      'A breaker is not inferred from an ordinary first-touch OB retest');
+    requireBlock('Breaker requires opposite structure break and rejection on return', /oppositeBreakAt[\s\S]*returnedFromFarSide[\s\S]*if\(movedAwayAt>=0&&oppositeBreakAt>movedAwayAt&&returnedFromFarSide&&reject\)/,
+      'Requires departure, opposite structural break, return and directional rejection');
+  }
 
   requireApp('QML requires confirmed four-pivot structure', /function detectQmlStructure\([\s\S]*?z\[2\]\.p>z\[0\]\.p[\s\S]*?z\[3\]\.p<z\[1\]\.p[\s\S]*?prior\[j\]\.close<z\[1\]\.p/,
     'Bearish QML requires a head sweep and a close-confirmed break of the protected leg before the shoulder retest');
