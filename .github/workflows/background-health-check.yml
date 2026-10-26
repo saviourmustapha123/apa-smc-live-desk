@@ -29,6 +29,8 @@ jobs:
           node-version: 22
 
       - name: Run background health checks
+        id: live-health
+        continue-on-error: true
         run: node scripts/background-health-check.mjs
 
       - name: Run QQQUSDT proxy fallback unit tests
@@ -73,4 +75,10 @@ jobs:
       - name: Replay actual production scanner against deterministic candle fixtures
         if: github.event_name != 'schedule'
         run: node --test scripts/production-scanner-replay.test.mjs
+
+      - name: Preserve live-feed failure status after all regression tests run
+        if: always() && steps.live-health.outcome == 'failure'
+        run: |
+          echo "::error::Live feed health checks failed. Regression tests above were still executed."
+          exit 1
 
