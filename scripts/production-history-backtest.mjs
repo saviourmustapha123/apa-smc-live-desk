@@ -132,7 +132,9 @@ function runBacktest(symbol, tf, bars, provider, exact) {
   // Replay the actual pending-OB detector at each historical candle close.
   // Do not treat retrospectively discovered HISTORICAL retests as orders that
   // existed before price touched their entry zones.
-  const firstIndex = Math.max(34, bars.length - 1000);
+  // Replay the most recent 500 candle closes per timeframe to keep the repeated
+  // production detector bounded; forward outcome evaluation still uses the full history.
+  const firstIndex = Math.max(34, bars.length - 500);
   for (let i = firstIndex; i < bars.length - 1; i++) {
     const history = bars.slice(Math.max(0, i + 1 - 1000), i + 1);
     const signal = engine.pending(symbol, tf, history);
