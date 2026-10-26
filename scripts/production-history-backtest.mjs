@@ -1,4 +1,7 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, mkdtemp, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createProductionScannerReplay } from './production-scanner-replay.mjs';
 import { executeSignal } from './trade-entry-replay.mjs';
 
@@ -66,6 +69,50 @@ function configuredQqqProxy() {
     return url.origin + url.pathname.replace(/\/$/, '');
   } catch { return ''; }
 }
+async function fetchBinanceVisionDaily(symbol, tf, days = 8) {
+  // Public historical archive is a separate exact-symbol source. It avoids
+  // relying exclusively on live futures REST endpoints, which some CI regions
+  // geo-block. Never substitute QQQ ETF candles for the QQQUSDT contract.
+  const end = new Date();
+  end.setUTCHours(0, 0, 0, 0);
+  end.setUTCDate(end.getUTCDate() - 1); // only fully closed daily archive files
+  const dates = Array.from({ length: days }, (_, i) => {
+    const d = new Date(end);
+    d.setUTCDate(d.getUTCDate() - i);
+    return d.toISOString().slice(0, 10);
+  });
+  const directory = await mkdtemp(join(tmpdir(), 'apa-smc-vision-'));
+  try {
+    const batches = await Promise.all(dates.map(async date => {
+      const file = symbol + '-' + tf + '-' + date + '.zip';
+      const url = 'https://data.binance.vision/data/futures/um/daily/klines/' +
+        symbol + '/' + tf + '/' + file;
+      try {
+        const response = await fetch(url, {
+          signal: AbortSignal.timeout(20000),
+          headers: { 'user-agent': 'APA-SMC-production-history-backtest/1.0' }
+        });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const path = join(directory, file);
+        await writeFile(path, Buffer.from(await response.arrayBuffer()));
+        const csv = execFileSync('unzip', ['-p', path], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+        return csv.split(/\\r?\\n/).map(line => {
+          const row = line.split(',');
+          if (!/^\\d+$/.test(row[0] || '') || row.length < 6) return null;
+          return normalizeBinance([[row[0], row[1], row[2], row[3], row[4], row[5]]])[0] || null;
+        }).filter(Boolean);
+      } catch {
+        return [];
+      }
+    }));
+    const byTime = new Map();
+    for (const bar of batches.flat()) byTime.set(bar.time, bar);
+    return [...byTime.values()].sort((a, b) => a.time - b.time);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
 async function fetchBars(symbol, tf) {
   const errors = [];
   let best = null;
@@ -112,6 +159,13 @@ async function fetchBars(symbol, tf) {
       } catch (e) { errors.push(provider + ': ' + e.message); }
     }
     if (best) return best;
+    // Retry with Binance's public historical archives for the exact perpetual
+    // contract before considering any non-equivalent ETF proxy.
+    try {
+      const archived = await fetchBinanceVisionDaily('QQQUSDT', tf, 8);
+      if (archived.length >= 100) return { bars: archived, provider: 'Binance Vision historical archive QQQUSDT', exact: true };
+      errors.push('Binance Vision archive returned only ' + archived.length + ' valid QQQUSDT bars');
+    } catch (e) { errors.push('Binance Vision archive: ' + e.message); }
     // Public runner IPs can be geo-blocked by futures exchanges. QQQ ETF is an
     // underlying-market proxy only; never label it as exact QQQUSDT contract data.
     try {
