@@ -1242,14 +1242,15 @@ function recentQualifiedZones(b,k,dispMult){
   // Desk rule: an Order Block is qualified only when its impulse leaves an associated FVG.
   // The same rule applies before considering the failed zone as a breaker.
   if(!hasFvg)continue;
-  let swept=false;
+  let swept=false,firstTouch=-1;
   for(let j=i+1;j<b.length;j++){
-   // A bearish breaker requires buy-side liquidity taken before the bullish OB fails.
-   // A bullish breaker requires sell-side liquidity taken before the bearish OB fails.
+   // A breaker requires the relevant opposing liquidity sweep before the OB fails.
    if(ob.side==='BULLISH'&&high&&b[j].high>high.p)swept=true;
    if(ob.side==='BEARISH'&&low&&b[j].low<low.p)swept=true;
+   if(firstTouch<0&&b[j].low<=ob.high&&b[j].high>=ob.low)firstTouch=j;
    if(ob.side==='BULLISH'?b[j].close<ob.low:b[j].close>ob.high){ob.invalidatedAt=j;break}
   }
+  ob.mitigatedAt=firstTouch;
   if(ob.invalidatedAt==null){blocks.push(ob);continue}
   // A failed OB is not automatically a breaker: require the relevant liquidity sweep first.
   if(!swept)continue;
@@ -1267,7 +1268,7 @@ function recentQualifiedZones(b,k,dispMult){
    if(touch&&reject){breakers.push({...ob,side,retestIndex:j,retestTime:bar.time});break}
   }
  }
- return {ob:blocks.at(-1)||null,breaker:breakers.at(-1)||null}
+ return {ob:blocks.at(-1)||null,breaker:breakers.at(-1)||null,blocks,breakers}
 }
 function latestInducementProxy(b,k){
  const pp=pivots(b,k),events=[];let trend='UNKNOWN',hiIndex=0,loIndex=0,high=null,low=null;
