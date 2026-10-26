@@ -35,7 +35,8 @@ jobs:
             echo "Cloudflare deployment credentials are configured."
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Cloudflare Worker source is in GitHub, but deployment was skipped because CLOUDFLARE_API_TOKEN and/or CLOUDFLARE_ACCOUNT_ID secrets are missing."
+            echo "::error::Cloudflare Worker deployment cannot run until repository secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are configured. The source change is committed but the live worker has NOT been updated."
+            exit 1
           fi
 
       - name: Deploy updated QQQUSDT worker
