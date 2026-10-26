@@ -31,6 +31,9 @@ jobs:
       - name: Run background health checks
         run: node scripts/background-health-check.mjs
 
+      - name: Run QQQUSDT proxy fallback unit tests
+        run: node --test scripts/qqqusdt-worker.test.mjs
+
       - name: Run production strategy source coverage audit
         if: github.event_name != 'schedule'
         run: node scripts/production-strategy-source-audit.mjs
