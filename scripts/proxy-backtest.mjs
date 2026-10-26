@@ -1,4 +1,8 @@
 import { assessAt, simulate } from './strategy-core.mjs';
+import { writeFile, mkdtemp, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 const API = 'https://biquote.io/api';
 const BYBIT_HOSTS = [process.env.QQQ_PROXY_URL || 'https://apa-smc-qqqusdt-proxy.saviourmustapha123.workers.dev', 'https://api.bybit.com', 'https://api.bytick.com'];
 const SYMBOLS = ['EURUSD', 'BTCUSD', 'QQQUSDT'];
@@ -14,6 +18,45 @@ const MAX_FORWARD_BARS = 100;
 const COST_SCENARIOS_R = [0, 0.05, 0.10, 0.20];
 const failures = [];
 const reports = [];
+
+async function fetchBinanceVisionDaily(symbol, interval, days = 35) {
+  // Exact-symbol Binance UM historical archives provide 4h candles when
+  // live exchange endpoints are region-blocked in GitHub Actions.
+  const end = new Date();
+  end.setUTCHours(0, 0, 0, 0);
+  end.setUTCDate(end.getUTCDate() - 1);
+  const dates = Array.from({ length: days }, (_, i) => {
+    const d = new Date(end);
+    d.setUTCDate(d.getUTCDate() - i);
+    return d.toISOString().slice(0, 10);
+  });
+  const directory = await mkdtemp(join(tmpdir(), 'apa-proxy-vision-'));
+  try {
+    const batches = await Promise.all(dates.map(async date => {
+      const file = symbol + '-' + interval + '-' + date + '.zip';
+      const url = 'https://data.binance.vision/data/futures/um/daily/klines/' + symbol + '/' + interval + '/' + file;
+      try {
+        const response = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
+        if (!response.ok) return [];
+        const path = join(directory, file);
+        await writeFile(path, Buffer.from(await response.arrayBuffer()));
+        const csv = execFileSync('unzip', ['-p', path], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+        return csv.split(/\\r?\\n/).map(line => {
+          const row = line.split(',');
+          if (!/^\\d+$/.test(row[0] || '') || row.length < 6) return null;
+          const bar = { time: Math.floor(Number(row[0]) / 1000), open: Number(row[1]), high: Number(row[2]), low: Number(row[3]), close: Number(row[4]) };
+          return Number.isFinite(bar.time) && [bar.open,bar.high,bar.low,bar.close].every(Number.isFinite) &&
+            bar.high >= Math.max(bar.open,bar.close,bar.low) && bar.low <= Math.min(bar.open,bar.close,bar.high) ? bar : null;
+        }).filter(Boolean);
+      } catch { return []; }
+    }));
+    const byTime = new Map();
+    for (const bar of batches.flat()) byTime.set(bar.time, bar);
+    return [...byTime.values()].sort((a,b)=>a.time-b.time);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
 
 async function fetchBars(symbol, interval) {
   // Prefer native 4h candles where available. Only build 8h/12h from valid
@@ -52,6 +95,20 @@ async function fetchBars(symbol, interval) {
         rows = data;
         normalise = b => ({ time: Number(b[0]) / 1000, open: Number(b[1]), high: Number(b[2]), low: Number(b[3]), close: Number(b[4]) });
         lastError = null;
+      } catch (error) { lastError = error; }
+    }
+    if (lastError || (sourceInterval === '4h' && (!rows || rows.length < 100))) {
+      // For 4h, use exact QQQUSDT archives before substituting the QQQ ETF.
+      // This also supplies enough exact 4h source bars for 8h/12h aggregation.
+      try {
+        const archived = await fetchBinanceVisionDaily('QQQUSDT', '4h', 35);
+        if (archived.length >= 100) {
+          rows = archived;
+          normalise = b => b;
+          lastError = null;
+        } else if (lastError) {
+          throw new Error('Binance Vision returned only ' + archived.length + ' valid 4h bars');
+        }
       } catch (error) { lastError = error; }
     }
     if (lastError) {
