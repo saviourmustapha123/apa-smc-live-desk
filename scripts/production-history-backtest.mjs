@@ -11,6 +11,7 @@ const INTERVAL_SECONDS = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600 };
 const report = [];
 const failures = [];
 const warnings = [];
+const completedBacktests = [];
 let exactCoverage = 0;
 let proxyCoverage = 0;
 const iso = seconds => new Date(seconds * 1000).toISOString();
@@ -194,6 +195,7 @@ for (const symbol of SYMBOLS) {
       const bars = data.bars.filter(b => validOHLC(b) && b.time + INTERVAL_SECONDS[tf] <= nowSeconds)
         .sort((a,b)=>a.time-b.time);
       const result = runBacktest(symbol, tf, bars, data.provider, data.exact);
+      completedBacktests.push({ ...result, exact: data.exact });
       log('- Last closed candle: ' + iso(bars.at(-1).time) + '; close ' + bars.at(-1).close);
       if (data.exact) exactCoverage++; else proxyCoverage++;
       const rate = result.winRate == null ? 'n/a' : result.winRate.toFixed(1) + '% (n=' + (result.wins + result.losses) + ')';
@@ -205,7 +207,7 @@ for (const symbol of SYMBOLS) {
       if (!result.outcomes.length) log('- No qualifying production-scanner candidates in this sample.');
       for (const x of result.outcomes) {
         const s = x.signal;
-        log('- ' + iso(s.time) + ' ' + s.side + ' entry ' + s.entry + ', SL ' + s.sl + ', TP ' + s.tp + ', planned ' + Number(s.rr).toFixed(2) + 'R → ' + x.outcome + (Number.isFinite(x.r) ? ' (' + x.r.toFixed(2) + 'R)' : '') + (x.entryTime ? '; filled ' + iso(x.entryTime) : '') + (x.exitTime ? '; resolved ' + iso(x.exitTime) : ''));
+        log('- ' + iso(s.time) + ' ' + s.side + ' [' + (s.setupType || 'UNCLASSIFIED') + '] entry ' + s.entry + ', SL ' + s.sl + ', TP ' + s.tp + ', planned ' + Number(s.rr).toFixed(2) + 'R → ' + x.outcome + (Number.isFinite(x.r) ? ' (' + x.r.toFixed(2) + 'R)' : '') + (Array.isArray(s.reason) && s.reason.length ? '; evidence: ' + s.reason.join('; ') : '') + (x.entryTime ? '; filled ' + iso(x.entryTime) : '') + (x.exitTime ? '; resolved ' + iso(x.exitTime) : ''));
       }
       log('');
     } catch (e) {
@@ -218,6 +220,28 @@ for (const symbol of SYMBOLS) {
     }
   }
 }
+log('## Outcome analysis by setup type');
+log('- Pattern-level counts are descriptive, not proof of predictive edge. Samples are separated by symbol/timeframe and exact-versus-proxy feed. No pattern should be promoted based on small samples or proxy-only results.');
+log('| Pair | TF | Feed | Setup type | Filled/resolved | Wins | Losses | Net R | Expectancy R |');
+log('|---|---|---|---|---:|---:|---:|---:|---:|');
+const patternGroups = new Map();
+for (const run of completedBacktests) {
+  for (const outcome of run.outcomes) {
+    if (!outcome.triggered || !Number.isFinite(outcome.r)) continue;
+    const setup = outcome.signal.setupType || 'UNCLASSIFIED';
+    const key = [run.symbol, run.tf, run.exact ? 'exact' : 'proxy', setup].join('|');
+    if (!patternGroups.has(key)) patternGroups.set(key, { symbol: run.symbol, tf: run.tf, feed: run.exact ? 'exact' : 'proxy', setup, n: 0, wins: 0, losses: 0, netR: 0 });
+    const g = patternGroups.get(key);
+    g.n++;
+    if (outcome.r > 0) g.wins++;
+    else if (outcome.r < 0) g.losses++;
+    g.netR += outcome.r;
+  }
+}
+for (const g of [...patternGroups.values()].sort((a,b)=>a.symbol.localeCompare(b.symbol)||a.tf.localeCompare(b.tf)||a.setup.localeCompare(b.setup))) {
+  log('| ' + g.symbol + ' | ' + g.tf + ' | ' + g.feed + ' | ' + g.setup + ' | ' + g.n + ' | ' + g.wins + ' | ' + g.losses + ' | ' + g.netR.toFixed(2) + 'R | ' + (g.n ? (g.netR/g.n).toFixed(2) + 'R' : 'n/a') + ' |');
+}
+log('');
 log('## Validation summary');
 log('- Exact pair/timeframe data coverage: ' + exactCoverage + '/' + (SYMBOLS.length * TIMEFRAMES.length));
 log('- Proxy pair/timeframe coverage: ' + proxyCoverage + '/' + (SYMBOLS.length * TIMEFRAMES.length) + ' (not valid as exact-contract proof)');
