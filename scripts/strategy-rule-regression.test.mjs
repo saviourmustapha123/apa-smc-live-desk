@@ -53,3 +53,13 @@ test('production scanner permits a displaced same-direction BOS entry only after
   assert.match(source, /const validatedSequence=\(hasEntryZone&&recentStructuralDisplacement&&hasLiquidityConfluence\)\|\|breakoutEntry;/);
   assert.match(source, /target\.rr<MIN_REWARD_RISK/);
 });
+
+test('historical replay reports setup-type outcomes separately and preserves signal evidence', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('./production-history-backtest.mjs', import.meta.url), 'utf8');
+  assert.match(source, /Outcome analysis by setup type/);
+  assert.match(source, /patternGroups/);
+  assert.match(source, /exact-versus-proxy feed/);
+  assert.match(source, /evidence: '\+s\.reason\.join/);
+  assert.match(source, /Expectancy R/);
+});
