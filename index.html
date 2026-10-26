@@ -544,7 +544,10 @@ function scanOpportunityHistory(symbol,tf,bars){
   if(ageBars===0&&!liveEligible){rejectLatest('Current setup blocked by market/data eligibility: '+eligibilityReason);continue;}
   const uniqueReasons=[...new Set(reasons)];
   const timing=estimateTargetHorizon(tf,hist,entry,target.tp);
-  found.push({symbol,tf,side,entry,sl:stop,tp:target.tp,rr:target.rr,reason:uniqueReasons,...timing,time:cur.time,confidence:'provisional-sequence-filtered',setupType:patternRetest?.type||blockRetest?.type||(ifvgRetest?'IFVG retest':fvgRetest?'FVG retest':hasRoleReversal?'SBR/RBS retest':'BOS/CHoCH retest'),status:ageBars===0?'NOT RUNNING':'HISTORICAL',movePct:null,rNow:null,ageBars,scanEngine:'APA-SMC strict sequence heuristic; unvalidated'});
+  // If no retest level supplied the entry, this is a close-confirmed market
+  // candidate, not a limit order that could have filled earlier inside the same candle.
+  const entryType=selectedGapRetest||blockRetest||patternRetest?'LIMIT_RETEST':'MARKET_CLOSE';
+  found.push({symbol,tf,side,entry,sl:stop,tp:target.tp,rr:target.rr,entryType,reason:uniqueReasons,...timing,time:cur.time,confidence:'provisional-sequence-filtered',setupType:patternRetest?.type||blockRetest?.type||(ifvgRetest?'IFVG retest':fvgRetest?'FVG retest':hasRoleReversal?'SBR/RBS retest':'BOS/CHoCH retest'),status:ageBars===0?'NOT RUNNING':'HISTORICAL',movePct:null,rNow:null,ageBars,scanEngine:'APA-SMC strict sequence heuristic; unvalidated'});
   if(ageBars===0){diag.candidateFound=true;diag.latestRejection='Production scanner accepted a provisional candidate';}
  }
  // Create an actionable pending setup after a confirmed BOS even before price returns to the order block.
