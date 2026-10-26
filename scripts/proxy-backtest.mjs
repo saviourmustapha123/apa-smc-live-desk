@@ -38,7 +38,7 @@ async function fetchBinanceVisionDaily(symbol, interval, days = 35) {
       const url = 'https://data.binance.vision/data/futures/um/daily/klines/' + symbol + '/' + interval + '/' + file;
       try {
         const response = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
-        if (!response.ok) return [];
+        if (!response.ok) throw new Error('HTTP ' + response.status);
         const path = join(directory, file);
         await writeFile(path, Buffer.from(await response.arrayBuffer()));
         const csv = execFileSync('unzip', ['-p', path], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
@@ -110,8 +110,27 @@ async function fetchBars(symbol, interval) {
       lastError = exchangeError;
     }
     if (sourceInterval === '4h' && (lastError || !rows || rows.length < 100)) {
-      // For 4h, use exact QQQUSDT archives before substituting the QQQ ETF.
-      // This also supplies enough exact 4h source bars for 8h/12h aggregation.
+      // Gate's public USDT-futures market is another exact-contract source.
+      try {
+        const gateUrl = 'https://api.gateio.ws/api/v4/futures/usdt/candlesticks?contract=QQQ_USDT&interval=4h&limit=1000&from=' + Math.floor(startMs/1000) + '&to=' + Math.floor(nowMs/1000);
+        const gateRows = await (async () => {
+          const response = await fetch(gateUrl, { signal: AbortSignal.timeout(12000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
+          if (!response.ok) throw new Error('Gate futures HTTP ' + response.status);
+          return response.json();
+        })();
+        if (!Array.isArray(gateRows)) throw new Error('Gate futures returned invalid candle rows');
+        const gateBars = gateRows.map(b => ({time:Number(b[0]),open:Number(b[5]),high:Number(b[3]),low:Number(b[4]),close:Number(b[2])}))
+          .filter(b => Number.isFinite(b.time) && [b.open,b.high,b.low,b.close].every(Number.isFinite) && b.high >= Math.max(b.open,b.close,b.low) && b.low <= Math.min(b.open,b.close,b.high))
+          .sort((a,b)=>a.time-b.time);
+        if (gateBars.length < 100) throw new Error('Gate futures returned only ' + gateBars.length + ' valid QQQ_USDT 4h bars');
+        rows = gateBars;
+        normalise = b => b;
+        lastError = null;
+      } catch (error) { lastError = error; }
+    }
+    if (sourceInterval === '4h' && (lastError || !rows || rows.length < 100)) {
+      // Binance Vision is the final exact-contract archive fallback. This also
+      // supplies 4h source bars for 8h/12h aggregation before any ETF proxy.
       try {
         const archived = await fetchBinanceVisionDaily('QQQUSDT', '4h', 35);
         if (archived.length >= 100) {
