@@ -128,24 +128,17 @@ async function fetchBars(symbol, tf) {
 function runBacktest(symbol, tf, bars, provider, exact) {
   const byTime = new Map(bars.map((b,i)=>[b.time,i]));
   const unique = new Map();
-  const coreSize = 500;
-  const overlap = 250;
-  let diagnostic = null;
-  // Replay overlapping windows so scanner history retention does not truncate the dataset.
-  for (let coreStart = 0; coreStart < bars.length - 1; coreStart += coreSize) {
-    const coreEnd = Math.min(bars.length - 1, coreStart + coreSize);
-    const windowStart = Math.max(0, coreStart - overlap);
-    const windowEnd = Math.min(bars.length, coreEnd + overlap);
-    const windowBars = bars.slice(windowStart, windowEnd);
-    const engine = createProductionScannerReplay({ now: (bars[windowEnd - 1]?.time || 0) * 1000 + INTERVAL_SECONDS[tf] * 1000 });
-    const result = engine.scan(symbol, tf, windowBars);
-    diagnostic = result.diagnostic || diagnostic;
-    const coreTimes = new Set(bars.slice(coreStart, coreEnd).map(b=>b.time));
-    for (const signal of result.signals) {
-      if (!Number.isFinite(signal.time) || !coreTimes.has(signal.time) || !byTime.has(signal.time)) continue;
-      const key = [signal.time,signal.side,signal.entry,signal.sl,signal.tp,signal.setupType].join('|');
-      if (!unique.has(key)) unique.set(key, signal);
-    }
+  const engine = createProductionScannerReplay({ now: (bars.at(-1)?.time || 0) * 1000 + INTERVAL_SECONDS[tf] * 1000 });
+  // Replay the actual pending-OB detector at each historical candle close.
+  // Do not treat retrospectively discovered HISTORICAL retests as orders that
+  // existed before price touched their entry zones.
+  const firstIndex = Math.max(34, bars.length - 1000);
+  for (let i = firstIndex; i < bars.length - 1; i++) {
+    const history = bars.slice(Math.max(0, i + 1 - 1000), i + 1);
+    const signal = engine.pending(symbol, tf, history);
+    if (!signal || signal.time !== bars[i].time) continue;
+    const key = [signal.orderBlock?.originTime, signal.side, signal.entry, signal.sl, signal.tp].join('|');
+    if (!unique.has(key)) unique.set(key, signal);
   }
   const candidates = [...unique.values()].sort((a,b)=>a.time-b.time || (Number(a.rr)||0)-(Number(b.rr)||0));
   const outcomes = [];
@@ -155,8 +148,7 @@ function runBacktest(symbol, tf, bars, provider, exact) {
     if (index == null || index < nextAvailableIndex) continue;
     const result = executeSignal(signal, bars, index);
     outcomes.push({ signal, ...result });
-    // Enforce one pending/active trade at a time per symbol and timeframe. This prevents
-    // overlapping same-direction candidates from being counted as independent trades.
+    // One pending/active trade at a time per symbol/timeframe.
     const endTime = result.exitTime ?? (result.entryTime && result.outcome.startsWith('UNRESOLVED') ? bars.at(-1).time : null);
     if (endTime != null && byTime.has(endTime)) nextAvailableIndex = byTime.get(endTime) + 1;
     else if (result.triggered || result.outcome.startsWith('UNRESOLVED')) nextAvailableIndex = bars.length;
@@ -168,16 +160,15 @@ function runBacktest(symbol, tf, bars, provider, exact) {
   const grossWinR = resolved.filter(x=>x.r>0).reduce((sum,x)=>sum+x.r,0);
   const grossLossR = -resolved.filter(x=>x.r<0).reduce((sum,x)=>sum+x.r,0);
   const netR = grossWinR - grossLossR;
-  const equity = [0]; let running = 0, peak = 0, maxDrawdown = 0;
-  for (const x of resolved) { running += x.r; equity.push(running); peak = Math.max(peak,running); maxDrawdown = Math.max(maxDrawdown,peak-running); }
+  let running = 0, peak = 0, maxDrawdown = 0;
+  for (const x of resolved) { running += x.r; peak = Math.max(peak,running); maxDrawdown = Math.max(maxDrawdown,peak-running); }
   const days = bars.length > 1 ? (bars.at(-1).time - bars[0].time) / 86400 : 0;
-  return { symbol, tf, bars: bars.length, days, provider, exact, diagnostic, candidates: candidates.length, evaluated: outcomes.length, executed: executed.length, wins, losses, unresolved: executed.length-resolved.length, missed: outcomes.filter(x=>!x.triggered&&/MISSED/.test(x.outcome)).length, invalidated: outcomes.filter(x=>!x.triggered&&/INVALIDATED/.test(x.outcome)).length, netR, grossWinR, grossLossR, profitFactor: grossLossR ? grossWinR/grossLossR : grossWinR ? Infinity : null, expectancyR: resolved.length ? netR/resolved.length : null, maxDrawdownR: maxDrawdown, winRate: resolved.length ? wins/resolved.length*100 : null, outcomes };
+  return { symbol, tf, bars: bars.length, days, provider, exact, diagnostic: null, candidates: candidates.length, evaluated: outcomes.length, executed: executed.length, wins, losses, unresolved: executed.length-resolved.length, missed: outcomes.filter(x=>!x.triggered&&/MISSED/.test(x.outcome)).length, invalidated: outcomes.filter(x=>!x.triggered&&/INVALIDATED/.test(x.outcome)).length, netR, grossWinR, grossLossR, profitFactor: grossLossR ? grossWinR/grossLossR : grossWinR ? Infinity : null, expectancyR: resolved.length ? netR/resolved.length : null, maxDrawdownR: maxDrawdown, winRate: resolved.length ? wins/resolved.length*100 : null, outcomes };
 }
-
 log('# APA SMC Live Desk — production-scanner historical replay');
 log('');
 log('- Generated: ' + new Date().toISOString());
-log('- Engine: actual production scanOpportunityHistory source extracted from index.html, not the simplified proxy strategy.');
+log('- Engine: production pendingOrderBlockOpportunity extracted from index.html, replayed at each historical candle close. This run validates fresh FVG-backed pending order-block setups; it does not claim to validate every QML/FVG/inducement signal family.');
 log('- Entry model: signal is evaluated after its candle closes; a limit/entry level must be touched on a later candle. Stops/targets are checked only after fill. If both are touched in one candle, stop-first is assumed. Only one pending or active trade is allowed per pair/timeframe at a time.');
 log('- Minimum RR: 1:3. Maximum forward evaluation: ' + MAX_FORWARD_BARS + ' candles. No commission, spread, funding or slippage is included; R results are before costs.');
 log('- Net R is the sum of resolved simulated wins and losses before transaction costs. Spread, commission, funding and slippage are excluded. This is historical candle replay, not live brokerage execution or proof of future profitability. Results with missing or proxy symbol feeds are not complete.');
