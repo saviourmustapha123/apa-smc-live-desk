@@ -115,7 +115,7 @@ async function fetchBars(symbol, tf) {
     // Public runner IPs can be geo-blocked by futures exchanges. QQQ ETF is an
     // underlying-market proxy only; never label it as exact QQQUSDT contract data.
     try {
-      const range = tf === '5m' ? '14d' : '60d';
+      const range = tf === '1m' ? '7d' : (tf === '5m' ? '14d' : '60d');
       const json = await getJson('https://query1.finance.yahoo.com/v8/finance/chart/QQQ?range=' + range + '&interval=' + tf);
       const bars = normalizeYahoo(json).sort((a,b)=>a.time-b.time);
       if (bars.length >= 100) return { bars, provider: 'Yahoo QQQ ETF proxy for QQQUSDT (not exact contract)', exact: false };
