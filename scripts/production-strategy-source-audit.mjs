@@ -58,8 +58,8 @@ if (start < 0 || next < 0) {
     'Trade-grade OB retests require displacement, a close-confirmed structure break, a three-candle FVG and a first fresh retest');
   requireApp('Breaker blocks have their own qualified chart zone', /BREAKER BLOCK · FAILED OB \+ OPPOSITE SHIFT \+ RETEST/,
     'A breaker is drawn separately only after an FVG-backed OB fails, opposite structural displacement occurs, and price returns to reject the failed zone');
-  requireApp('Fresh order-block first retest is enforced', /let invalidAt=-1,previousTouch=false;[\s\S]*?if\(invalidAt<0&&!previousTouch&&touched/,
-    'An already mitigated zone cannot be reused as a fresh order-block entry');
+  requireApp('Fresh order-block first retest is enforced after a new high/low', /let invalidAt=-1,previousTouch=false,extensionSeen=false,touchedBeforeExtension=false;[\s\S]*?if\(invalidAt<0&&!previousTouch&&extensionSeen&&!touchedBeforeExtension&&touched/,
+    'A valid first OB retest requires a post-BOS extension beyond the impulse extreme; an earlier mitigation cannot be reused as fresh');
 
   requireApp('Pending OB requires FVG-backed BOS and fresh zone while inducement remains optional', /const linkedIdm=!![\s\S]*?Inducement not present in this setup; not assumed or fabricated/,
     'A pending OB needs its own FVG-backed displacement and a fresh zone; linked IDM is recorded when present but absence alone does not suppress the setup');
