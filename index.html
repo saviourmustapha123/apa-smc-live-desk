@@ -388,9 +388,8 @@ function pendingOrderBlockOpportunity(symbol,tf,bars){
   if(!(bullish?stop<entry:stop>entry))continue;
   const target=structuralTarget(side,entry,stop,high,low,b);
   if(!target||target.rr<MIN_REWARD_RISK)continue;
-  // A pending order is invalid if its TP is already behind current price or was touched after the impulse before entry activation.
-  const targetAlreadyConsumed=b.slice(i+1).some(c=>bullish?c.high>=target.tp:c.low<=target.tp);
-  if((bullish?target.tp<=current.close:target.tp>=current.close)||targetAlreadyConsumed)continue;
+  // structuralTarget already rejects a swing crossed after its formation; also require the target to remain ahead of current price.
+  if(bullish?target.tp<=current.close:target.tp>=current.close)continue;
   const reasons=[
    (bullish?'Bullish':'Bearish')+' close-confirmed '+structureEvent,
    'ATR-qualified displacement + three-candle FVG',
