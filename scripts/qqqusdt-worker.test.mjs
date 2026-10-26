@@ -26,7 +26,8 @@ test('Bybit ticker request falls back to actual Binance ticker data and preserve
   assert.equal(body.retCode, 0);
   assert.equal(body.result.list[0].lastPrice, '123.45');
   assert.match(response.headers.get('x-apa-data-source'), /Binance-fallback/);
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3, 'primary Bybit, alternate Bytick, then Binance fallback are attempted in order');
+  assert.match(calls[1], /api\.bytick\.com/);
 });
 
 test('Bybit candle request maps 60-minute interval to Binance 1h and returns real OHLC rows', async () => {
