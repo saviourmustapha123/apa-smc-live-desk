@@ -830,7 +830,7 @@ function renderOverlay(){
  const mode=$('overlayDensity')?.value||s.overlayDensity||'clean';
  const htf=new Set(['4h','1d','1W','1M','1Y']);
  const allZones=[...(s.globalZones||[]).filter(z=>z.sourceTf!==s.tf),...(s.zoneDefs||[]).map(z=>({...z,sourceTf:s.tf}))];
- const priority={'order-block':0,'liquidity-bsl':2,'liquidity-ssl':2,'qml':3,'fvg':3,'ifvg':3,'role-reversal':3,'inducement':4,'structure':5,'apa-rejection':6,'apa-engulf':6,'apa-displacement':7};
+ const priority={'order-block':0,'breaker':1,'liquidity-bsl':2,'liquidity-ssl':2,'qml':3,'fvg':3,'ifvg':3,'role-reversal':3,'inducement':4,'structure':5,'apa-rejection':6,'apa-engulf':6,'apa-displacement':7};
  const zoneLimit=mode==='clean'?2:mode==='balanced'?10:40;
  const allowedZones=mode==='clean'?allZones.filter(z=>z.sourceTf===s.tf||htf.has(z.sourceTf)):allZones;
  allowedZones.sort((a,b)=>(priority[a.kind]??7)-(priority[b.kind]??7)||Number(b.start)-Number(a.start));
@@ -917,7 +917,7 @@ function addAdvancedAnnotations(b,marks){
  let unfilled=gaps.filter(g=>g.invertedAt===undefined).slice(-4);
  for(const g of unfilled){const bull=g.dir==='bull';zone(b[g.i-2].time,b[last].time,g.hi,g.lo,(bull?'BULLISH':'BEARISH')+' FVG','#2dd4bf','#2dd4bf30','fvg',true);marks.push({time:b[g.i].time,position:bull?'belowBar':'aboveBar',color:bull?'#35d39a':'#ff9c69',shape:'square',text:bull?'FVG ↑':'FVG ↓'})}
  for(const g of gaps.filter(x=>x.invertedAt!==undefined).slice(-3)){const bull=g.invDir==='bull',at=b[g.invertedAt];zone(b[g.i-2].time,b[last].time,g.hi,g.lo,(bull?'BULLISH':'BEARISH')+' iFVG','#c084fc','#c084fc28','ifvg',true);marks.push({time:at.time,position:bull?'belowBar':'aboveBar',color:bull?'#35d39a':'#ff657a',shape:'arrowUp',text:bull?'iFVG ↑':'iFVG ↓'})}
- // Independent BOS/CHoCH event segments. Breaker blocks are not mapped on this chart.
+ // Independent BOS/CHoCH event segments. Qualified breaker zones are mapped by the main analysis layer.
  let direction=0,structureEvents=[];
  for(let i=from;i<=last;i++){
   const prev=b[i-1],cur=b[i],hh=confirmedH.filter(p=>p.i<i).at(-1),ll=confirmedL.filter(p=>p.i<i).at(-1);
@@ -931,7 +931,7 @@ function addAdvancedAnnotations(b,marks){
   structureEvents.push({i,bullish,change,level});
   direction=bullish?1:-1;
  }
- // Chart mapping is intentionally limited to qualified ORDER BLOCK zones; breaker detection is not rendered.
+ // Main analysis draws qualified FVG-backed OBs and breakers; this layer adds independent context annotations.
 
  // Liquidity map: equal highs/lows (potential stop pools) and confirmed sweeps.
  // These are price-structure proxies; a chart cannot reveal the actual orders sitting at a level.
