@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const worker = readFileSync(new URL('../proxy/qqqusdt-worker.js', import.meta.url), 'utf8');
 const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
   .filter(([, attrs, body]) => !/\bsrc\s*=/.test(attrs) && body.trim());
 assert.ok(scripts.length > 0, 'HTML must contain inline application JavaScript');
@@ -33,6 +34,7 @@ assert.ok(html.includes('function signalBarEndMs(tf,timeSeconds)'), 'calendar ti
 assert.ok(html.includes("if(tf==='1W')" ) && html.includes("if(tf==='1M')") && html.includes("if(tf==='1Y')"), 'weekly/monthly/yearly boundary handling missing');
 assert.ok(html.includes('marketTimeframeHealthPanel') && html.includes('recordTimeframeHealth'), 'visible feed diagnostics must report per-market/timeframe state');
 assert.ok(html.includes("const DEFAULT_QQQ_PROXY='';") && html.includes('function safeQqqProxy(') && html.includes('safeQqqProxy(p.qqqProxy||DEFAULT_QQQ_PROXY)'), 'QQQ proxy must remain configurable and not be assumed healthy without a successful feed check');
+assert.ok(worker.includes('api-gcp.binance.com') && worker.includes('api.binance.com'), 'QQQ proxy must try alternate Binance public hosts before declaring upstream failure');
 assert.ok(html.includes('ob.mitigatedAt=firstTouch') && html.includes('const qualified=recentQualifiedZones(b,k,s.disp)'), 'fresh/mitigated OB and breaker zones must be shared across timeframe charts');
 
 const blockStart = html.indexOf('function detectRecentBlockRetest');
