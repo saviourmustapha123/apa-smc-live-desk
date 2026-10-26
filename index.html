@@ -393,7 +393,7 @@ function pendingOrderBlockOpportunity(symbol,tf,bars){
   const reasons=[
    (bullish?'Bullish':'Bearish')+' close-confirmed '+structureEvent,
    'ATR-qualified displacement + three-candle FVG',
-   contextMode==='TREND SHIFT'?'Break opposes the confirmed prior swing trend; potential CHoCH':'Break is continuation / BOS context; inducement is optional',
+   'Inducement is optional for a valid FVG-backed OB; do not fabricate it',
    'Close-confirmed '+structureEvent+' + ATR-qualified displacement + FVG',
    (bullish?'Demand':'Supply')+' order block remains fresh and unmitigated',
    linkedIdm?'BOS-linked inducement and nearby liquidity swept':'Inducement not present in this setup; not assumed or fabricated',
