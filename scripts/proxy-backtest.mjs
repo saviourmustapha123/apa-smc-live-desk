@@ -23,11 +23,14 @@ async function fetchBars(symbol, interval) {
   const sourceSeconds = TIMEFRAME_SECONDS[sourceInterval];
   let rows;
   let normalise;
+  const nowMs = Date.now();
+  const historyDays = sourceInterval === '1m' ? 7 : sourceInterval === '5m' ? 30 : sourceInterval === '15m' ? 90 : sourceInterval === '1d' ? 1095 : 365;
+  const startMs = nowMs - historyDays * 86400000;
   if (symbol === 'QQQUSDT') {
     let lastError;
     for (const host of BYBIT_HOSTS) {
       try {
-        const url = host + '/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + BYBIT_INTERVAL[sourceInterval] + '&limit=1000';
+        const url = host + '/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + BYBIT_INTERVAL[sourceInterval] + '&limit=1000&start=' + startMs + '&end=' + nowMs;
         const response = await fetch(url, { signal: AbortSignal.timeout(12000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         const json = await response.json();
@@ -42,7 +45,7 @@ async function fetchBars(symbol, interval) {
       // Retry an alternate exact-contract provider before falling back to the
       // underlying QQQ ETF. The report must retain the proxy disclaimer.
       try {
-        const response = await fetch('https://fapi.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + sourceInterval + '&limit=1000', { signal: AbortSignal.timeout(12000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
+        const response = await fetch('https://fapi.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + sourceInterval + '&limit=1000&startTime=' + startMs + '&endTime=' + nowMs, { signal: AbortSignal.timeout(12000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
         if (!response.ok) throw new Error('Binance futures HTTP ' + response.status);
         const data = await response.json();
         if (!Array.isArray(data) || !data.length) throw new Error('Binance futures returned no OHLC rows');
@@ -74,7 +77,8 @@ async function fetchBars(symbol, interval) {
     if (lastError) throw new Error('QQQUSDT exchange providers and Yahoo ETF fallback unavailable: ' + lastError.message);
     if (!normalise) normalise = b => ({ time: Number(b[0]) / 1000, open: Number(b[1]), high: Number(b[2]), low: Number(b[3]), close: Number(b[4]) });
   } else {
-    const url = API + '/' + symbol + '/ohlc?interval=' + sourceInterval + '&limit=1000';
+    const from = new Date(startMs).toISOString(), to = new Date(nowMs).toISOString();
+    const url = API + '/' + symbol + '/ohlc?interval=' + sourceInterval + '&limit=1000&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
     const response = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
     if (!response.ok) throw new Error('HTTP ' + response.status);
     const json = await response.json();
