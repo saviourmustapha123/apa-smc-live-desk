@@ -102,9 +102,9 @@ async function fetchBinanceVisionDaily(symbol, tf, days = 8) {
         const path = join(directory, file);
         await writeFile(path, Buffer.from(await response.arrayBuffer()));
         const csv = execFileSync('unzip', ['-p', path], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
-        return csv.split(/\\r?\\n/).map(line => {
+        return csv.split(/\r?\n/).map(line => {
           const row = line.split(',');
-          if (!/^\\d+$/.test(row[0] || '') || row.length < 6) return null;
+          if (!/^\d+$/.test(row[0] || '') || row.length < 6) return null;
           return normalizeBinance([[row[0], row[1], row[2], row[3], row[4], row[5]]])[0] || null;
         }).filter(Boolean);
       } catch (error) {
