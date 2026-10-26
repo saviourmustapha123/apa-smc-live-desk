@@ -24,6 +24,10 @@ export function executeSignal(signal, bars, index) {
   let triggeredAt = -1;
   for (let i = index + 1; i < Math.min(bars.length, index + 1 + MAX_FORWARD_BARS); i++) {
     const b = bars[i];
+    // A gap already beyond the stop invalidates an unfilled pending order before
+    // considering any later intrabar touch of the entry level.
+    const stopGapAtOpen = signal.side === 'BUY' ? b.open <= signal.sl : b.open >= signal.sl;
+    if (stopGapAtOpen) return { outcome: 'INVALIDATED BEFORE ENTRY', r: null, triggered: false, exitTime: b.time };
     const entryTouched = b.low <= signal.entry && b.high >= signal.entry;
     const stopTouched = signal.side === 'BUY' ? b.low <= signal.sl : b.high >= signal.sl;
     const targetTouched = signal.side === 'BUY' ? b.high >= signal.tp : b.low <= signal.tp;
