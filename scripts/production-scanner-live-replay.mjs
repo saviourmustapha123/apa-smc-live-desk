@@ -1,10 +1,12 @@
 import { createProductionScannerReplay } from './production-scanner-replay.mjs';
 
 const BYBIT = 'https://api.bybit.com/v5/market/kline';
+const BIQUOTE = 'https://biquote.io/api';
 const LIMIT = 1000;
 const symbols = [
-  { appSymbol: 'BTCUSD', marketSymbol: 'BTCUSDT', sourceNote: 'Bybit BTCUSDT perpetual proxy; not the app BTCUSD feed' },
-  { appSymbol: 'QQQUSDT', marketSymbol: 'QQQUSDT', sourceNote: 'Bybit QQQUSDT linear perpetual feed' }
+  { appSymbol: 'BTCUSD', marketSymbol: 'BTCUSD', source: 'biquote', sourceNote: 'App-configured Biquote BTCUSD feed' },
+  { appSymbol: 'EURUSD', marketSymbol: 'EURUSD', source: 'biquote', sourceNote: 'App-configured Biquote EURUSD feed' },
+  { appSymbol: 'QQQUSDT', marketSymbol: 'QQQUSDT', source: 'bybit', sourceNote: 'Bybit QQQUSDT linear perpetual feed' }
 ];
 const now = Date.now();
 const nowSeconds = Math.floor(now / 1000);
@@ -14,19 +16,35 @@ const toBars = rows => rows.slice().reverse().map(row => {
   const closeTime = time + 300;
   return { time, open: Number(row[1]), high: Number(row[2]), low: Number(row[3]), close: Number(row[4]), volume: Number(row[5]), closeTime, ...(closeTime >= nowSeconds ? { isOpen: true } : {}) };
 });
-async function fetchBars(symbol) {
-  const url = BYBIT + '?category=linear&symbol=' + encodeURIComponent(symbol) + '&interval=5&limit=' + LIMIT;
+async function fetchBars(item) {
+  if (item.source === 'biquote') {
+    const url = BIQUOTE + '/' + encodeURIComponent(item.marketSymbol) + '/ohlc?interval=5m&limit=' + LIMIT;
+    const response = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'APA-SMC-Historical-Replay/1.0' } });
+    if (!response.ok) throw new Error(item.marketSymbol + ' Biquote candles HTTP ' + response.status);
+    const payload = await response.json();
+    const rows = Array.isArray(payload) ? payload : payload?.bars || payload?.data || payload?.candles || payload?.ohlc || [];
+    const bars = rows.map(row => {
+      const raw = row.openTime ?? row.time ?? row.timestamp ?? row.date;
+      const parsed = typeof raw === 'number' ? raw : (/^\\d+(\\.\\d+)?$/.test(String(raw)) ? Number(raw) : Date.parse(raw));
+      const time = Math.floor(parsed > 1e12 ? parsed / 1000 : parsed);
+      return { time, open: Number(row.open), high: Number(row.high), low: Number(row.low), close: Number(row.close), volume: Number(row.volume ?? row.tickVolume ?? 0), closeTime: time + 300, isOpen: time + 300 >= nowSeconds };
+    }).filter(b => Number.isFinite(b.time) && b.time > 0 && [b.open,b.high,b.low,b.close].every(Number.isFinite) && b.high >= Math.max(b.open,b.close,b.low) && b.low <= Math.min(b.open,b.close,b.high)).sort((a,b) => a.time-b.time);
+    if (bars.length < 100) throw new Error(item.marketSymbol + ' returned only ' + bars.length + ' valid Biquote candles');
+    return bars;
+  }
+  const url = BYBIT + '?category=linear&symbol=' + encodeURIComponent(item.marketSymbol) + '&interval=5&limit=' + LIMIT;
   const response = await fetch(url, { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'APA-SMC-Historical-Replay/1.0' } });
-  if (!response.ok) throw new Error(symbol + ' candles HTTP ' + response.status);
+  if (!response.ok) throw new Error(item.marketSymbol + ' candles HTTP ' + response.status);
   const payload = await response.json();
   const rows = payload?.result?.list;
-  if (payload?.retCode !== 0 || !Array.isArray(rows) || rows.length < 100) throw new Error(symbol + ' returned insufficient Bybit candle history');
+  if (payload?.retCode !== 0 || !Array.isArray(rows) || rows.length < 100) throw new Error(item.marketSymbol + ' returned insufficient Bybit candle history');
   return toBars(rows);
 }
 const engine = createProductionScannerReplay({ now });
-const summary = { generatedAt: new Date(now).toISOString(), timeframe: '5m', rrMinimum: 3, source: 'Bybit linear perpetual public klines', markets: [] };
+const summary = { generatedAt: new Date(now).toISOString(), timeframe: '5m', rrMinimum: 3, source: 'App-configured Biquote candles for BTCUSD/EURUSD; Bybit public klines for QQQUSDT', markets: [], feedErrors: [] };
 for (const item of symbols) {
-  const bars = await fetchBars(item.marketSymbol);
+  try {
+  const bars = await fetchBars(item);
   const scanned = engine.scan(item.appSymbol, '5m', bars);
   const candidates = scanned.signals.filter(signal => Number(signal.rr) >= 3 && Number(signal.time) < nowSeconds - duration['5m']);
   const outcomes = engine.resolveOutcomes(item.appSymbol, '5m', bars, candidates);
@@ -60,6 +78,9 @@ for (const item of symbols) {
       rr: t.rr, status: t.status, outcome: t.outcome, r: t.r
     }))
   });
+  } catch (error) {
+    summary.feedErrors.push({ appSymbol: item.appSymbol, source: item.source, error: String(error?.message || error) });
+  }
 }
 console.log('APA_SMC_HISTORICAL_REPLAY_RESULT');
 console.log(JSON.stringify(summary, null, 2));
