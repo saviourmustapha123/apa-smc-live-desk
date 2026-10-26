@@ -355,6 +355,10 @@ function pendingOrderBlockOpportunity(symbol,tf,bars){
   const bullish=impulse.close>impulse.open&&!!high&&prev.close<=high.p&&impulse.close>high.p;
   const bearish=impulse.close<impulse.open&&!!low&&prev.close>=low.p&&impulse.close<low.p;
   if(!bullish&&!bearish)continue;
+  const priorBullTrend=known.h.length>=2&&known.l.length>=2&&known.h.at(-1).p>known.h.at(-2).p&&known.l.at(-1).p>known.l.at(-2).p;
+  const priorBearTrend=known.h.length>=2&&known.l.length>=2&&known.h.at(-1).p<known.h.at(-2).p&&known.l.at(-1).p<known.l.at(-2).p;
+  const structureEvent=bullish?(priorBearTrend?'CHoCH':'BOS'):(priorBullTrend?'CHoCH':'BOS');
+  const contextMode=structureEvent==='CHoCH'?'TREND SHIFT':'CONTINUATION / STRUCTURAL BOS';
   const fvgConfirmed=i>=2&&(bullish?impulse.low>b[i-2].high:impulse.high<b[i-2].low);
   if(!fvgConfirmed)continue;
   // Continuation rule: after a confirmed new high/new low in an established trend, a fresh FVG-backed OB may be mitigated for the next move without inducement. After a CHoCH, later aligned breaks may be continuation BOS; never require QML/inducement on every block.
