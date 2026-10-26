@@ -56,7 +56,7 @@ if (start < 0 || next < 0) {
   }
   requireApp('Order-block retest requires an FVG-backed displacement', /const hasFvg=i>=2&&\(bullish\?impulse\.low>b\[i-2\]\.high:impulse\.high<b\[i-2\]\.low\);[\s\S]*?if\(!hasFvg\)continue;/,
     'Trade-grade OB retests require displacement, a close-confirmed structure break, a three-candle FVG and a first fresh retest');
-  requireApp('Chart maps order blocks only; no breaker-block mapping', !/BREAKER BLOCK|BREAKER RETEST|kind:\s*['\"]breaker-block['\"]|text:\s*[^\n]*BREAKER/.test(app),
+  requireApp('Chart maps order blocks only; no breaker-block mapping', !/label:\s*[^,\n]*BREAKER|kind:\s*['\"]breaker-block['\"]|text:\s*[^\n]*BREAKER|row\(['\"]Breaker block/.test(app),
     'The chart must not display breaker-block labels, markers, or separate breaker-block zones');
   requireApp('Fresh order-block first retest is enforced', /let invalidAt=-1,previousTouch=false;[\s\S]*?if\(invalidAt<0&&!previousTouch&&touched/,
     'An already mitigated zone cannot be reused as a fresh order-block entry');
