@@ -84,7 +84,8 @@ async function fetchBars(symbol, interval) {
         break;
       } catch (error) { lastError = error; }
     }
-    if (lastError || (sourceInterval === '4h' && (!rows || rows.length < 100))) {
+    const minimumSourceRows = sourceInterval === '1d' ? 40 : 100;
+    if (lastError || !rows || rows.length < minimumSourceRows) {
       // Retry alternate exact-contract Binance futures hosts even when a primary
       // host returned a short response. Do not mistake a partial history for coverage.
       let exchangeError = lastError;
@@ -102,7 +103,7 @@ async function fetchBars(symbol, interval) {
       }
       lastError = exchangeError;
     }
-    if (lastError || (sourceInterval === '4h' && (!rows || rows.length < 100))) {
+    if (sourceInterval === '4h' && (lastError || !rows || rows.length < 100)) {
       // For 4h, use exact QQQUSDT archives before substituting the QQQ ETF.
       // This also supplies enough exact 4h source bars for 8h/12h aggregation.
       try {
