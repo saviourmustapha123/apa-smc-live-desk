@@ -317,13 +317,16 @@ function detectRecentBlockRetest(bars,k,dispMult){
   for(let j=i-1;j>=Math.max(0,i-4);j--){if(bullish?b[j].close<b[j].open:b[j].close>b[j].open){origin=j;break}}
   if(origin<0)continue;
   const candle=b[origin],zone={low:candle.low,high:candle.high,side:bullish?'BUY':'SELL',formedAt:i};
-  let invalidAt=-1,previousTouch=false;
+  let invalidAt=-1,previousTouch=false,extensionSeen=false,touchedBeforeExtension=false;
   for(let j=i+1;j<n-1;j++){
    if(zone.side==='BUY'?b[j].close<zone.low:b[j].close>zone.high){invalidAt=j;break}
-   if(b[j].low<=zone.high&&b[j].high>=zone.low)previousTouch=true;
+   const touched=b[j].low<=zone.high&&b[j].high>=zone.low;
+   if(touched){previousTouch=true;if(!extensionSeen)touchedBeforeExtension=true}
+   // Require a post-BOS extension beyond the impulse extreme before the first OB mitigation.
+   if(zone.side==='BUY'?b[j].high>impulse.high:b[j].low<impulse.low)extensionSeen=true;
   }
   const touched=current.low<=zone.high&&current.high>=zone.low;
-  if(invalidAt<0&&!previousTouch&&touched&&((zone.side==='BUY'&&current.close>current.open&&current.close>=(zone.low+zone.high)/2)||(zone.side==='SELL'&&current.close<current.open&&current.close<=(zone.low+zone.high)/2))){
+  if(invalidAt<0&&!previousTouch&&extensionSeen&&!touchedBeforeExtension&&touched&&((zone.side==='BUY'&&current.close>current.open&&current.close>=(zone.low+zone.high)/2)||(zone.side==='SELL'&&current.close<current.open&&current.close<=(zone.low+zone.high)/2))){
    // A valid first retest of an FVG-backed OB is not automatically invalid when
    // a separate inducement event is absent. Record inducement only when its full
    // BOS-linked sweep sequence is actually present; never fabricate it.
@@ -379,13 +382,16 @@ function pendingOrderBlockOpportunity(symbol,tf,bars){
   }
   if(origin<0)continue;
   const ob=b[origin],zone={low:ob.low,high:ob.high};
-  let invalidated=false,mitigated=false;
+  let invalidated=false,mitigated=false,extensionSeen=false,touchedBeforeExtension=false;
   for(let j=i+1;j<b.length;j++){
    const candle=b[j];
    if(bullish?candle.close<zone.low:candle.close>zone.high){invalidated=true;break}
-   if(candle.low<=zone.high&&candle.high>=zone.low)mitigated=true;
+   const touched=candle.low<=zone.high&&candle.high>=zone.low;
+   if(touched){mitigated=true;if(!extensionSeen)touchedBeforeExtension=true}
+   // Continuation sequence is BOS -> fresh external extension (new high/low) -> OB retest.
+   if(bullish?candle.high>impulse.high:candle.low<impulse.low)extensionSeen=true;
   }
-  if(invalidated||mitigated)continue;
+  if(invalidated||mitigated||!extensionSeen||touchedBeforeExtension)continue;
   // A pending limit idea is valid only while price remains on the expected side of the untouched OB.
   if(bullish?current.close<=zone.high:current.close>=zone.low)continue;
   const entry=(zone.low+zone.high)/2;
