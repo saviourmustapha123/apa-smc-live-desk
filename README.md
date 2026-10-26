@@ -50,3 +50,8 @@ To inspect or run the checks:
 ## Security
 
 See [SECURITY.md](SECURITY.md). Keep the repository public while using GitHub Pages on the current free setup; making the repository private may unpublish the site. Review GitHub account email privacy, enable two-factor authentication or a passkey, and never commit secrets.
+
+
+## Strategy rule registry
+
+The revised, source-aware rule baseline is documented in [`docs/STRATEGY_RULE_REGISTRY_REVISION_2.md`](docs/STRATEGY_RULE_REGISTRY_REVISION_2.md). It records the latest inducement, order-block, breaker-block and QML corrections; the other SMC/APA/Alchemist variables; required detector states; and the distinction between rule definitions, implementation verification and performance validation. This is a specification baseline, not evidence that all rules have been implemented or that the strategy is profitable.
