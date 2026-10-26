@@ -522,12 +522,18 @@ function scanOpportunityHistory(symbol,tf,bars){
   const hasPatternOrRole=!!patternRetest||hasRoleReversal;
   const hasEntryZone=hasZoneRetest||hasPatternOrRole;
   const hasLiquidityConfluence=recentDirectionalSweep||inducementSweep||!!(blockRetest&&blockRetest.inducementSweepAt!=null)||hasPatternOrRole;
-  const validatedSequence=hasEntryZone&&recentStructuralDisplacement&&hasLiquidityConfluence;
-  if(!validatedSequence){rejectLatest('Confluence incomplete: requires POI/pattern retest, recent same-direction displacement, and liquidity/pattern confirmation');continue;}
+  // Two explicit entry models are allowed: (1) a confirmed POI retest, or
+  // (2) a close-confirmed structure-break entry only when the same direction
+  // also has fresh displacement and a recent directional liquidity sweep.
+  // This avoids deadlocking the scanner while price runs away without retesting,
+  // without turning an isolated BOS/FVG into a trade. The hard 3R gate still applies.
+  const breakoutEntry=hasStructure&&recentStructuralDisplacement&&recentDirectionalSweep;
+  const validatedSequence=(hasEntryZone&&recentStructuralDisplacement&&hasLiquidityConfluence)||breakoutEntry;
+  if(!validatedSequence){rejectLatest('No entry model passed: need a POI retest with displacement/liquidity, or a displaced structure break after a directional sweep');continue;}
   if(disp)reasons.push('Displacement confirmed (ATR filter)');
   if(recentStructuralDisplacement)reasons.push('Recent same-direction BOS/CHoCH with displacement');
   if(recentDirectionalSweep)reasons.push('Recent directional liquidity sweep');
-  reasons.push('Entry sequence passed: structure + displacement + POI retest + liquidity/pattern confluence');
+  reasons.push(breakoutEntry&&!hasEntryZone?'Entry sequence passed: liquidity sweep + displaced structure break (market-close model)':'Entry sequence passed: structure + displacement + POI retest + liquidity/pattern confluence');
 
   // The final trigger candle must confirm direction. A liquidity sweep may qualify
   // without ATR displacement; a plain structure break must show displacement or a
