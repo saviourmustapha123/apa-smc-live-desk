@@ -58,7 +58,7 @@ if (start < 0 || next < 0) {
       'Order block and breaker block have distinct lifecycle labels');
     requireBlock('Breaker requires invalidation and movement fully beyond the old OB', /if\(invalidAt>=0&&touched\)[\s\S]*fullyAway=flipped==='SELL'\?candleAfterBreach\.high<zone\.low:candleAfterBreach\.low>zone\.high/,
       'A breaker is not inferred from an ordinary first-touch OB retest');
-    requireBlock('Breaker requires opposite structure break and rejection on return', /oppositeBreak[\s\S]*returnedFromFarSide[\s\S]*if\(movedAway&&oppositeBreak&&returnedFromFarSide&&reject\)/,
+    requireBlock('Breaker requires opposite structure break and rejection on return', /oppositeBreakAt[\s\S]*returnedFromFarSide[\s\S]*if\(movedAwayAt>=0&&oppositeBreakAt>movedAwayAt&&returnedFromFarSide&&reject\)/,
       'Requires departure, opposite structural break, return and directional rejection');
   }
 
