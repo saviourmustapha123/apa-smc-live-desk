@@ -51,13 +51,20 @@ async function fetchBars(symbol, interval) {
     }
     if (lastError) {
       try {
-        const range = sourceInterval === '1m' ? '7d' : sourceInterval === '5m' ? '14d' : '60d';
-        const response = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/QQQ?range=' + range + '&interval=' + sourceInterval, { signal: AbortSignal.timeout(15000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
+        const yahooInterval = sourceInterval === '4h' ? '1h' : sourceInterval;
+        const range = yahooInterval === '1m' ? '7d' : yahooInterval === '5m' ? '14d' : '60d';
+        const response = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/QQQ?range=' + range + '&interval=' + yahooInterval, { signal: AbortSignal.timeout(15000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
         if (!response.ok) throw new Error('Yahoo QQQ ETF HTTP ' + response.status);
         const json = await response.json(), result = json.chart?.result?.[0];
         if (!result || !Array.isArray(result.timestamp)) throw new Error(json.chart?.error?.description || 'Yahoo returned no chart rows');
-        const q = result.indicators?.quote?.[0];
-        rows = result.timestamp.map((time,i) => ({ time, open: Number(q?.open?.[i]), high: Number(q?.high?.[i]), low: Number(q?.low?.[i]), close: Number(q?.close?.[i]), isOpen: time + sourceSeconds > Math.floor(Date.now()/1000) }));
+        const q = result.indicators?.quote?.[0], yahooSeconds = yahooInterval === '1h' ? 3600 : sourceSeconds;
+        rows = result.timestamp.map((time,i) => ({ time, open: Number(q?.open?.[i]), high: Number(q?.high?.[i]), low: Number(q?.low?.[i]), close: Number(q?.close?.[i]), isOpen: time + yahooSeconds > Math.floor(Date.now()/1000) }));
+        if (sourceInterval === '4h') {
+          const groups = new Map();
+          for (const bar of rows) { const bucket = Math.floor(bar.time / 14400) * 14400; if (!groups.has(bucket)) groups.set(bucket, []); groups.get(bucket).push(bar); }
+          rows = [...groups.entries()].filter(([,group]) => group.length === 4 && group.every((bar,i) => i === 0 || bar.time - group[i-1].time === 3600))
+            .map(([time,group]) => ({ time, open: group[0].open, high: Math.max(...group.map(b=>b.high)), low: Math.min(...group.map(b=>b.low)), close: group[group.length-1].close, isOpen: time + 14400 > Math.floor(Date.now()/1000) }));
+        }
         normalise = b => b;
         lastError = null;
       } catch (error) { lastError = error; }
