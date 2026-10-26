@@ -927,6 +927,18 @@ function addAdvancedAnnotations(b,marks){
  const k=Math.max(2,+s.k||3),last=b.length-1,from=Math.max(2,last-100);
  const all=pivots(b,k),confirmedH=all.h.filter(p=>p.i<=last-k),confirmedL=all.l.filter(p=>p.i<=last-k);
  const zone=(start,end,high,low,label,color,fill,kind='zone',extendRight=true)=>{if(!Number.isFinite(high)||!Number.isFinite(low)||high<=low)return;s.zoneDefs.push({start,end,high,low,label,color,fill,kind,extendRight})};
+ // Feed the same qualified OB/breaker detector used by the selected chart into the
+ // shared annotation layer, so source-timeframe zones stay visible on every chart.
+ const qualified=recentQualifiedZones(b,k,s.disp);
+ for(const ob of (qualified.blocks||[]).slice(-4)){
+  const bullish=ob.side==='BULLISH',fresh=ob.mitigatedAt==null,endTime=fresh?b[last].time:(b[ob.mitigatedAt]?.time||b[last].time),color=bullish?'#35d39a':'#ff9c69';
+  zone(ob.time,endTime,ob.high,ob.low,(bullish?'BULLISH':'BEARISH')+' ORDER BLOCK · '+(fresh?'FRESH':'MITIGATED')+' · FVG + BOS',color,color+(fresh?'32':'18'),'order-block',fresh);
+ }
+ for(const breaker of (qualified.breakers||[]).slice(-3)){
+  const bullish=breaker.side==='BULLISH',color=bullish?'#a78bfa':'#f97316';
+  zone(breaker.time,b[last].time,breaker.high,breaker.low,(bullish?'BULLISH':'BEARISH')+' BREAKER BLOCK · FAILED OB + OPPOSITE SHIFT + RETEST',color,color+'30','breaker',true);
+  if(breaker.retestTime)marks.push({time:breaker.retestTime,position:bullish?'belowBar':'aboveBar',color,shape:'square',text:'BREAKER RETEST'});
+ }
  // Three-candle fair value gaps and inversions. Zones remain local to their origin and are labelled independently.
  let gaps=[];
  for(let i=Math.max(2,last-100);i<=last;i++){
