@@ -299,12 +299,12 @@ function detectRecentBlockRetest(bars,k,dispMult){
   }
   const touched=current.low<=zone.high&&current.high>=zone.low;
   if(invalidAt<0&&!previousTouch&&touched&&((zone.side==='BUY'&&current.close>current.open&&current.close>=(zone.low+zone.high)/2)||(zone.side==='SELL'&&current.close<current.open&&current.close<=(zone.low+zone.high)/2))){
-   // APA entry model: BOS-linked inducement and nearby equal-level liquidity must
-   // be swept before the first mitigation of this order block.
+   // A valid first retest of an FVG-backed OB is not automatically invalid when
+   // a separate inducement event is absent. Record inducement only when its full
+   // BOS-linked sweep sequence is actually present; never fabricate it.
    const idm=latestInducementProxy(b.slice(0,n-1),k),idmSide=zone.side==='BUY'?'BULLISH':'BEARISH';
-   if(idm&&idm.status==='SWEPT'&&idm.side===idmSide&&idm.bosTime===impulse.time&&idm.eventIndex>i){
-    events.push({...zone,type:'ORDER BLOCK RETEST · IDM + LIQUIDITY SWEPT',inducementSweepAt:idm.eventIndex,inducementLevel:idm.level,liquidityLevels:idm.liquidityLevels||[idm.level]});
-   }
+   const linkedIdm=!!(idm&&idm.status==='SWEPT'&&idm.side===idmSide&&idm.bosTime===impulse.time&&idm.eventIndex>i);
+   events.push({...zone,type:linkedIdm?'ORDER BLOCK RETEST · IDM + LIQUIDITY SWEPT':'ORDER BLOCK RETEST · FVG + BOS',...(linkedIdm?{inducementSweepAt:idm.eventIndex,inducementLevel:idm.level,liquidityLevels:idm.liquidityLevels||[idm.level]}:{})});
    continue;
   }
   if(invalidAt>=0&&touched){
@@ -561,6 +561,14 @@ function realizedSignalR(t){
  if(t.status==='STOP LOSS')return -1;
  return null;
 }
+function signalBarEndMs(tf,timeSeconds){
+ const d=new Date(Number(timeSeconds)*1000);
+ if(tf==='1W'){const day=(d.getUTCDay()+6)%7;return Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()-day+7)}
+ if(tf==='1M')return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1);
+ if(tf==='1Y')return Date.UTC(d.getUTCFullYear()+1,0,1);
+ const span=({'1m':60000,'3m':180000,'5m':300000,'15m':900000,'30m':1800000,'1h':3600000,'2h':7200000,'4h':14400000,'6h':21600000,'8h':28800000,'12h':43200000,'1d':86400000}[tf]||3600000);
+ return Number(timeSeconds)*1000+span;
+}
 function resolveSignalOutcomes(symbol,tf,bars){
  const closedBars=(bars||[]).filter(b=>!b.isOpen&&Number.isFinite(b.time)&&Number.isFinite(b.high)&&Number.isFinite(b.low)).sort((a,b)=>a.time-b.time);
  if(!closedBars.length)return [];
@@ -575,11 +583,10 @@ function resolveSignalOutcomes(symbol,tf,bars){
   // Persisted active trades must remain active across reloads and shortened
   // candle history. Reconstruct entry state from the stored trigger timestamp,
   // then evaluate only the candle that contains that trigger and later candles.
-  const timeframeMs={'1m':60000,'3m':180000,'5m':300000,'15m':900000,'30m':1800000,'1h':3600000,'2h':7200000,'4h':14400000,'6h':21600000,'8h':28800000,'12h':43200000,'1d':86400000}[tf]||3600000;
   let entered=Boolean(triggeredAt)||t.status==='RUNNING',finalStatus=null,exitPrice=null,closedAt=null;
   for(const bar of closedBars){
    if(bar.time<=Number(t.time))continue;
-   if(entered&&triggeredAt&&bar.time*1000+timeframeMs<=Number(triggeredAt))continue;
+   if(entered&&triggeredAt&&signalBarEndMs(tf,bar.time)<=Number(triggeredAt))continue;
    const entryTouched=bar.low<=entry&&bar.high>=entry;
    const stopTouched=t.side==='BUY'?bar.low<=sl:bar.high>=sl;
    const targetTouched=t.side==='BUY'?bar.high>=tp:bar.low<=tp;
@@ -672,7 +679,7 @@ async function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode){
  // Chart analysis still covers across 11 timeframes; only actionable alerts are restricted below.
  // Higher/lower context frames remain available on the chart, but manual-entry alerts
  // are limited to practical execution frames to avoid eleven overlapping alerts per pair.
- const signalSets=sets.filter(([tf])=>['1m','5m','15m','1h','4h','8h','12h','1d'].includes(tf));
+ const signalSets=sets; // All supported timeframes participate in candidate discovery; HTFs are not display-only.
  const seen=new Set(s.log.map(t=>[t.symbol,t.tf,t.side,t.time].join('|'))),additions=[];
  const openStatuses=new Set(['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED','RUNNING','TRIGGERED','ACTIVE']);
  const alreadyOpen=s.log.filter(t=>t.symbol===symbol&&openStatuses.has(String(t.status||'').toUpperCase())&&Number(t.rr)>=MIN_REWARD_RISK);
@@ -715,7 +722,7 @@ async function refreshTopDown(force=false,freshOnly=s.signalFreshMode){
   const scanSets=[['1m',m1],['5m',m5],['15m',m15],['1h',h1],['4h',h4],['8h',h8],['12h',h12],['1d',d1],['1W',weekly],['1M',monthly],['1Y',yearly]];
   rebuildUnifiedAnnotations(scanSets);
   const additions=[],seen=new Set(s.log.map(t=>[t.symbol,t.tf,t.side,t.time].join('|')));
-  const signalSets=scanSets.filter(([tf])=>['1m','5m','15m','1h','4h','8h','12h','1d'].includes(tf));
+  const signalSets=scanSets; // Keep top-down context and actionable discovery unified across all 11 frames.
   const openStatuses=new Set(['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED','RUNNING','TRIGGERED','ACTIVE']);
   const alreadyOpen=s.log.filter(t=>t.symbol===sym&&openStatuses.has(String(t.status||'').toUpperCase())&&Number(t.rr)>=MIN_REWARD_RISK);
   const openTf=new Set(alreadyOpen.map(t=>t.tf));let openCount=alreadyOpen.length;
@@ -1132,12 +1139,12 @@ async function runAutomaticPairScan(){
  try{
   const count=await scanBackgroundPair(market,true);
   const statusEl=$('signalEngineStatus');
-  const executionTfs=['1m','5m','15m','1h','4h','8h','12h','1d'];
+  const executionTfs=['1m','5m','15m','1h','4h','8h','12h','1d','1W','1M','1Y'];
   const diagnostics=executionTfs.map(tf=>strategyScanDiagnostics.get(market+'|'+tf)).filter(Boolean);
   const foundTfs=diagnostics.filter(d=>d.candidateFound).map(d=>d.tf.toUpperCase());
   const blockers=diagnostics.filter(d=>!d.candidateFound).map(d=>d.tf.toUpperCase()+': '+d.latestRejection);
   const explanation=count?count+' new qualifying candidates':foundTfs.length?'No new signal: a qualifying setup already exists or the timeframe has an open setup ('+foundTfs.slice(0,3).join(', ')+')':'No signal: '+(blockers.slice(0,2).join(' · ')||'waiting for enough confirmed candles');
-  if(statusEl)statusEl.textContent='Automatic scan · '+market+' · 8 execution timeframes checked · '+explanation+' · '+new Date().toLocaleTimeString();
+  if(statusEl)statusEl.textContent='Automatic scan · '+market+' · 11 timeframes checked (1m → yearly) · '+explanation+' · '+new Date().toLocaleTimeString();
  }catch(error){const statusEl=$('signalEngineStatus');if(statusEl)statusEl.textContent='Automatic scan failed for '+market+' · '+(error?.message||String(error))+' · retrying automatically';console.warn('Automatic signal scan failed for '+market,error)}
  finally{automaticScanBusy=false}
 }
