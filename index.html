@@ -527,7 +527,8 @@ function scanOpportunityHistory(symbol,tf,bars){
   // also has fresh displacement and a recent directional liquidity sweep.
   // This avoids deadlocking the scanner while price runs away without retesting,
   // without turning an isolated BOS/FVG into a trade. The hard 3R gate still applies.
-  const breakoutEntry=hasStructure&&recentStructuralDisplacement&&recentDirectionalSweep;
+  const sameDirectionBreak=side==='BUY'?upBreak:downBreak;
+  const breakoutEntry=sameDirectionBreak&&recentStructuralDisplacement&&recentDirectionalSweep;
   const validatedSequence=(hasEntryZone&&recentStructuralDisplacement&&hasLiquidityConfluence)||breakoutEntry;
   if(!validatedSequence){rejectLatest('No entry model passed: need a POI retest with displacement/liquidity, or a displaced structure break after a directional sweep');continue;}
   if(disp)reasons.push('Displacement confirmed (ATR filter)');
