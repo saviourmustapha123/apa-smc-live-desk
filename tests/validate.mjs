@@ -38,6 +38,8 @@ const blockFn = html.slice(blockStart, blockEnd);
 assert.ok(blockFn.includes('const linkedIdm='), 'OB retest must record optional linked inducement');
 assert.ok(blockFn.includes("'ORDER BLOCK RETEST · FVG + BOS'"), 'valid OB retest must be admitted without fabricated inducement');
 assert.ok(!blockFn.includes('if(idm&&idm.status===\'SWEPT\''), 'OB retest must not hard-require inducement');
+const rulebook = readFileSync(new URL('../STRATEGY_RULEBOOK.md', import.meta.url), 'utf8');
+assert.ok(rulebook.includes('Continuation OBs do not require inducement') && rulebook.includes('first pullback can mitigate a fresh OB'), 'rulebook must preserve continuation OBs without inducement and valid first mitigation');
 
 console.log('PASS: inline JavaScript syntax');
 console.log('PASS: 3 markets × 11 timeframe UI/scan contract');
