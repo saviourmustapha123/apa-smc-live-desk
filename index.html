@@ -1205,23 +1205,38 @@ function recentQualifiedZones(b,k,dispMult){
   const impulse=b[i],prior=b[i-1],baseAtr=atr(b.slice(0,i))||Math.max(impulse.high-impulse.low,1e-8),body=Math.abs(impulse.close-impulse.open);
   if(body<baseAtr*dispMult)continue;
   const priorPivots=pivots(b.slice(0,i),k),high=priorPivots.h.at(-1),low=priorPivots.l.at(-1);
-  // Core OB qualification: displacement must close through a confirmed opposing swing.
-  // A three-candle FVG is supporting confluence, not a mandatory condition for every valid OB.
   const bullish=impulse.close>impulse.open&&high&&prior.close<=high.p&&impulse.close>high.p;
   const bearish=impulse.close<impulse.open&&low&&prior.close>=low.p&&impulse.close<low.p;
   if(!bullish&&!bearish)continue;
-  let origin=-1;for(let j=i-1;j>=Math.max(0,i-3);j--){if(bullish?b[j].close<b[j].open:b[j].close>b[j].open){origin=j;break}}
+  let origin=-1;
+  for(let j=i-1;j>=Math.max(0,i-3);j--){if(bullish?b[j].close<b[j].open:b[j].close>b[j].open){origin=j;break}}
   if(origin<0)continue;
-  const candle=b[origin],hasFvg=i>=2&&(bullish?impulse.low>b[i-2].high:impulse.high<b[i-2].low),ob={index:origin,time:candle.time,low:candle.low,high:candle.high,side:bullish?'BULLISH':'BEARISH',impulseIndex:i,hasFvg,invalidatedAt:null};
-  for(let j=i+1;j<b.length;j++){if(ob.side==='BULLISH'?b[j].close<ob.low:b[j].close>ob.high){ob.invalidatedAt=j;break}}
+  const candle=b[origin],hasFvg=i>=2&&(bullish?impulse.low>b[i-2].high:impulse.high<b[i-2].low);
+  const ob={index:origin,time:candle.time,low:candle.low,high:candle.high,side:bullish?'BULLISH':'BEARISH',impulseIndex:i,hasFvg,invalidatedAt:null};
+  let swept=false;
+  for(let j=i+1;j<b.length;j++){
+   // A bearish breaker requires buy-side liquidity taken before the bullish OB fails.
+   // A bullish breaker requires sell-side liquidity taken before the bearish OB fails.
+   if(ob.side==='BULLISH'&&high&&b[j].high>high.p)swept=true;
+   if(ob.side==='BEARISH'&&low&&b[j].low<low.p)swept=true;
+   if(ob.side==='BULLISH'?b[j].close<ob.low:b[j].close>ob.high){ob.invalidatedAt=j;break}
+  }
   if(ob.invalidatedAt==null){blocks.push(ob);continue}
+  // A failed OB is not automatically a breaker: require the relevant liquidity sweep first.
+  if(!swept)continue;
   const side=ob.side==='BULLISH'?'BEARISH':'BULLISH';let oppositeBreak=-1;
   for(let j=ob.invalidatedAt+1;j<b.length;j++){
    const p=pivots(b.slice(0,j),k),swing=side==='BEARISH'?p.l.at(-1):p.h.at(-1);
-   if(swing&&(side==='BEARISH'?b[j-1].close>=swing.p&&b[j].close<swing.p:b[j-1].close<=swing.p&&b[j].close>swing.p)){oppositeBreak=j;break}
+   const a=atr(b.slice(Math.max(0,j-20),j+1))||Math.max(b[j].high-b[j].low,1e-8);
+   const displacement=Math.abs(b[j].close-b[j].open)>=a*Math.max(.1,Number(dispMult)||1.2);
+   if(swing&&displacement&&(side==='BEARISH'?b[j-1].close>=swing.p&&b[j].close<swing.p:b[j-1].close<=swing.p&&b[j].close>swing.p)){oppositeBreak=j;break}
   }
   if(oppositeBreak<0)continue;
-  for(let j=oppositeBreak+1;j<b.length;j++){const bar=b[j],touch=bar.low<=ob.high&&bar.high>=ob.low,reject=side==='BEARISH'?bar.close<ob.low:bar.close>ob.high;if(touch&&reject){breakers.push({...ob,side,retestIndex:j,retestTime:bar.time});break}}
+  for(let j=oppositeBreak+1;j<b.length;j++){
+   const bar=b[j],touch=bar.low<=ob.high&&bar.high>=ob.low;
+   const reject=side==='BEARISH'?bar.close<ob.low:bar.close>ob.high;
+   if(touch&&reject){breakers.push({...ob,side,retestIndex:j,retestTime:bar.time});break}
+  }
  }
  return {ob:blocks.at(-1)||null,breaker:breakers.at(-1)||null}
 }
