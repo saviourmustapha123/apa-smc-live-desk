@@ -16,6 +16,8 @@ test('ordinary order-block retest requires the original zone to remain valid and
 test('breaker block requires original OB invalidation, movement fully away, opposite structure break, and return rejection', () => {
   assert.match(detector, /if\(invalidAt>=0&&touched\)/);
   assert.match(detector, /fullyAway=flipped==='SELL'\?candleAfterBreach\.high<zone\.low:candleAfterBreach\.low>zone\.high/);
+  assert.match(detector, /if\(!movedAway\)continue/);
+  assert.ok(detector.indexOf('if(fullyAway)movedAway=true;') < detector.indexOf('if(!movedAway)continue') && detector.indexOf('if(!movedAway)continue') < detector.indexOf('if(swing&&(flipped==='));
   assert.match(detector, /if\(swing&&\(flipped==='SELL'\?/);
   assert.match(detector, /returnedFromFarSide/);
   assert.match(detector, /const reject=flipped==='SELL'\?current\.close<zone\.low&&current\.close<current\.open:current\.close>zone\.high&&current\.close>current\.open/);
