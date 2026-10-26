@@ -34,7 +34,7 @@ test('replay exposes the production pending-order-block detector separately from
 
 test('admits a fresh continuation OB without inducement', () => {
   const engine = createProductionScannerReplay({ now: NOW });
-  const bars = candles(60);
+  const bars = candles(60, { lastTime: Math.floor(NOW / 1000) - 9 * 300 });
   const push = (open, high, low, close) => bars.push({ time: bars.at(-1).time + 300, open, high, low, close });
   push(100.2,100.4,99.3,99.6); push(99.6,100.1,99.5,100.0);
   push(100.5,103.7,101.2,103.4); push(103.0,103.2,102.6,102.8);
