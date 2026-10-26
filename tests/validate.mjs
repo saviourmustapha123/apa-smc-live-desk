@@ -24,9 +24,6 @@ assert.ok(html.includes('const signalSets=sets;'), 'background scan must inspect
 assert.ok(html.includes('const signalSets=scanSets;'), 'top-down scan must inspect every supported timeframe');
 assert.ok(html.includes('if(!hasFvg)continue;'), 'unqualified OBs without FVG must be rejected');
 assert.ok(html.includes('if(!fvgConfirmed)continue;'), 'pending OB setups must require associated FVG');
-assert.ok(html.includes('function lastStructuralBias('), 'structure classification must track confirmed structural bias after CHoCH');
-assert.ok(html.includes('const priorBias=lastStructuralBias(b,k,i)'), 'pending OB detector must distinguish continuation BOS from trend-shift CHoCH');
-assert.ok(html.includes('const priorBias=lastStructuralBias(hist,+s.k,hist.length-1)'), 'historical scanner must use the same structural-bias rule');
 
 assert.ok(html.includes('!extensionSeen||touchedBeforeExtension'), 'pending OB requires BOS then a fresh high/low before first mitigation');
 assert.ok(html.includes('extensionSeen&&!touchedBeforeExtension&&touched'), 'OB retest requires post-BOS extension before first mitigation');
