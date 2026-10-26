@@ -65,6 +65,8 @@ if (start < 0 || next < 0) {
     'Where nearby equal-level liquidity exists, the sweep must clear the outer pool and reclaim the cluster');
   requireApp('OB retest is sequenced after IDM sweep', /idm\.bosTime===impulse\.time[\s\S]*?idm\.eventIndex>i[\s\S]*?ORDER BLOCK RETEST · IDM \+ LIQUIDITY SWEPT/,
     'The live OB entry path requires the linked inducement/liquidity sweep before first mitigation');
+  requireApp('IDM and nearby liquidity have separate physical chart zones', /NEARBY LIQUIDITY POOL · IDM SEQUENCE[\s\S]*?kind:'inducement'/,
+    'The map distinguishes the inducement level from nearby liquidity that must be cleared and reclaimed');
 }
 
 const proxy = await readFile(new URL('./proxy-backtest.mjs', import.meta.url), 'utf8');
