@@ -66,7 +66,7 @@ test('Bybit candle request maps 60-minute interval to Binance 1h and returns rea
 test('Binance ticker request falls back to actual Bybit ticker data and preserves Binance response shape', async () => {
   const worker = makeWorker(async url => {
     const u = new URL(String(url));
-    if (u.hostname === 'fapi.binance.com') throw new Error('simulated Binance network block');
+    if (u.hostname.endsWith('binance.com')) throw new Error('simulated Binance network block');
     return jsonResponse({ retCode: 0, result: { list: [{ symbol: 'QQQUSDT', lastPrice: '222.10' }] } });
   });
   const response = await worker.fetch(new Request('https://worker.test/fapi/v1/ticker/price?symbol=QQQUSDT'));
