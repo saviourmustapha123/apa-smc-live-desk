@@ -11,18 +11,40 @@ export function executeSignal(signal, bars, index) {
   const plannedReward = signal.side === 'BUY' ? signal.tp - signal.entry : signal.entry - signal.tp;
   if (!(riskAtPlannedEntry > 0 && plannedReward > 0 && plannedReward / riskAtPlannedEntry >= MIN_RR)) return { outcome: 'REJECTED INVALID LEVELS/RR', r: null, triggered: false };
   const signalBar = bars[index];
-  const targetTouchedBeforeOrderWasActive = signal.side === 'BUY'
-    ? signalBar.high >= signal.tp
-    : signalBar.low <= signal.tp;
-  const entryTouchedBeforeOrderWasActive = signalBar.low <= signal.entry && signalBar.high >= signal.entry;
-  if (targetTouchedBeforeOrderWasActive || entryTouchedBeforeOrderWasActive) {
-    const reason = targetTouchedBeforeOrderWasActive
-      ? 'target already touched on signal candle'
-      : 'entry already touched on signal candle';
-    return { outcome: 'MISSED ENTRY (' + reason + ')', r: null, triggered: false, exitTime: signalBar.time };
-  }
   let triggeredAt = -1;
-  for (let i = index + 1; i < Math.min(bars.length, index + 1 + MAX_FORWARD_BARS); i++) {
+  let entry = signal.entry;
+  let risk = riskAtPlannedEntry;
+  let rr = plannedReward / riskAtPlannedEntry;
+  if (signal.entryType === 'MARKET_CLOSE') {
+    // The signal is only known after its candle closes. Replay a market-style
+    // candidate at the next candle open; never mark its own close as a missed limit fill.
+    const fillBar = bars[index + 1];
+    if (!fillBar) return { outcome: 'UNRESOLVED (no post-signal candle)', r: null, triggered: false };
+    const stopGapAtOpen = signal.side === 'BUY' ? fillBar.open <= signal.sl : fillBar.open >= signal.sl;
+    const targetGapAtOpen = signal.side === 'BUY' ? fillBar.open >= signal.tp : fillBar.open <= signal.tp;
+    if (stopGapAtOpen) return { outcome: 'INVALIDATED BEFORE ENTRY', r: null, triggered: false, exitTime: fillBar.time };
+    if (targetGapAtOpen) return { outcome: 'MISSED ENTRY (target reached before market fill)', r: null, triggered: false, exitTime: fillBar.time };
+    entry = fillBar.open;
+    risk = signal.side === 'BUY' ? entry - signal.sl : signal.sl - entry;
+    const reward = signal.side === 'BUY' ? signal.tp - entry : entry - signal.tp;
+    rr = risk > 0 ? reward / risk : NaN;
+    if (!(Number.isFinite(rr) && rr >= MIN_RR)) {
+      return { outcome: 'REJECTED GAP REDUCED RR', r: null, triggered: false, exitTime: fillBar.time, entry };
+    }
+    triggeredAt = index + 1;
+  } else {
+    const targetTouchedBeforeOrderWasActive = signal.side === 'BUY'
+      ? signalBar.high >= signal.tp
+      : signalBar.low <= signal.tp;
+    const entryTouchedBeforeOrderWasActive = signalBar.low <= signal.entry && signalBar.high >= signal.entry;
+    if (targetTouchedBeforeOrderWasActive || entryTouchedBeforeOrderWasActive) {
+      const reason = targetTouchedBeforeOrderWasActive
+        ? 'target already touched on signal candle'
+        : 'entry already touched on signal candle';
+      return { outcome: 'MISSED ENTRY (' + reason + ')', r: null, triggered: false, exitTime: signalBar.time };
+    }
+  }
+  for (let i = triggeredAt >= 0 ? triggeredAt + 1 : index + 1; i < Math.min(bars.length, index + 1 + MAX_FORWARD_BARS); i++) {
     const b = bars[i];
     // A gap already beyond the stop invalidates an unfilled pending order before
     // considering any later intrabar touch of the entry level.
@@ -41,9 +63,6 @@ export function executeSignal(signal, bars, index) {
     if (horizon >= bars.length) return { outcome: 'UNRESOLVED (data ended)', r: null, triggered: false };
     return { outcome: 'MISSED ENTRY / NOT FILLED', r: null, triggered: false };
   }
-  const entry = signal.entry;
-  const risk = signal.side === 'BUY' ? entry - signal.sl : signal.sl - entry;
-  const rr = Math.abs(signal.tp - entry) / risk;
   for (let i = triggeredAt; i < Math.min(bars.length, triggeredAt + MAX_FORWARD_BARS); i++) {
     const b = bars[i];
     const stop = signal.side === 'BUY' ? b.low <= signal.sl : b.high >= signal.sl;
