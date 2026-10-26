@@ -38,3 +38,9 @@ test('pending signals are not treated as active broker executions', () => {
   assert.match(html, /return 'NOT TRIGGERED'/);
   assert.match(html, /Background paper entries are simulated, not broker executions/);
 });
+
+test('QQQ ETF fallback uses Yahoo-supported intraday history windows', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('./production-history-backtest.mjs', import.meta.url), 'utf8');
+  assert.match(source, /const range = tf === '1m' \? '7d' : tf === '5m' \? '14d' : '60d'/);
+});
