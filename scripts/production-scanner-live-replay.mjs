@@ -25,7 +25,7 @@ async function fetchBars(item) {
     const rows = Array.isArray(payload) ? payload : payload?.bars || payload?.data || payload?.candles || payload?.ohlc || [];
     const bars = rows.map(row => {
       const raw = row.openTime ?? row.time ?? row.timestamp ?? row.date;
-      const parsed = typeof raw === 'number' ? raw : (/^\\d+(\\.\\d+)?$/.test(String(raw)) ? Number(raw) : Date.parse(raw));
+      const parsed = typeof raw === 'number' ? raw : (/^\d+(\.\d+)?$/.test(String(raw)) ? Number(raw) : Date.parse(raw));
       const time = Math.floor(parsed > 1e12 ? parsed / 1000 : parsed);
       return { time, open: Number(row.open), high: Number(row.high), low: Number(row.low), close: Number(row.close), volume: Number(row.volume ?? row.tickVolume ?? 0), closeTime: time + 300, isOpen: time + 300 >= nowSeconds };
     }).filter(b => Number.isFinite(b.time) && b.time > 0 && [b.open,b.high,b.low,b.close].every(Number.isFinite) && b.high >= Math.max(b.open,b.close,b.low) && b.low <= Math.min(b.open,b.close,b.high)).sort((a,b) => a.time-b.time);
