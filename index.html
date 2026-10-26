@@ -317,9 +317,13 @@ function detectRecentBlockRetest(bars,k,dispMult){
     const candleAfterBreach=b[j];
     const fullyAway=flipped==='SELL'?candleAfterBreach.high<zone.low:candleAfterBreach.low>zone.high;
     if(fullyAway)movedAway=true;
+    // The structural break must occur after price has fully cleared the
+    // invalidated block; a break that happened before this sequence is not
+    // evidence of a valid breaker transition.
+    if(!movedAway)continue;
     const knownHigh=allPivots.h.filter(p=>p.i+k<j).at(-1),knownLow=allPivots.l.filter(p=>p.i+k<j).at(-1);
     const swing=flipped==='SELL'?knownLow:knownHigh;
-    if(swing&&(flipped==='SELL'?b[j-1].close>=swing.p&&candleAfterBreach.close<swing.p:b[j-1].close<=swing.p&&candleAfterBreach.close>swing.p))oppositeBreak=true;
+    if(swing&&(flipped==='SELL'?b[j-1].close>=swing.p&&candleAfterBreach.close<swing.p:b[j-1].close<=swing.p&&candleAfterBreach.close>swing.p)){oppositeBreak=true;break;}
    }
    const returnedFromFarSide=flipped==='SELL'?current.high>=zone.low:current.low<=zone.high;
    const reject=flipped==='SELL'?current.close<zone.low&&current.close<current.open:current.close>zone.high&&current.close>current.open;
