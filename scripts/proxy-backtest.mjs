@@ -31,6 +31,7 @@ async function fetchBinanceVisionDaily(symbol, interval, days = 35) {
     return d.toISOString().slice(0, 10);
   });
   const directory = await mkdtemp(join(tmpdir(), 'apa-proxy-vision-'));
+  const archiveErrors = [];
   try {
     const batches = await Promise.all(dates.map(async date => {
       const file = symbol + '-' + interval + '-' + date + '.zip';
@@ -48,11 +49,16 @@ async function fetchBinanceVisionDaily(symbol, interval, days = 35) {
           return Number.isFinite(bar.time) && [bar.open,bar.high,bar.low,bar.close].every(Number.isFinite) &&
             bar.high >= Math.max(bar.open,bar.close,bar.low) && bar.low <= Math.min(bar.open,bar.close,bar.high) ? bar : null;
         }).filter(Boolean);
-      } catch { return []; }
+      } catch (error) {
+        archiveErrors.push(date + ': ' + String(error?.message || error));
+        return [];
+      }
     }));
     const byTime = new Map();
     for (const bar of batches.flat()) byTime.set(bar.time, bar);
-    return [...byTime.values()].sort((a,b)=>a.time-b.time);
+    const result = [...byTime.values()].sort((a,b)=>a.time-b.time);
+    if (result.length < 100) console.warn('Binance Vision exact QQQUSDT ' + interval + ' archive coverage: ' + result.length + ' bars; sample errors: ' + archiveErrors.slice(0,4).join(' | '));
+    return result;
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
