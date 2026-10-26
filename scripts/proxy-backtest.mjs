@@ -17,7 +17,7 @@ const reports = [];
 
 async function fetchBars(symbol, interval) {
   const aggregateHours = interval === '4h' ? 4 : interval === '8h' ? 2 : interval === '12h' ? 3 : 1;
-  const sourceInterval = aggregateHours > 1 ? '4h' : interval;
+  const sourceInterval = interval === '4h' ? '1h' : aggregateHours > 1 ? '4h' : interval;
   const sourceSeconds = TIMEFRAME_SECONDS[sourceInterval];
   let rows;
   let normalise;
