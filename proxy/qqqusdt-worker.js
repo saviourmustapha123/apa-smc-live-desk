@@ -57,7 +57,10 @@ async function bybitCompatibleFallback(path, incoming) {
   const interval = incoming.searchParams.get("interval") || "1";
   const binanceInterval = BYBIT_TO_BINANCE[interval];
   if (!binanceInterval) throw new Error("No Binance fallback mapping for Bybit interval " + interval);
-  const { data } = await fetchJson(binanceKlineUrl(new URL("https://proxy.invalid" + path + "?" + incoming.searchParams.toString())));
+  const q = new URLSearchParams({ symbol: "QQQUSDT", interval: binanceInterval, limit: incoming.searchParams.get("limit") || "500" });
+  if (incoming.searchParams.has("start")) q.set("startTime", incoming.searchParams.get("start"));
+  if (incoming.searchParams.has("end")) q.set("endTime", incoming.searchParams.get("end"));
+  const { data } = await fetchJson(BINANCE_UPSTREAM + "/fapi/v1/klines?" + q);
   if (!Array.isArray(data)) throw new Error("Invalid Binance klines");
   const rows = data.map(r => [r[0], r[1], r[2], r[3], r[4], r[5], r[7] || "0"]);
   return { retCode: 0, retMsg: "OK", result: { category: "linear", symbol: "QQQUSDT", list: rows }, time: Date.now() };
