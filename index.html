@@ -312,22 +312,22 @@ function detectRecentBlockRetest(bars,k,dispMult){
    // original OB, move away on the far side, break opposite structure, then
    // return to the zone and reject it in the flipped direction.
    const flipped=zone.side==='BUY'?'SELL':'BUY';
-   let movedAway=false,oppositeBreak=false;
+   let movedAwayAt=-1,oppositeBreakAt=-1;
    for(let j=invalidAt+1;j<n-1;j++){
     const candleAfterBreach=b[j];
     const fullyAway=flipped==='SELL'?candleAfterBreach.high<zone.low:candleAfterBreach.low>zone.high;
-    if(fullyAway)movedAway=true;
-    // The structural break must occur after price has fully cleared the
-    // invalidated block; a break that happened before this sequence is not
-    // evidence of a valid breaker transition.
-    if(!movedAway)continue;
+    if(movedAwayAt<0&&fullyAway)movedAwayAt=j;
+    // Enforce the full sequence in chronological order: breach, clear the
+    // far side, break opposite structure, then a later return and rejection.
+    if(movedAwayAt<0)continue;
     const knownHigh=allPivots.h.filter(p=>p.i+k<j).at(-1),knownLow=allPivots.l.filter(p=>p.i+k<j).at(-1);
     const swing=flipped==='SELL'?knownLow:knownHigh;
-    if(swing&&(flipped==='SELL'?b[j-1].close>=swing.p&&candleAfterBreach.close<swing.p:b[j-1].close<=swing.p&&candleAfterBreach.close>swing.p)){oppositeBreak=true;break;}
+    if(swing&&(flipped==='SELL'?b[j-1].close>=swing.p&&candleAfterBreach.close<swing.p:b[j-1].close<=swing.p&&candleAfterBreach.close>swing.p)){oppositeBreakAt=j;break;}
    }
-   const returnedFromFarSide=flipped==='SELL'?current.high>=zone.low:current.low<=zone.high;
+   const previous=b[n-2];
+   const returnedFromFarSide=oppositeBreakAt>=0&&(flipped==='SELL'?previous.close<zone.low&&current.high>=zone.low:previous.close>zone.high&&current.low<=zone.high);
    const reject=flipped==='SELL'?current.close<zone.low&&current.close<current.open:current.close>zone.high&&current.close>current.open;
-   if(movedAway&&oppositeBreak&&returnedFromFarSide&&reject)events.push({...zone,side:flipped,type:'BREAKER BLOCK RETEST'});
+   if(movedAwayAt>=0&&oppositeBreakAt>movedAwayAt&&returnedFromFarSide&&reject)events.push({...zone,side:flipped,type:'BREAKER BLOCK RETEST'});
   }
  }
  return events.at(-1)||null;
