@@ -27,6 +27,8 @@ assert.ok(html.includes('BREAKER BLOCK · FAILED OB + OPPOSITE SHIFT + RETEST'),
 assert.ok(html.includes('function signalBarEndMs(tf,timeSeconds)'), 'calendar timeframe outcome timing must be handled');
 assert.ok(html.includes("if(tf==='1W')" ) && html.includes("if(tf==='1M')") && html.includes("if(tf==='1Y')"), 'weekly/monthly/yearly boundary handling missing');
 assert.ok(html.includes('marketTimeframeHealthPanel') && html.includes('recordTimeframeHealth'), 'visible feed diagnostics must report per-market/timeframe state');
+assert.ok(html.includes('const DEFAULT_QQQ_PROXY=') && html.includes('saviourmustapha123.workers.dev'), 'the known QQQUSDT worker must be the default data route');
+assert.ok(html.includes('ob.mitigatedAt=firstTouch') && html.includes('const qualified=recentQualifiedZones(b,k,s.disp)'), 'fresh/mitigated OB and breaker zones must be shared across timeframe charts');
 
 const blockStart = html.indexOf('function detectRecentBlockRetest');
 const blockEnd = html.indexOf('function pendingOrderBlockOpportunity', blockStart);
