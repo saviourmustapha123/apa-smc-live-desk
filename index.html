@@ -227,6 +227,41 @@ function volumeContext(bars){
  const target=total*.7;let used=profile[maxIdx],left=maxIdx-1,right=maxIdx+1;while(used<target&&(left>=0||right<bins)){const lv=left>=0?profile[left]:-1,rv=right<bins?profile[right]:-1;if(rv>lv){used+=Math.max(0,rv);right++}else{used+=Math.max(0,lv);left--}}const val=lo+(Math.max(0,left+1)+.5)*step,vah=lo+(Math.min(bins-1,right-1)+.5)*step;
  return (ratio===null?'Relative volume unavailable':'Last bar '+ratio.toFixed(2)+'× 100-bar average')+' · '+kind+' POC '+priceFor(poc,s.symbol)+' · approximate 70% value area '+priceFor(val,s.symbol)+'–'+priceFor(vah,s.symbol);
 }
+// Conservative top-down admission gate. A lower timeframe is not a standalone signal:
+// every required higher timeframe must have enough closed candles, fresh data, and
+// a clear structure bias aligned with the candidate. Neutral/conflicting context blocks.
+function evaluateTopDownAlignment(candidateTf,side,barsByTf,nowMs=Date.now()){
+ const hierarchy={
+  '1m':['5m','15m','1h','4h'],
+  '5m':['15m','1h','4h'],
+  '15m':['1h','4h','1d'],
+  '1h':['4h','1d','1W'],
+  '4h':['1d','1W','1M'],
+  '8h':['1d','1W','1M'],
+  '12h':['1d','1W','1M'],
+  '1d':['1W','1M','1Y']
+ };
+ const durations={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'8h':28800,'12h':43200,'1d':86400,'1W':604800,'1M':2678400,'1Y':31622400};
+ const required=hierarchy[candidateTf];
+ if(!required)return {allowed:false,reason:'No approved top-down hierarchy for '+candidateTf,checks:[]};
+ const wanted=side==='BUY'?1:side==='SELL'?-1:0;
+ if(!wanted)return {allowed:false,reason:'Candidate direction is unknown',checks:[]};
+ const checks=[];
+ for(const tf of required){
+  const bars=(barsByTf[tf]||[]).filter(x=>!x.isOpen);
+  if(bars.length<20)return {allowed:false,reason:'Blocked: insufficient closed '+tf+' candles',checks:[...checks,{tf,ok:false,reason:'insufficient closed candles'}]};
+  const last=bars.at(-1),age=(nowMs/1000)-Number(last.time),maxAge=(durations[tf]||86400)*3;
+  if(!Number.isFinite(age)||age < -60||age>maxAge)
+   return {allowed:false,reason:'Blocked: stale or invalid '+tf+' data',checks:[...checks,{tf,ok:false,reason:'stale/invalid data'}]};
+  const summary=summarizeTf(tf,bars);
+  if(summary.score===0)
+   return {allowed:false,reason:'Blocked: '+tf+' structure is unclear or ranging',checks:[...checks,{tf,ok:false,reason:'unclear/ranging structure'}]};
+  if(summary.score!==wanted)
+   return {allowed:false,reason:'Blocked: '+tf+' structure conflicts with '+side,checks:[...checks,{tf,ok:false,reason:'conflicting structure'}]};
+  checks.push({tf,ok:true,reason:summary.bias});
+ }
+ return {allowed:true,reason:'Higher-timeframe structure aligned',checks};
+}
 function summarizeTf(tf,bars){
  const b=(bars||[]).filter(x=>!x.isOpen);if(b.length<20)return {tf,bias:'Insufficient data',detail:b.length+' closed bars',score:0,volume:'Unavailable'};
  const p=pivots(b,Math.max(2,Math.min(+s.k,4))),h=p.h,l=p.l,sh=h.at(-1),sh2=h.at(-2),sl=l.at(-1),sl2=l.at(-2);let bias='Range / unclear',score=0;
@@ -666,6 +701,7 @@ async function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode){
  const [m1,m5,m15,h1,h4,h8,h12,d1]=await Promise.all([load('1m',1000),load('5m',1000),load('15m',1000),load('1h',1000),load('4h',1000),load('8h',300),load('12h',300),load('1d',1000)]);
  const weekly=await load('1W',1300),monthly=await load('1M',300),yearly=await load('1Y',25);
  const sets=[['1m',m1],['5m',m5],['15m',m15],['1h',h1],['4h',h4],['8h',h8],['12h',h12],['1d',d1],['1W',weekly],['1M',monthly],['1Y',yearly]];
+ const barsByTf=Object.fromEntries(sets);
  // Chart analysis still covers across 11 timeframes; only actionable alerts are restricted below.
  // Higher/lower context frames remain available on the chart, but manual-entry alerts
  // are limited to practical execution frames to avoid eleven overlapping alerts per pair.
@@ -676,6 +712,13 @@ async function scanBackgroundPair(symbol,freshOnly=s.signalFreshMode){
  const openTf=new Set(alreadyOpen.map(t=>t.tf));let openCount=alreadyOpen.length;
  for(const [tf,bars] of signalSets)for(const candidate of scanOpportunityHistory(symbol,tf,bars)){
   if(candidate.status==='HISTORICAL')continue;
+  const alignment=evaluateTopDownAlignment(tf,candidate.side,barsByTf);
+  if(!alignment.allowed){
+   const d=strategyScanDiagnostics.get(symbol+'|'+tf);
+   if(d){d.latestRejection='Top-down gate: '+alignment.reason;d.topDownChecks=alignment.checks}
+   continue;
+  }
+  candidate.topDownAlignment={required:alignment.checks.map(x=>x.tf),checks:alignment.checks,verifiedAt:Date.now()};
   // Do not publish a pending limit setup if the latest confirmed candle has
   // already crossed its structural stop or target before the setup was admitted.
   // That prevents a just-created card from appearing and immediately closing
@@ -698,7 +741,7 @@ async function refreshTopDown(force=false,freshOnly=s.signalFreshMode){
  if(!force&&s.lastTopDownAt&&Date.now()-s.lastTopDownAt<60000)return;
  if(s.topDownBusy)return;s.topDownBusy=true;
  const host=$('topDownRows'),statusEl=$('topDownStatus');if(!host||!statusEl){s.topDownBusy=false;return}
- statusEl.textContent='Collecting independent timeframe candles and calculating context…';
+ statusEl.textContent='Collecting closed candles and checking the top-down signal gate…';
  try{
   const sym=s.symbol;
   const load=async(tf,limit)=>{let cached=[];try{cached=await dbGet(sym,tf)}catch{}try{const fresh=await getBars(sym,tf,limit);if(fresh.length)await dbPut(fresh,sym,tf);const map=new Map(cached.map(b=>[b.time,b]));fresh.forEach(b=>map.set(b.time,b));return [...map.values()].sort((a,b)=>a.time-b.time).slice(-2000)}catch(e){return cached.slice(-2000)}};
@@ -711,6 +754,7 @@ async function refreshTopDown(force=false,freshOnly=s.signalFreshMode){
   ];
   const scanSets=[['1m',m1],['5m',m5],['15m',m15],['1h',h1],['4h',h4],['8h',h8],['12h',h12],['1d',d1],['1W',weekly],['1M',monthly],['1Y',yearly]];
   rebuildUnifiedAnnotations(scanSets);
+  const barsByTf=Object.fromEntries(scanSets);
   const additions=[],seen=new Set(s.log.map(t=>[t.symbol,t.tf,t.side,t.time].join('|')));
   const signalSets=scanSets.filter(([tf])=>['1m','5m','15m','1h','4h','8h','12h','1d'].includes(tf));
   const openStatuses=new Set(['NOT RUNNING','NOT TRIGGERED','PENDING','UNTRIGGERED','RUNNING','TRIGGERED','ACTIVE']);
@@ -719,6 +763,10 @@ async function refreshTopDown(force=false,freshOnly=s.signalFreshMode){
   for(const [tf,bars] of signalSets)for(const candidate of scanOpportunityHistory(sym,tf,bars)){
    if(candidate.status==='HISTORICAL')continue;
    if(candidate.status!=='RUNNING'&&candidateAlreadyPastLevels(candidate,bars))continue;
+   // Hard gate: a lower-timeframe candidate cannot enter the signal log without fresh, closed, aligned higher-timeframe structure.
+   const alignment=evaluateTopDownAlignment(tf,candidate.side,barsByTf);
+   if(!alignment.allowed)continue;
+   candidate.topDownAlignment={allowed:true,reason:alignment.reason,checks:alignment.checks,verifiedAt:Date.now()};
    const key=[candidate.symbol,candidate.tf,candidate.side,candidate.time].join('|');
    if(seen.has(key)||openTf.has(tf))continue;
    seen.add(key);openTf.add(tf);openCount++;additions.push(candidate);
@@ -734,7 +782,7 @@ async function refreshTopDown(force=false,freshOnly=s.signalFreshMode){
   if(additions.length){if(sym===s.symbol)draw();else renderOverlay()}
   const votes=rows.slice(0,5).filter(x=>x.score!==0),net=votes.reduce((a,x)=>a+x.score,0);
   const agreement=net>0?'Higher-timeframe tilt bullish':net<0?'Higher-timeframe tilt bearish':'Higher-timeframe context mixed';
-  host.innerHTML=rows.map(x=>'<div style="padding:8px 0;border-bottom:1px solid #1e2b38"><div class="row"><span><b>'+x.tf+'</b></span><b style="color:'+(x.score>0?'var(--g)':x.score<0?'var(--r)':'var(--m)')+'">'+x.bias+'</b></div><div class="fine">'+x.detail+'</div><div class="fine">'+x.volume+'</div></div>').join('')+'<div class="note" style="margin-top:9px"><b>'+agreement+'</b><br>Directional votes: '+net+' across '+votes.length+' timeframes with readable structure. This is context, not an entry signal.</div>';
+  host.innerHTML=rows.map(x=>'<div style="padding:8px 0;border-bottom:1px solid #1e2b38"><div class="row"><span><b>'+x.tf+'</b></span><b style="color:'+(x.score>0?'var(--g)':x.score<0?'var(--r)':'var(--m)')+'">'+x.bias+'</b></div><div class="fine">'+x.detail+'</div><div class="fine">'+x.volume+'</div></div>').join('')+'<div class="note" style="margin-top:9px"><b>'+agreement+'</b><br>Directional votes: '+net+' across '+votes.length+' timeframes with readable structure. Higher-timeframe context is a mandatory candidate filter; it does not trigger entries by itself.</div>';
   let otherPairNew=0;if(Date.now()-s.lastOtherPairScan>=300000){s.lastOtherPairScan=Date.now();const others=Object.keys(symbolConfig).filter(market=>market!==sym);for(const other of others){try{otherPairNew+=await scanBackgroundPair(other)}catch(e){console.warn('Background market scan unavailable for '+other,e)}}}
   const hd=historyDiagnostics[sym]||{},coverage=hd.oldest?'oldest daily '+new Date(hd.oldest*1000).toISOString().slice(0,10):'oldest daily date unavailable';
   const backfill=hd.reason||'history backfill status unavailable';

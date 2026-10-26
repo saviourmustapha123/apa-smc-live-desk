@@ -3,6 +3,7 @@ name: APA SMC background health check
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
   schedule:
     - cron: "*/5 * * * *"
@@ -67,7 +68,26 @@ jobs:
         if: github.event_name != 'schedule'
         run: node --test scripts/chart-signal-parity.test.mjs
 
+      - name: Test uploaded-book strategy registry and RR gate
+        if: github.event_name != 'schedule'
+        run: node --test scripts/book-strategy-registry.test.mjs
+
+      - name: Test deterministic LowKey book-rule primitives
+        if: github.event_name != 'schedule'
+        run: node --test scripts/book-rule-detectors.test.mjs
+
+      - name: Test shared market event primitives
+        if: github.event_name != 'schedule'
+        run: node --test scripts/shared-market-events.test.mjs
+
+      - name: Test production top-down timeframe alignment gate
+        if: github.event_name != 'schedule'
+        run: node --test scripts/top-down-alignment.test.mjs
+
       - name: Replay actual production scanner against deterministic candle fixtures
         if: github.event_name != 'schedule'
         run: node --test scripts/production-scanner-replay.test.mjs
 
+      - name: Replay production trade outcomes against fresh historical market candles
+        if: github.event_name != 'schedule'
+        run: node scripts/production-scanner-live-replay.mjs
