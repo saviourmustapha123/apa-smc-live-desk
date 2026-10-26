@@ -275,14 +275,19 @@ function detectRecentBlockRetest(bars,k,dispMult){
   const bullish=impulse.close>impulse.open&&high&&prev.close<=high.p&&impulse.close>high.p;
   const bearish=impulse.close<impulse.open&&low&&prev.close>=low.p&&impulse.close<low.p;
   if(!bullish&&!bearish)continue;
+  const hasFvg=i>=2&&(bullish?impulse.low>b[i-2].high:impulse.high<b[i-2].low);
+  if(!hasFvg)continue;
   let origin=-1;
   for(let j=i-1;j>=Math.max(0,i-3);j--){if(bullish?b[j].close<b[j].open:b[j].close>b[j].open){origin=j;break}}
   if(origin<0)continue;
   const candle=b[origin],zone={low:candle.low,high:candle.high,side:bullish?'BUY':'SELL',formedAt:i};
-  let invalidAt=-1;
-  for(let j=i+1;j<n-1;j++){if(zone.side==='BUY'?b[j].close<zone.low:b[j].close>zone.high){invalidAt=j;break}}
+  let invalidAt=-1,previousTouch=false;
+  for(let j=i+1;j<n-1;j++){
+   if(zone.side==='BUY'?b[j].close<zone.low:b[j].close>zone.high){invalidAt=j;break}
+   if(b[j].low<=zone.high&&b[j].high>=zone.low)previousTouch=true;
+  }
   const touched=current.low<=zone.high&&current.high>=zone.low;
-  if(invalidAt<0&&touched&&((zone.side==='BUY'&&current.close>current.open&&current.close>=(zone.low+zone.high)/2)||(zone.side==='SELL'&&current.close<current.open&&current.close<=(zone.low+zone.high)/2))){
+  if(invalidAt<0&&!previousTouch&&touched&&((zone.side==='BUY'&&current.close>current.open&&current.close>=(zone.low+zone.high)/2)||(zone.side==='SELL'&&current.close<current.open&&current.close<=(zone.low+zone.high)/2))){
    events.push({...zone,type:'ORDER BLOCK RETEST'});
    continue;
   }
