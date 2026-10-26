@@ -170,7 +170,7 @@ test('bearish continuation retest requires BOS, a fresh low, then first OB mitig
   push(100.2,100.4,99.3,99.6); push(99.6,100.1,99.5,100.0);
   push(100.5,103.7,101.2,103.4); push(103.4,104.4,103.1,104.1);
   push(104.0,104.2,103.0,103.4); push(103.4,103.8,102.6,103.0);
-  push(103.0,103.3,100.2,100.6);
+  push(100.3,100.7,100.2,100.6);
   const bars = source.map(c=>({time:c.time,open:200-c.open,high:200-c.low,low:200-c.high,close:200-c.close}));
   const result = engine.blockRetest(bars);
   assert.ok(result, 'qualifying bearish first retest should be recognised');
