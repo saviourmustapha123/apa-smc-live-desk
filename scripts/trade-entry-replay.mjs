@@ -44,7 +44,7 @@ export function executeSignal(signal, bars, index) {
       return { outcome: 'MISSED ENTRY (' + reason + ')', r: null, triggered: false, exitTime: signalBar.time };
     }
   }
-  for (let i = triggeredAt >= 0 ? triggeredAt + 1 : index + 1; i < Math.min(bars.length, index + 1 + MAX_FORWARD_BARS); i++) {
+  for (let i = triggeredAt >= 0 ? bars.length : index + 1; i < Math.min(bars.length, index + 1 + MAX_FORWARD_BARS); i++) {
     const b = bars[i];
     // A gap already beyond the stop invalidates an unfilled pending order before
     // considering any later intrabar touch of the entry level.
