@@ -185,7 +185,7 @@ test('structural targets select the nearest confirmed opposing swing that satisf
 
 test('live chart maps Order Blocks and distinct qualified Breaker Blocks', () => {
   assert.match(html, /kind:'order-block'/);
-  assert.match(html, /BULLISH OB|BEARISH OB/);
+  assert.match(html, /ORDER BLOCK RETEST · FVG \+ BOS/);
   assert.match(html, /BREAKER BLOCK · FAILED OB \+ OPPOSITE SHIFT \+ RETEST/);
   assert.match(html, /const priority=\{'order-block':0,'breaker':1/);
 });
@@ -410,7 +410,7 @@ test('multi-trigger signal reasons are retained as structured explanations', () 
 
 test('order blocks and breaker blocks use separate, causally ordered detection rules in the signal scanner', () => {
   assert.match(html, /function detectRecentBlockRetest\(bars,k,dispMult\)/);
-  assert.match(html, /type:'ORDER BLOCK RETEST · IDM \+ LIQUIDITY SWEPT'/);
+  assert.match(html, /type:linkedIdm\?'ORDER BLOCK RETEST · IDM \+ LIQUIDITY SWEPT':'ORDER BLOCK RETEST · FVG \+ BOS'/);
   assert.match(html, /type:'BREAKER BLOCK RETEST'/);
   assert.match(html, /const reject=flipped==='SELL'\?current\.close<zone\.low&&current\.close<current\.open:current\.close>zone\.high&&current\.close>current\.open/);
   assert.match(html, /const blockRetest=detectRecentBlockRetest\(hist,\+s\.k,s\.disp\)/);
