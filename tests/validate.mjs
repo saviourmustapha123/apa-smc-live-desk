@@ -23,6 +23,7 @@ assert.ok(html.includes('const signalSets=sets;'), 'background scan must inspect
 assert.ok(html.includes('const signalSets=scanSets;'), 'top-down scan must inspect every supported timeframe');
 assert.ok(html.includes('if(!hasFvg)continue;'), 'unqualified OBs without FVG must be rejected');
 assert.ok(html.includes('if(!fvgConfirmed)continue;'), 'pending OB setups must require associated FVG');
+assert.ok(html.includes('Entry already touched before pending order activation') && html.includes('entryTouchedBeforeOrderActive'), 'a retest discovered after candle close must not become a false pending entry');
 assert.ok(html.includes('BREAKER BLOCK · FAILED OB + OPPOSITE SHIFT + RETEST'), 'breaker zones must be explicitly mapped');
 assert.ok(html.includes('function signalBarEndMs(tf,timeSeconds)'), 'calendar timeframe outcome timing must be handled');
 assert.ok(html.includes("if(tf==='1W')" ) && html.includes("if(tf==='1M')") && html.includes("if(tf==='1Y')"), 'weekly/monthly/yearly boundary handling missing');
