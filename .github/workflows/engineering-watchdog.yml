@@ -1,0 +1,88 @@
+name: APA SMC engineering watchdog
+
+on:
+  workflow_run:
+    workflows: ["APA SMC production history backtest"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+concurrency:
+  group: apa-smc-engineering-watchdog
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout monitored branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.ref_name }}
+
+      - name: Run deterministic checks again to distinguish transient failures
+        id: checks
+        continue-on-error: true
+        run: |
+          set +e
+          node --test scripts/production-scanner-replay.test.mjs > /tmp/replay.log 2>&1
+          replay=$?
+          node --test scripts/strategy-rule-regression.test.mjs > /tmp/rules.log 2>&1
+          rules=$?
+          node scripts/production-strategy-source-audit.mjs > /tmp/source-audit.log 2>&1
+          audit=$?
+          node scripts/engineering-audit.mjs > /tmp/engineering-audit.log 2>&1
+          engineering=$?
+          node --test scripts/*.test.mjs > /tmp/all-tests.log 2>&1
+          alltests=$?
+          {
+            echo "replay=$replay"
+            echo "rules=$rules"
+            echo "audit=$audit"
+            echo "engineering=$engineering"
+            echo "alltests=$alltests"
+          } >> "$GITHUB_OUTPUT"
+          cat /tmp/replay.log /tmp/rules.log /tmp/source-audit.log /tmp/engineering-audit.log /tmp/all-tests.log > /tmp/combined.log
+          exit 0
+
+      - name: Open or update an engineering incident when checks still fail
+        if: steps.checks.outputs.replay != '0' || steps.checks.outputs.rules != '0' || steps.checks.outputs.audit != '0' || steps.checks.outputs.engineering != '0' || steps.checks.outputs.alltests != '0' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.event.workflow_run.html_url || github.server_url }}
+          BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
+          REPLAY: ${{ steps.checks.outputs.replay }}
+          RULES: ${{ steps.checks.outputs.rules }}
+          AUDIT: ${{ steps.checks.outputs.audit }}
+          ENGINEERING: ${{ steps.checks.outputs.engineering }}
+          ALLTESTS: ${{ steps.checks.outputs.alltests }}
+        run: |
+          title="[Watchdog] APA SMC validation needs engineering review"
+          body="$(cat <<EOF
+          ## Automated engineering watchdog
+
+          A production validation run failed or a manual watchdog check was requested. The watchdog re-ran deterministic checks and recorded their exit codes.
+
+          - Production scanner replay tests: ${REPLAY:-not run}
+          - Strategy-rule regression tests: ${RULES:-not run}
+          - Production source audit: ${AUDIT:-not run}
+          - Engineering audit: ${ENGINEERING:-not run}
+          - Full deterministic suite: ${ALLTESTS:-not run}
+          - Branch: ${BRANCH}
+          - Original run: ${RUN_URL}
+
+          **Safety rule:** this watchdog does not silently rewrite trading rules or promote a strategy to live use. It creates an incident for a human-reviewed correction because automatic changes to entry/stop/target logic can create financial risk. Fix the root cause, add a regression test, and rerun the complete suite. Historical-data coverage failures must be distinguished from code defects.
+          EOF
+          )"
+          existing="$(gh issue list --repo "$REPO" --state open --search 'in:title APA SMC validation needs engineering review' --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" --body "$body"
+          else
+            gh issue create --repo "$REPO" --title "$title" --body "$body"
+          fi
