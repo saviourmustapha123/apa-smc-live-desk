@@ -154,6 +154,8 @@ test('bullish continuation retest requires BOS, a fresh high, then first OB miti
   const noExtension = bars.map(c=>({...c}));
   const extensionIndex = noExtension.length - 4;
   noExtension[extensionIndex] = {...noExtension[extensionIndex], high:103.6, close:103.5};
+  noExtension[extensionIndex + 1] = { ...noExtension[extensionIndex + 1], open:103.4, high:103.6, low:103.0, close:103.4 };
+  noExtension[extensionIndex + 2] = { ...noExtension[extensionIndex + 2], open:103.4, high:103.6, low:102.6, close:103.0 };
   assert.equal(engine.blockRetest(noExtension), null, 'a retest without a post-BOS new high must be rejected');
 
   const prematureTouch = bars.slice();
