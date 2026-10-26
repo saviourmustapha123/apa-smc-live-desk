@@ -61,7 +61,7 @@ async function fetchBars(symbol, interval) {
         if (!result || !Array.isArray(result.timestamp)) throw new Error(json.chart?.error?.description || 'Yahoo returned no chart rows');
         const q = result.indicators?.quote?.[0], yahooSeconds = yahooInterval === '1h' ? 3600 : sourceSeconds;
         rows = result.timestamp.map((time,i) => ({ time, open: Number(q?.open?.[i]), high: Number(q?.high?.[i]), low: Number(q?.low?.[i]), close: Number(q?.close?.[i]), isOpen: time + yahooSeconds > Math.floor(Date.now()/1000) }));
-        if (interval === '8h' || interval === '12h') {
+        if (sourceInterval === '4h') {
           const groups = new Map();
           for (const bar of rows) { const bucket = Math.floor(bar.time / 14400) * 14400; if (!groups.has(bucket)) groups.set(bucket, []); groups.get(bucket).push(bar); }
           rows = [...groups.entries()].filter(([,group]) => group.length === 4 && group.every((bar,i) => i === 0 || bar.time - group[i-1].time === 3600))
