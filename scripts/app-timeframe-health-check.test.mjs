@@ -228,10 +228,10 @@ test('all-timeframe SMC zones are rebuilt into one symbol-wide overlay and mappe
 
 test('QQQUSDT supports a configurable Cloudflare Workers proxy for region-restricted Binance data', () => {
   assert.match(html, /function safeQqqProxy\(value\)/);
-  assert.match(html, /function qqqUrl\(path\)/);
+  assert.match(html, /async function qqqJson\(path\)/);
   assert.match(html, /id="qqqProxy"/);
-  assert.ok(html.includes("qqqUrl('/fapi/v1/klines?'+q)"));
-  assert.ok(html.includes("qqqUrl('/fapi/v1/ticker/price?symbol=QQQUSDT')"));
+  assert.ok(html.includes("qqqJson('/fapi/v1/klines?'+q)"));
+  assert.ok(html.includes("qqqJson('/fapi/v1/ticker/price?symbol=QQQUSDT')"));
   assert.match(html, /HTTP 451 · Binance has region-restricted this public API request/);
 });
 
