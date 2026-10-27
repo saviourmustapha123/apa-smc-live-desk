@@ -7,10 +7,11 @@ import { executeSignal } from './trade-entry-replay.mjs';
 
 const OUT = new URL('../artifacts/production-history-backtest.md', import.meta.url);
 const TIMEFRAMES = ['1m', '5m', '15m', '1h'];
+const CONTEXT_TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '8h', '12h'];
 const SYMBOLS = ['EURUSD', 'BTCUSD', 'QQQUSDT'];
 const MIN_RR = 3;
 const MAX_FORWARD_BARS = 100;
-const INTERVAL_SECONDS = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600 };
+const INTERVAL_SECONDS = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '8h': 28800, '12h': 43200 };
 const report = [];
 const failures = [];
 const warnings = [];
@@ -194,7 +195,7 @@ async function fetchBars(symbol, tf) {
   throw new Error(errors.join('; '));
 }
 
-function runBacktest(symbol, tf, bars, provider, exact) {
+function runBacktest(symbol, tf, bars, provider, exact, contextBarsByTf) {
   const byTime = new Map(bars.map((b,i)=>[b.time,i]));
   const unique = new Map();
   const engine = createProductionScannerReplay({ now: (bars.at(-1)?.time || 0) * 1000 + INTERVAL_SECONDS[tf] * 1000 });
@@ -208,6 +209,21 @@ function runBacktest(symbol, tf, bars, provider, exact) {
     const history = bars.slice(Math.max(0, i + 1 - 1000), i + 1);
     const signal = engine.pending(symbol, tf, history);
     if (!signal || signal.time !== bars[i].time) continue;
+    const signalCloseTime = signal.time + INTERVAL_SECONDS[tf];
+    const contextSets = CONTEXT_TIMEFRAMES.map(contextTf => {
+      const contextBars = contextBarsByTf?.[contextTf] || [];
+      const interval = INTERVAL_SECONDS[contextTf];
+      let low = 0, high = contextBars.length;
+      while (low < high) {
+        const mid = (low + high) >>> 1;
+        if (contextBars[mid].time + interval <= signalCloseTime) low = mid + 1;
+        else high = mid;
+      }
+      return [contextTf, contextBars.slice(0, low)];
+    });
+    const alignment = engine.align(signal, contextSets);
+    if (!alignment.ok) continue;
+    signal.reason = [...(Array.isArray(signal.reason) ? signal.reason : [signal.reason].filter(Boolean)), alignment.label];
     const key = [signal.orderBlock?.originTime, signal.side, signal.entry, signal.sl].join('|');
     if (!unique.has(key)) unique.set(key, signal);
   }
@@ -248,13 +264,27 @@ log('| Pair | TF | Provider | Exact symbol data? | Bars | Days | Candidates | Ev
 log('|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
 
 for (const symbol of SYMBOLS) {
+  const contextDataByTf = new Map();
+  for (const contextTf of CONTEXT_TIMEFRAMES) {
+    try {
+      const data = await fetchBars(symbol, contextTf);
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const bars = data.bars.filter(b => validOHLC(b) && b.time + INTERVAL_SECONDS[contextTf] <= nowSeconds)
+        .sort((a,b)=>a.time-b.time);
+      if (bars.length < 20) throw new Error('Only ' + bars.length + ' closed candles for higher-timeframe context');
+      contextDataByTf.set(contextTf, { data, bars });
+    } catch (error) {
+      contextDataByTf.set(contextTf, { data: null, bars: [], error });
+      if (TIMEFRAMES.includes(contextTf)) failures.push(symbol + ' ' + contextTf + ' context feed: ' + error.message);
+    }
+  }
+  const contextBarsByTf = Object.fromEntries([...contextDataByTf.entries()].map(([tf, item]) => [tf, item.bars]));
   for (const tf of TIMEFRAMES) {
     try {
-      const data = await fetchBars(symbol, tf);
-      const nowSeconds = Math.floor(Date.now() / 1000);
-      const bars = data.bars.filter(b => validOHLC(b) && b.time + INTERVAL_SECONDS[tf] <= nowSeconds)
-        .sort((a,b)=>a.time-b.time);
-      const result = runBacktest(symbol, tf, bars, data.provider, data.exact);
+      const loaded = contextDataByTf.get(tf);
+      if (!loaded || loaded.error || !loaded.data) throw loaded?.error || new Error('No candle data');
+      const { data, bars } = loaded;
+      const result = runBacktest(symbol, tf, bars, data.provider, data.exact, contextBarsByTf);
       log('- Last closed candle: ' + iso(bars.at(-1).time) + '; close ' + bars.at(-1).close);
       if (data.exact) exactCoverage++; else proxyCoverage++;
       const rate = result.winRate == null ? 'n/a' : result.winRate.toFixed(1) + '% (n=' + (result.wins + result.losses) + ')';
