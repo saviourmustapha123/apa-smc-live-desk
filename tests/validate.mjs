@@ -35,7 +35,7 @@ assert.ok(html.includes('function signalBarEndMs(tf,timeSeconds)'), 'calendar ti
 assert.ok(html.includes("if(tf==='1W')" ) && html.includes("if(tf==='1M')") && html.includes("if(tf==='1Y')"), 'weekly/monthly/yearly boundary handling missing');
 assert.ok(html.includes('marketTimeframeHealthPanel') && html.includes('recordTimeframeHealth'), 'visible feed diagnostics must report per-market/timeframe state');
 assert.ok(html.includes("const DEFAULT_QQQ_PROXY='https://apa-smc-qqqusdt-proxy.saviourmustapha123.workers.dev';") && html.includes('function safeQqqProxy(') && html.includes('safeQqqProxy(p.qqqProxy||DEFAULT_QQQ_PROXY)') && html.includes('async function qqqJson(path)') && html.includes('async function bybitJson(path)') && html.includes('if(!r.ok)'), 'QQQ proxy must be preconfigured but remain URL-validated, configurable, and dependent on successful HTTP/data checks');
-assert.ok(worker.includes('fapi1.binance.com') && worker.includes('fapi4.binance.com') && worker.includes('api-gcp.binance.com'), 'QQQ proxy must try alternate Binance futures hosts before declaring upstream failure');
+assert.ok(worker.includes('fapi1.binance.com') && worker.includes('fapi4.binance.com') && worker.includes('for (let attempt = 0; attempt < 2; attempt++)') && !worker.includes('api-gcp.binance.com'), 'QQQ proxy must retry and use only official Binance futures hosts before declaring upstream failure');
 assert.ok(html.includes('ob.mitigatedAt=firstTouch') && html.includes('const qualified=recentQualifiedZones(b,k,s.disp)'), 'fresh/mitigated OB and breaker zones must be shared across timeframe charts');
 
 const blockStart = html.indexOf('function detectRecentBlockRetest');
