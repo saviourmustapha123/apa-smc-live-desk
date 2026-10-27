@@ -95,7 +95,7 @@ async function fetchBars(symbol, interval) {
       // Retry alternate exact-contract Binance futures hosts even when a primary
       // host returned a short response. Do not mistake a partial history for coverage.
       let exchangeError = lastError;
-      for (const host of ['https://fapi.binance.com','https://fapi1.binance.com','https://fapi2.binance.com','https://fapi3.binance.com','https://fapi4.binance.com','https://api-gcp.binance.com']) {
+      for (const host of ['https://fapi.binance.com','https://fapi1.binance.com','https://fapi2.binance.com','https://fapi3.binance.com','https://fapi4.binance.com']) {
         try {
           const response = await fetch(host + '/fapi/v1/klines?symbol=QQQUSDT&interval=' + sourceInterval + '&limit=1000&startTime=' + startMs + '&endTime=' + nowMs, { signal: AbortSignal.timeout(12000), headers: { 'user-agent': 'APA-SMC-proxy-backtest/1.0' } });
           if (!response.ok) throw new Error(host + ' HTTP ' + response.status);
