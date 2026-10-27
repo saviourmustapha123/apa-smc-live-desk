@@ -654,3 +654,28 @@ test('expired and invalidated pending signals have explicit non-loss labels', ()
   assert.ok(html.includes("if(st==='INVALIDATED')return 'INVALIDATED BEFORE ENTRY'"));
   assert.ok(html.includes("if(['TAKE PROFIT','STOP LOSS','CLOSED'].includes(st))return 'CLOSED · '+st"));
 });
+
+
+test('network requests time out and remote journal loading does not block first chart render', () => {
+  assert.match(html, /async function boundedFetch\(url,options=\{\},timeoutMs=12000\)/);
+  assert.match(html, /Request timed out after /);
+  assert.match(html, /await start\(\);syncBackgroundPaperTrades\(true\)/);
+  assert.doesNotMatch(html, /await loadSignalStore\(\);await syncBackgroundPaperTrades\(false\)/);
+});
+
+test('weekly, monthly and yearly history requests share one pending daily backfill', () => {
+  assert.match(html, /const dailyHistoryCache=new Map\(\),dailyHistoryPending=new Map\(\)/);
+  assert.match(html, /if\(dailyHistoryPending\.has\(sym\)\)return dailyHistoryPending\.get\(sym\)/);
+  assert.match(html, /dailyHistoryPending\.set\(sym,task\);try\{return await task\}finally\{dailyHistoryPending\.delete\(sym\)\}/);
+});
+
+test('late network responses cannot overwrite the currently selected pair or timeframe', () => {
+  assert.match(html, /const generation=\+\+s\.startGeneration/);
+  assert.match(html, /if\(generation!==s\.startGeneration\|\|sym!==s\.symbol\|\|tf!==s\.tf\)return/);
+  assert.match(html, /const quoteSymbol=s\.symbol,quoteTf=s\.tf/);
+  assert.match(html, /if\(quoteSymbol!==s\.symbol\|\|quoteTf!==s\.tf\)return/);
+});
+
+test('long historical downloads avoid repeatedly rebuilding the chart', () => {
+  assert.match(html, /if\(s\.tf==='1m'&&loaded%10000<1000\)draw\(\)/);
+});
