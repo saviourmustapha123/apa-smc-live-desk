@@ -5,7 +5,7 @@ import { createContext, Script } from 'node:vm';
 
 const source = await readFile(new URL('../proxy/qqqusdt-worker.js', import.meta.url), 'utf8');
 function makeWorker(fetchImpl) {
-  const context = createContext({ fetch: fetchImpl, URL, URLSearchParams, Request, Response, console });
+  const context = createContext({ fetch: fetchImpl, URL, URLSearchParams, Request, Response, console, setTimeout });
   new Script(source.replace('export default {', 'const worker = {') + '\nthis.worker = worker;').runInContext(context);
   return context.worker;
 }
