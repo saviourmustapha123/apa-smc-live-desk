@@ -15,6 +15,7 @@ test('service-worker shell cache version tracks the current app release', () => 
 
 test('offline shell pre-caches Learning Studio and its local module', () => {
   assert.match(sw, /SHELL_FILES = \[[^\]]*'\.\/learning-studio\.html'[^\]]*'\.\/scripts\/strategy-lab-ui\.mjs'/);
+  assert.ok(sw.includes("'./scripts/strategy-discovery.mjs'"), 'Learning Studio import dependency must also be cached');
 });
 
 test('offline Learning Studio navigation falls back to the Learning Studio document, not the main dashboard', () => {
