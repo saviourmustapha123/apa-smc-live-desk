@@ -226,7 +226,9 @@ test('all-timeframe SMC zones are rebuilt into one symbol-wide overlay and mappe
   assert.match(html, /const completedTrades=mode==='clean'\?\[\]:s\.log\.filter/);
 });
 
-test('QQQUSDT supports a configurable Cloudflare Workers proxy for region-restricted Binance data', () => {
+test('QQQUSDT uses the deployed Cloudflare Worker by default, including when a saved proxy setting is blank', () => {
+  assert.ok(html.includes("const DEFAULT_QQQ_PROXY='https://apa-smc-qqqusdt-proxy.saviourmustapha123.workers.dev';"));
+  assert.match(html, /s\.qqqProxy=safeQqqProxy\(p\.qqqProxy\|\|DEFAULT_QQQ_PROXY\)/);
   assert.match(html, /function safeQqqProxy\(value\)/);
   assert.match(html, /async function qqqJson\(path\)/);
   assert.match(html, /id="qqqProxy"/);
