@@ -286,6 +286,7 @@ for (const symbol of SYMBOLS) {
       if (!loaded || loaded.error || !loaded.data) throw loaded?.error || new Error('No candle data');
       const { data, bars } = loaded;
       const result = runBacktest(symbol, tf, bars, data.provider, data.exact, contextBarsByTf);
+      log('- Replay window: last ' + Math.min(bars.length, MAX_REPLAY_CLOSES[tf] || 500) + ' closed candles evaluated for candidates; forward outcomes use available history.');
       log('- Last closed candle: ' + iso(bars.at(-1).time) + '; close ' + bars.at(-1).close);
       if (data.exact) exactCoverage++; else proxyCoverage++;
       const rate = result.winRate == null ? 'n/a' : result.winRate.toFixed(1) + '% (n=' + (result.wins + result.losses) + ')';
