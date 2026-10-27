@@ -81,7 +81,7 @@ function normalizeBinance(rows) {
 }
 function configuredQqqProxy() {
   try {
-    const url = new URL(String(process.env.QQQ_PROXY_URL || ''));
+    const url = new URL(String(process.env.QQQ_PROXY_URL || 'https://apa-smc-qqqusdt-proxy.saviourmustapha123.workers.dev'));
     if (url.protocol !== 'https:' || !url.hostname.endsWith('.workers.dev') ||
         url.username || url.password || url.search || url.hash) return '';
     return url.origin + url.pathname.replace(/\/$/, '');
@@ -115,9 +115,9 @@ async function fetchBars(symbol, tf) {
   const proxyBase = configuredQqqProxy();
   const providers = [
     ...(proxyBase ? [['Configured Cloudflare Worker', proxyBase + '/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000']] : []),
-    ['Binance USD-M', 'https://fapi.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'],
-    ['Binance API alternate', 'https://api.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'],
-    ['Binance GCP alternate', 'https://api-gcp.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000']
+    ...['fapi.binance.com','fapi1.binance.com','fapi2.binance.com','fapi3.binance.com','fapi4.binance.com']
+      .map((host, index) => [index === 0 ? 'Binance USD-M' : 'Binance USD-M alternate ' + index,
+        'https://' + host + '/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'])
   ];
   for (const [provider, url] of providers) {
     try {
