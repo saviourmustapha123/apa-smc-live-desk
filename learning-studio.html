@@ -62,6 +62,7 @@ const toolNames={select:'Select / move',line:'Line',rect:'Rectangle',brush:'Pain
 function pt(e){const r=layer.getBoundingClientRect();return {x:Math.max(0,Math.min(900,(e.clientX-r.left)*900/r.width)),y:Math.max(0,Math.min(330,(e.clientY-r.top)*330/r.height))}}
 function safeText(t){return esc(t).replace(/\n/g,'&#10;')}
 function nearestAnnotation(p,exclude){let best=null,dist=Infinity;for(const a of state.annotations){if(a.id===exclude)continue;const x=a.type==='text'?a.x+a.w/2:(a.x1??a.x??0),y=a.type==='text'?a.y+a.h/2:(a.y1??a.y??0),d=Math.hypot(p.x-x,p.y-y);if(d<dist&&d<48){dist=d;best=a}}return best}
+function annotationAnchor(a){if(!a)return {x:0,y:0};if(a.type==='text')return {x:a.x+a.w/2,y:a.y+a.h/2};if(a.type==='brush'&&a.points?.length){const p=a.points[Math.floor(a.points.length/2)];return {x:p.x,y:p.y}}return {x:((a.x1??a.x??0)+(a.x2??a.x??0))/2,y:((a.y1??a.y??0)+(a.y2??a.y??0))/2}}
 function renderAnnotations(){
  if(!layer)return;
  const out=[];
@@ -72,7 +73,7 @@ function renderAnnotations(){
   else if(a.type==='rect')out.push('<rect class="'+cl+'" data-id="'+a.id+'" x="'+Math.min(a.x1,a.x2)+'" y="'+Math.min(a.y1,a.y2)+'" width="'+Math.max(2,Math.abs(a.x2-a.x1))+'" height="'+Math.max(2,Math.abs(a.y2-a.y1))+'" fill="'+stroke+'" fill-opacity=".14" stroke="'+stroke+'" stroke-width="'+sw+'" />');
   else if(a.type==='brush')out.push('<polyline class="'+cl+'" data-id="'+a.id+'" points="'+(a.points||[]).map(p=>p.x+','+p.y).join(' ')+'" fill="none" stroke="'+stroke+'" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round" />');
   else if(a.type==='point')out.push('<g class="'+cl+'" data-id="'+a.id+'"><circle cx="'+a.x1+'" cy="'+a.y1+'" r="'+(selected?7:5)+'" fill="'+stroke+'" /><circle cx="'+a.x1+'" cy="'+a.y1+'" r="11" fill="none" stroke="'+stroke+'" stroke-width="1" stroke-dasharray="2 3"/></g>');
-  else if(a.type==='arrow'||a.type==='connector')out.push('<line class="'+cl+'" data-id="'+a.id+'" x1="'+a.x1+'" y1="'+a.y1+'" x2="'+a.x2+'" y2="'+a.y2+'" stroke="'+stroke+'" stroke-width="'+sw+'" stroke-linecap="round" marker-end="url(#annotArrow)" />');
+  else if(a.type==='arrow'||a.type==='connector'){const f=a.type==='connector'?annotationAnchor(state.annotations.find(x=>x.id===a.fromId)):null,t=a.type==='connector'?annotationAnchor(state.annotations.find(x=>x.id===a.toId)):null;out.push('<line class="'+cl+'" data-id="'+a.id+'" x1="'+(f?f.x:a.x1)+'" y1="'+(f?f.y:a.y1)+'" x2="'+(t?t.x:a.x2)+'" y2="'+(t?t.y:a.y2)+'" stroke="'+stroke+'" stroke-width="'+sw+'" stroke-linecap="round" marker-end="url(#annotArrow)" />')}
   else if(a.type==='text'){
    const lines=String(a.text||'').split('\n'),fs=a.fontSize||15;
    out.push('<g class="'+cl+'" data-id="'+a.id+'"><rect x="'+a.x+'" y="'+a.y+'" width="'+a.w+'" height="'+a.h+'" rx="5" fill="#111a24" fill-opacity=".94" stroke="'+stroke+'" stroke-width="'+sw+'"/>');
