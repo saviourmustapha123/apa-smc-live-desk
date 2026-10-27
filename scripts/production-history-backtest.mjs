@@ -178,7 +178,7 @@ async function fetchBars(symbol, tf) {
     // Retry with Binance's public historical archives for the exact perpetual
     // contract before considering any non-equivalent ETF proxy.
     try {
-      const archived = await fetchBinanceVisionDaily('QQQUSDT', tf, 30);
+      const archived = await fetchBinanceVisionDaily('QQQUSDT', tf, 60);
       if (archived.length >= 100) return { bars: archived, provider: 'Binance Vision historical archive QQQUSDT', exact: true };
       errors.push('Binance Vision archive returned only ' + archived.length + ' valid QQQUSDT bars');
     } catch (e) { errors.push('Binance Vision archive: ' + e.message); }
