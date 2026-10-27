@@ -14,7 +14,7 @@ function candles(count, { interval = 300, lastTime = Math.floor(NOW / 1000) - in
 function trendingCandles(count, direction, interval = 300) {
   const lastTime = Math.floor(NOW / 1000) - interval;
   return Array.from({ length: count }, (_, i) => {
-    const center = 100 + direction * i * 0.12 + Math.sin(i * 0.7) * 1.8;
+    const center = 100 + direction * i * 0.8 + Math.sin(i * 0.7) * 1.8;
     return { time: lastTime - (count - 1 - i) * interval, open: center - direction * 0.15, high: center + 0.45, low: center - 0.45, close: center + direction * 0.15 };
   });
 }
