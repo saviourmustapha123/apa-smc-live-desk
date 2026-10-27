@@ -598,6 +598,16 @@ test('live admission rejects setups whose latest confirmed close already crossed
   assert.match(html, /if\(candidate\.status!=='RUNNING'&&candidateAlreadyPastLevels\(candidate,bars\)\)continue/);
 });
 
+test('actionable signals require higher-timeframe structure alignment, preventing isolated low-timeframe entries', () => {
+  assert.match(html, /function structureBiasScore\(bars\)/);
+  assert.match(html, /function topDownAlignment\(candidate,sets\)/);
+  assert.match(html, /higher-timeframe structure conflicts or is mixed/);
+  assert.match(html, /const aligned=readable\.filter\(x=>x\.score===direction\)\.length,required=Math\.ceil\(readable\.length\*2\/3\)/);
+  assert.match(html, /const alignment=topDownAlignment\(candidate,signalSets\)/);
+  assert.match(html, /Top-down alignment rejected candidate/);
+  assert.match(html, /Top-down structure aligned/);
+});
+
 test('signal admission has no artificial daily quota and scans all eleven timeframes', () => {
   assert.match(html, /function signalDayStamp\(t\)/);
   assert.doesNotMatch(html, /daily limit of [0-9]+ new candidates reached/);
