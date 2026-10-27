@@ -125,7 +125,7 @@ test('concurrent 8H/12H requests share a short-lived hourly cache and pending fe
 
 test('weekly/monthly/yearly views reuse the bounded daily-history cache during refresh bursts', () => {
   assert.match(html, /const dailyHistoryCache=new Map\(\),dailyHistoryPending=new Map\(\)/);
-  assert.match(html, /const cacheKey=qqqCacheSymbol\(sym\),cached=dailyHistoryCache\.get\(cacheKey\)/);
+  assert.match(html, /const providerAtStart=s\.qqqProvider,cacheKey=qqqCacheSymbol\(sym\),cached=dailyHistoryCache\.get\(cacheKey\)/);
   assert.match(html, /if\(cached&&Date\.now\(\)-cached\.at<30000\)return cached/);
   assert.match(html, /reused in-memory daily history cache/);
   assert.match(html, /dailyHistoryCache\.set\(cacheKey,result\)/);
@@ -675,6 +675,8 @@ test('late network responses cannot overwrite the currently selected pair or tim
   assert.match(html, /const generation=\+\+s\.startGeneration/);
   assert.match(html, /if\(generation!==s\.startGeneration\|\|sym!==s\.symbol\|\|tf!==s\.tf\)return/);
   assert.match(html, /const quoteSymbol=s\.symbol,quoteTf=s\.tf/);
+  assert.match(html, /const quoteSymbol=s\.symbol,quoteTf=s\.tf,quoteProvider=s\.qqqProvider/);
+  assert.match(html, /quoteProvider!==s\.qqqProvider/);
   assert.match(html, /if\(quoteSymbol!==s\.symbol\|\|quoteTf!==s\.tf\)return/);
 });
 
