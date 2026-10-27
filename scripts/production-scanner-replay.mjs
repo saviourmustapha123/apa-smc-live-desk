@@ -7,8 +7,9 @@ function extractFunction(name) {
   const start = app.indexOf('function ' + name + '(');
   if (start < 0) throw new Error('Production function not found: ' + name);
   const nextFunction = app.indexOf('\nfunction ', start + 10);
+  const nextAsyncFunction = app.indexOf('\nasync function ', start + 10);
   const nextDiagnosticMap = app.indexOf('\nconst strategyScanDiagnostics', start + 10);
-  const candidates = [nextFunction, nextDiagnosticMap].filter(index => index >= 0);
+  const candidates = [nextFunction, nextAsyncFunction, nextDiagnosticMap].filter(index => index >= 0);
   if (!candidates.length) throw new Error('Could not find the end boundary for production function: ' + name);
   return app.slice(start, Math.min(...candidates));
 }
@@ -16,7 +17,7 @@ function extractFunction(name) {
 const functionNames = [
   'fxSessionOpenAt', 'marketSessionOpen', 'signalEligibilityReason',
   'pivots', 'atr', 'detectQmlStructure', 'detectPatternRetest', 'detectRecentBlockRetest',
-  'latestInducementProxy', 'targetLevelUnreached', 'structuralTarget',
+  'latestInducementProxy', 'targetLevelUnreached', 'structuralTarget', 'structureBiasScore', 'topDownAlignment',
   'signalHorizonForTf', 'estimateTargetHorizon', 'pendingOrderBlockOpportunity',
   'scanOpportunityHistory'
 ];
@@ -36,6 +37,7 @@ export function createProductionScannerReplay({ now = Date.now(), k = 3, displac
     '\nthis.__pending = pendingOrderBlockOpportunity;' +
     '\nthis.__blockRetest = detectRecentBlockRetest;' +
     '\nthis.__targetLevelUnreached = targetLevelUnreached;' +
+    '\nthis.__align = topDownAlignment;' +
     '\nthis.__diagnostics = () => strategyScanDiagnostics;';
   new Script(source, { filename: 'production-scanner-replay.vm.js' }).runInContext(context);
   return {
@@ -52,6 +54,9 @@ export function createProductionScannerReplay({ now = Date.now(), k = 3, displac
     },
     targetLevelUnreached(side, target, bars, targetIndex) {
       return context.__targetLevelUnreached(side, target, bars, targetIndex);
+    },
+    align(candidate, sets) {
+      return context.__align(candidate, sets);
     }
   };
 }
