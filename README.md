@@ -18,7 +18,7 @@ A mobile-friendly, single-page market-analysis desk for EUR/USD and BTC/USD. It 
 QQQUSDT is an ETF-linked perpetual contract, not QQQ ETF shares. The chart now supports two venue-specific public market-data adapters:
 
 - **Bybit linear perpetual (default alternate):** public V5 ticker and kline endpoints, including 1m, 5m, 15m, 1h, 4h, 8h, 12h and daily candles.
-- **Binance USDⓈ-M Futures:** public futures ticker and kline endpoints, with the existing optional proxy setting available for networks where direct access is permitted but browser access needs a relay.
+- **Binance USDⓈ-M Futures:** public futures ticker and kline endpoints. The deployed Cloudflare Worker is prefilled as the default proxy so region-restricted or CORS-blocked browser requests can use the relay; the provider and proxy remain configurable in Settings.
 
 Choose the provider in **Settings → QQQUSDT market-data venue**, then use **Test feed**. The app stores QQQUSDT candles in separate provider-specific local caches so candles from different exchanges are not merged. Prices, wicks, volume, spreads and signal outcomes can differ by venue; inspect signals against the same venue you intend to use. Public endpoint availability still depends on network and regional access. If both providers fail, the app should report the feed failure rather than imply that live data is running.
 
