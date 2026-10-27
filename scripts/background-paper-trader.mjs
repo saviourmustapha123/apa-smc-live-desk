@@ -181,7 +181,7 @@ function renderTrade(trade) {
     ' | signal ' + iso(trade.signalTime) +
     ' | entry ' + trade.entry + ' / SL ' + trade.sl + ' / TP ' + trade.tp +
     ' | planned ' + Number(trade.rr).toFixed(2) + 'R' +
-    ' | **' + trade.status + '**: ' + trade.outcome +
+    ' | **' + (trade.status === 'NOT RUNNING' ? 'NOT TRIGGERED' : trade.status) + '**: ' + trade.outcome +
     (trade.entryTime ? ' | filled ' + iso(trade.entryTime) : '') +
     (trade.exitTime ? ' | exit ' + iso(trade.exitTime) : '') +
     (Number.isFinite(trade.resultR) ? ' | result ' + trade.resultR.toFixed(2) + 'R' : '');
@@ -262,7 +262,7 @@ for (const symbol of SYMBOLS) {
       log('- Feed: ' + state.feedStatus[key].status + ' · ' + data.provider + ' · ' + bars.length + ' closed candles · latest ' + iso(latest.time) + ' · close ' + latest.close);
       log('- New scanner candidates at latest close: ' + candidateCount);
       const current = activeFor(symbol, tf);
-      if (current) log('- Open paper setup: ' + current.status + ' · ' + current.side + ' · entry ' + current.entry + ' · SL ' + current.sl + ' · TP ' + current.tp);
+      if (current) log('- Open paper setup: ' + (current.status === 'NOT RUNNING' ? 'NOT TRIGGERED' : current.status) + ' · ' + current.side + ' · entry ' + current.entry + ' · SL ' + current.sl + ' · TP ' + current.tp);
       else log('- Open paper setup: none');
       log('');
     } catch (error) {
