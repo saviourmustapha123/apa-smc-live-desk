@@ -11,6 +11,39 @@ function candles(count, { interval = 300, lastTime = Math.floor(NOW / 1000) - in
   });
 }
 
+function trendingCandles(count, direction, interval = 300) {
+  const lastTime = Math.floor(NOW / 1000) - interval;
+  return Array.from({ length: count }, (_, i) => {
+    const center = 100 + direction * i * 0.12 + Math.sin(i * 0.7) * 1.8;
+    return { time: lastTime - (count - 1 - i) * interval, open: center - direction * 0.15, high: center + 0.45, low: center - 0.45, close: center + direction * 0.15 };
+  });
+}
+
+test('top-down gate requires readable aligned higher-timeframe structure for actionable entries', () => {
+  const engine = createProductionScannerReplay({ now: NOW });
+  const candidate = { tf: '1m', side: 'BUY' };
+  const bullish = [
+    ['1m', trendingCandles(100, 1, 60)],
+    ['5m', trendingCandles(100, 1, 300)],
+    ['15m', trendingCandles(100, 1, 900)],
+    ['1h', trendingCandles(100, 1, 3600)],
+    ['4h', trendingCandles(100, 1, 14400)]
+  ];
+  const aligned = engine.align(candidate, bullish);
+  assert.equal(aligned.ok, true);
+  assert.match(aligned.label, /aligned 3\/3/);
+
+  const mixed = [...bullish];
+  mixed[2] = ['15m', trendingCandles(100, -1, 900)];
+  assert.equal(engine.align(candidate, mixed).ok, true, 'two of three readable higher frames can form a majority');
+  mixed[1] = ['5m', trendingCandles(100, -1, 300)];
+  assert.equal(engine.align(candidate, mixed).ok, false, 'a conflicting majority must reject the setup');
+
+  const missing = [['1m', bullish[0][1]], ['5m', []], ['15m', []], ['1h', []]];
+  assert.equal(engine.align(candidate, missing).ok, false, 'a low-timeframe setup cannot pass without readable higher-timeframe structure');
+  assert.equal(engine.align({ tf: '1Y', side: 'BUY' }, bullish).ok, true, 'the highest available timeframe has no parent timeframe');
+});
+
 test('replays the actual production scanner source, not the proxy strategy', () => {
   const engine = createProductionScannerReplay({ now: NOW });
   const result = engine.scan('BTCUSD', '5m', candles(120));
