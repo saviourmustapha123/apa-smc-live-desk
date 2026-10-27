@@ -136,7 +136,7 @@ export default {
         if (!BINANCE_INTERVALS.has(interval)) return response("Unsupported Binance candle interval", 400);
         if (!Number.isInteger(limit) || limit < 1 || limit > 1000) return response("limit must be an integer from 1 to 1000", 400);
         for (const key of ["startTime","endTime"]) if (!validIntegerParam(incoming,key,0,Number.MAX_SAFE_INTEGER)) return response(key + " must be a non-negative millisecond timestamp",400);
-        if ([...incoming.searchParams.keys()].some(k => !["symbol","interval","limit","startTime","endTime"].includes(k))) return response("Unsupported query parameter",400);
+        if ([...incoming.searchParams.keys()].some(k => !["symbol","interval","limit","startTime","endTime"].includes(k))) return response("Unsupported query parameter: " + [...incoming.searchParams.keys()].filter(k => !["symbol","interval","limit","startTime","endTime","category","start","end"].includes(k)).join(","),400);
       } else if ([...incoming.searchParams.keys()].some(k => k !== "symbol")) return response("Unsupported query parameter",400);
     }
     if (isBybit) {
