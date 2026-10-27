@@ -64,6 +64,10 @@ jobs:
         if: github.event_name != 'schedule'
         run: node --test scripts/app-timeframe-health-check.test.mjs
 
+      - name: Run service-worker cache and offline-navigation tests
+        if: github.event_name != 'schedule'
+        run: node --test scripts/service-worker.test.mjs
+
       - name: Run production signal lifecycle regression tests
         if: github.event_name != 'schedule'
         run: node --test scripts/signal-lifecycle-regression.test.mjs
