@@ -105,7 +105,7 @@ function addTextAt(p){
  const txt=prompt('Write the explanation for this chart text box:');if(txt===null||!txt.trim())return;
  const fs=Math.max(10,Math.min(32,Number($('annotTextSize').value)||15)),lines=txt.split('\n');
  const a={id:uid(),type:'text',x:p.x,y:p.y,w:Math.max(130,Math.min(310,Math.max(...lines.map(x=>x.length),12)*fs*.58+18)),h:Math.max(48,lines.length*(fs+3)+18),text:txt,fontSize:fs,color:$('annotColor').value};
- a.x=Math.min(a.x,900-a.w);a.y=Math.min(a.y,330-a.h);state.annotations.push(a);state.selectedAnnotation=a.id;renderAnnotations();
+ a.x=Math.min(a.x,900-a.w);a.y=Math.min(a.y,330-a.h);state.annotations.push(a);state.selectedAnnotation=a.id;renderAnnotations();persist();
 }
 layer.addEventListener('pointerdown',e=>{
  const p=pt(e),resize=e.target.closest('[data-resize]'),hit=e.target.closest('[data-id]');
@@ -127,7 +127,7 @@ layer.addEventListener('pointermove',e=>{
 });
 function endPointer(e){if(state.drag){state.drag=null;persist();return}if(state.drawing){finishDrawing(pt(e));persist()}}
 layer.addEventListener('pointerup',endPointer);layer.addEventListener('pointercancel',endPointer);
-$('deleteAnnotation').onclick=()=>{if(!state.selectedAnnotation)return;state.annotations=state.annotations.filter(a=>a.id!==state.selectedAnnotation&&a.fromId!==state.selectedAnnotation&&a.toId!==state.selectedAnnotation);state.selectedAnnotation=null;renderAnnotations()};
+$('deleteAnnotation').onclick=()=>{if(!state.selectedAnnotation)return;state.annotations=state.annotations.filter(a=>a.id!==state.selectedAnnotation&&a.fromId!==state.selectedAnnotation&&a.toId!==state.selectedAnnotation);state.selectedAnnotation=null;renderAnnotations();persist()};
 $('clearAnnotations').onclick=()=>{if(state.annotations.length&&confirm('Clear all drawings on this chart?')){state.annotations=[];state.selectedAnnotation=null;renderAnnotations();persist()}};
 $('editAnnotationText').onclick=()=>{const a=state.annotations.find(x=>x.id===state.selectedAnnotation);if(!a||a.type!=='text'){alert('Select a text box first.');return}const t=prompt('Edit this explanation:',a.text);if(t!==null){a.text=t;const lines=t.split('\n');a.h=Math.max(a.h,lines.length*(a.fontSize+3)+18);renderAnnotations();persist()}};
 $('annotTextSize').onchange=()=>{const a=state.annotations.find(x=>x.id===state.selectedAnnotation);if(a?.type==='text'){a.fontSize=Math.max(10,Math.min(32,Number($('annotTextSize').value)||15));a.h=Math.max(a.h,a.text.split('\n').length*(a.fontSize+3)+18);renderAnnotations()}};
@@ -153,10 +153,10 @@ function renderLibrary(){const all=[...state.records,...state.instructions.map(x
 document.addEventListener('click',e=>{const b=e.target.closest('[data-review]');if(!b)return;const r=state.records.find(x=>x.id===b.dataset.review);if(!r)return;r.reviewStatus=b.dataset.status;persist();renderLibrary()});
 $('filterType').onchange=renderLibrary;$('searchCases').oninput=renderLibrary;
 function download(name,obj){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1200)}
-$('exportLibrary').onclick=()=>download('apa-smc-learning-library.json',{version:1,exportedAt:new Date().toISOString(),records:state.records,instructions:state.instructions});
+$('exportLibrary').onclick=()=>download('apa-smc-learning-library.json',{version:1,exportedAt:new Date().toISOString(),records:state.records,instructions:state.instructions,annotations:state.annotations});
 $('exportBackup').onclick=$('exportLibrary').onclick;$('exportReplay').onclick=()=>download('apa-smc-replay-cases.json',{symbol:$('symbol').value,timeframe:$('timeframe').value,candles:state.candles.slice(0,state.cursor+1),records:state.records.filter(r=>r.replayIndex!==null)});
 $('exportProposals').onclick=()=>download('apa-smc-rule-proposals.json',{status:'PROPOSALS_ONLY_NOT_APPLIED',exportedAt:new Date().toISOString(),proposals:state.records.filter(r=>r.type==='correction'&&r.reviewStatus==='reviewed').map(r=>({id:r.id,category:r.model,systemLabel:r.systemLabel,correctLabel:r.correctLabel,rule:r.ruleText,exceptions:r.whenNot,evidence:r.evidence,requiresRegressionTests:true,approvedForLive:false}))});
-$('clearLearning').onclick=()=>{if(confirm('Permanently clear all local learning records and instructions on this browser? Export a backup first.')){state.records=[];state.instructions=[];persist();renderLibrary()}};
+$('clearLearning').onclick=()=>{if(confirm('Permanently clear all local learning records and instructions on this browser? Export a backup first.')){state.records=[];state.instructions=[];state.annotations=[];state.selectedAnnotation=null;persist();renderLibrary();renderAnnotations()}};
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='pane-'+b.dataset.tab));if(b.dataset.tab==='library')renderLibrary()});
 $('symbol').onchange=draw;$('timeframe').onchange=draw;load();renderLibrary();draw();renderAnnotations();$('storageStatus').textContent='Saved locally · '+state.records.length+' cases';
 })();
