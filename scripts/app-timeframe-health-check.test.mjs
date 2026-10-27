@@ -125,8 +125,9 @@ test('concurrent 8H/12H requests share a short-lived hourly cache and pending fe
 
 test('weekly/monthly/yearly views reuse the bounded daily-history cache during refresh bursts', () => {
   assert.match(html, /const dailyHistoryCache=new Map\(\)/);
-  assert.match(html, /cachedDaily&&Date\.now\(\)-cachedDaily\.at<30000&&cachedDaily\.bars\.length/);
+  assert.match(html, /cachedDaily&&Date\.now\(\)-cachedDaily\.at<30000/);
   assert.match(html, /reused in-memory daily history cache/);
+  assert.match(html, /latestError&&!daily\.length\)\{const result=\{at:Date\.now\(\),bars:\[\],rounds,target,reason\};dailyHistoryCache\.set\(sym,result\);return result/);
   assert.match(html, /dailyHistoryCache\.set\(sym,\{at:Date\.now\(\),bars:daily\}\)/);
 });
 
