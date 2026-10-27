@@ -123,6 +123,11 @@ export default {
     if (request.method === "OPTIONS") return response(null, 204);
     if (request.method !== "GET") return response("Method not allowed", 405);
     const incoming = new URL(request.url);
+    // Ignore analytics/tracking parameters added by browsers, link previews, or sharing tools.
+    // They are not market-data inputs and must never be forwarded upstream.
+    for (const key of [...incoming.searchParams.keys()]) {
+      if (/^utm_/i.test(key)) incoming.searchParams.delete(key);
+    }
     const path = incoming.pathname;
     const isBybit = path === "/v5/market/tickers" || path === "/v5/market/kline";
     const isBinance = path === "/fapi/v1/ticker/price" || path === "/fapi/v1/klines";
