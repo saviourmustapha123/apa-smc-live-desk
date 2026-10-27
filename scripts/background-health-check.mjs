@@ -151,7 +151,16 @@ try {
   else fail('GitHub Pages site content', 'HTTP success but expected app title not found');
   const sourceRelease = source.match(/<meta\s+name=["']app-release["']\s+content=["']([^"']+)["']/i)?.[1];
   const deployedRelease = html.match(/<meta\s+name=["']app-release["']\s+content=["']([^"']+)["']/i)?.[1];
+  const compareRelease = (a, b) => {
+    const left = String(a).split('.').map(Number), right = String(b).split('.').map(Number);
+    for (let i = 0; i < Math.max(left.length, right.length); i++) {
+      const delta = (left[i] || 0) - (right[i] || 0);
+      if (delta) return delta;
+    }
+    return 0;
+  };
   if (sourceRelease && deployedRelease && sourceRelease === deployedRelease) pass('Deployed app release matches audited source', deployedRelease);
+  else if (sourceRelease && deployedRelease && compareRelease(sourceRelease, deployedRelease) > 0) warn('GitHub Pages release is behind audited source', 'source=' + sourceRelease + ', deployed=' + deployedRelease + '; the health check may overlap the Pages deployment. The Pages workflow separately verifies deployment completion.');
   else fail('Deployed app release matches audited source', 'source=' + (sourceRelease || 'missing') + ', deployed=' + (deployedRelease || 'missing'));
 } catch (e) { fail('GitHub Pages site reachability', e.message); }
 
