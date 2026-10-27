@@ -12,7 +12,14 @@ const warn = (name, detail = '') => { warnings.push(name); console.warn(`WARN  $
 
 async function get(url) {
   const res = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { 'user-agent': 'APA-SMC-Live-Desk-health-check/1.0' } });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const data = await res.clone().json();
+      detail = [data.message || data.error || '', data.primary ? 'primary: ' + data.primary : '', data.fallback ? 'fallback: ' + data.fallback : ''].filter(Boolean).join(' · ');
+    } catch {}
+    throw new Error(`HTTP ${res.status}${detail ? ' · ' + detail : ''}`);
+  }
   return res;
 }
 
