@@ -41,7 +41,8 @@ test('top-down gate requires readable aligned higher-timeframe structure for act
 
   const missing = [['1m', bullish[0][1]], ['5m', []], ['15m', []], ['1h', []]];
   assert.equal(engine.align(candidate, missing).ok, false, 'a low-timeframe setup cannot pass without readable higher-timeframe structure');
-  assert.equal(engine.align({ tf: '1Y', side: 'BUY' }, bullish).ok, true, 'the highest available timeframe has no parent timeframe');
+  const yearlySets = [...bullish, ['1Y', trendingCandles(100, 1, 31536000)]];
+  assert.equal(engine.align({ tf: '1Y', side: 'BUY' }, yearlySets).ok, true, 'the highest available timeframe has no parent timeframe');
 });
 
 test('replays the actual production scanner source, not the proxy strategy', () => {
