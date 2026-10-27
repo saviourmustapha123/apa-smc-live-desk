@@ -6,6 +6,8 @@ const SOURCE = `https://raw.githubusercontent.com/saviourmustapha123/apa-smc-liv
 const API = 'https://biquote.io/api';
 const failures = [];
 const warnings = [];
+let binanceRegionRestricted = false;
+let bybitRegionRestricted = false;
 const pass = (name, detail = '') => console.log(`PASS  ${name}${detail ? ' — ' + detail : ''}`);
 const fail = (name, detail = '') => { failures.push(name); console.error(`FAIL  ${name}${detail ? ' — ' + detail : ''}`); };
 const warn = (name, detail = '') => { warnings.push(name); console.warn(`WARN  ${name}${detail ? ' — ' + detail : ''}`); };
@@ -46,7 +48,7 @@ try {
     if (Array.isArray(rows) && rows.length > 0 && rows.every(r => Array.isArray(r) && [0,1,2,3,4,5,6].every(i => Number.isFinite(Number(r[i]))))) pass('Binance QQQUSDT ' + interval + ' candles', rows.length + ' valid OHLCV rows');
     else fail('Binance QQQUSDT ' + interval + ' candles', 'No valid OHLCV rows');
   }
-} catch (e) { if (/HTTP 451/.test(e.message)) warn('Binance QQQUSDT public REST feed is region-restricted from this CI runner', 'Binance connector has returned live QQQUSDT quotes and candles, but the deployed browser feed remains dependent on the viewer\'s network region.'); else fail('Binance QQQUSDT market feed', e.message); }
+} catch (e) { if (/HTTP 451/.test(e.message)) { binanceRegionRestricted = true; warn('Binance QQQUSDT public REST feed is region-restricted from this CI runner', 'The user has confirmed the deployed ticker endpoint separately; live access remains region-dependent.'); } else fail('Binance QQQUSDT market feed', e.message); }
 
   try {
     const response = await (await get('https://api.bybit.com/v5/market/tickers?category=linear&symbol=QQQUSDT')).json();
@@ -70,7 +72,7 @@ try {
       if (validRows) pass('Bybit QQQUSDT interval ' + interval, validRows.length + ' valid OHLCV rows');
       else fail('Bybit QQQUSDT interval ' + interval, lastDetail + ' after 3 attempts');
     }
-  } catch (e) { if (/HTTP (403|451)/.test(e.message)) warn('Bybit public market-data endpoint is region-restricted from this CI runner', e.message); else fail('Bybit QQQUSDT market feed', e.message); }
+  } catch (e) { if (/HTTP (403|451)/.test(e.message)) { bybitRegionRestricted = true; warn('Bybit public market-data endpoint is region-restricted from this CI runner', e.message); } else fail('Bybit QQQUSDT market feed', e.message); }
 
   const QQQ_PROXY = process.env.QQQ_PROXY_URL || 'https://apa-smc-qqqusdt-proxy.saviourmustapha123.workers.dev';
   let proxyProvider = null, proxyFailure = 'No provider attempted';
@@ -115,7 +117,10 @@ try {
       pass('Cloudflare QQQUSDT proxy · Bybit ticker + eight intervals', 'ticker and 1m–1d OHLCV checks passed');
     } catch (e) { proxyFailure += ' | Bybit proxy: ' + e.message; }
   }
-  if (!proxyProvider) fail('Configured Cloudflare QQQUSDT proxy', proxyFailure);
+  if (!proxyProvider) {
+    if (binanceRegionRestricted && bybitRegionRestricted && /HTTP 502/.test(proxyFailure)) warn('Cloudflare QQQUSDT proxy cannot be fully verified from this CI region', proxyFailure + '. Both upstream exchanges are region-blocked from this runner; verify live ticker and candle access from the target browser region before relying on signals.');
+    else fail('Configured Cloudflare QQQUSDT proxy', proxyFailure);
+  }
 
   const checks = [
     ['minimum 1:3 reward/risk gate', /(?:rr\s*<\s*3|rr\s*<\s*MIN_REWARD_RISK)/.test(source)],
