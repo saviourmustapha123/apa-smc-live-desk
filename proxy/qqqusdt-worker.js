@@ -37,31 +37,28 @@ async function fetchJson(url) {
   // Binance futures REST is geo-restricted from some edge regions. Try the
   // documented alternate public hostnames without changing path or parameters.
   if (["fapi.binance.com","fapi1.binance.com","fapi2.binance.com","fapi3.binance.com","fapi4.binance.com"].includes(original.hostname)) {
-    for (const hostname of ["fapi.binance.com","fapi1.binance.com","fapi2.binance.com","fapi3.binance.com","fapi4.binance.com","api.binance.com","api-gcp.binance.com"]) {
+    for (const hostname of ["fapi.binance.com","fapi1.binance.com","fapi2.binance.com","fapi3.binance.com","fapi4.binance.com"]) {
       if (hostname === original.hostname) continue;
       const alternate = new URL(original);
       alternate.hostname = hostname;
       candidates.push(alternate);
     }
-  } else if (original.hostname === "api.binance.com" && original.pathname.startsWith("/fapi/")) {
-    const alternate = new URL(original);
-    alternate.hostname = "api-gcp.binance.com";
-    candidates.push(alternate);
-  } else if (original.hostname === "api-gcp.binance.com" && original.pathname.startsWith("/fapi/")) {
-    const alternate = new URL(original);
-    alternate.hostname = "fapi.binance.com";
-    candidates.push(alternate);
   }
   let lastError;
-  for (const candidate of candidates) {
-    try {
-      const res = await fetch(candidate.toString(), { method: "GET", headers: { "Accept": "application/json" }, redirect: "follow" });
-      const body = await res.text();
-      if (!res.ok) throw new Error("HTTP " + res.status + " from " + candidate.hostname);
-      let data;
-      try { data = JSON.parse(body); } catch { throw new Error("Non-JSON response from " + candidate.hostname); }
-      return { data, contentType: res.headers.get("content-type") || "application/json" };
-    } catch (error) { lastError = error; }
+  // Retry the complete official-host rotation once after transient edge/network failures.
+  // This helps intermittent upstream resets without fabricating or caching a price.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    for (const candidate of candidates) {
+      try {
+        const res = await fetch(candidate.toString(), { method: "GET", headers: { "Accept": "application/json" }, redirect: "follow" });
+        const body = await res.text();
+        if (!res.ok) throw new Error("HTTP " + res.status + " from " + candidate.hostname);
+        let data;
+        try { data = JSON.parse(body); } catch { throw new Error("Non-JSON response from " + candidate.hostname); }
+        return { data, contentType: res.headers.get("content-type") || "application/json" };
+      } catch (error) { lastError = error; }
+    }
+    if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 150));
   }
   throw lastError || new Error("All configured market data hosts failed");
 }
