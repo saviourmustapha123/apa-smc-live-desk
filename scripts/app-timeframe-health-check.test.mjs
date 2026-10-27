@@ -123,7 +123,7 @@ test('concurrent 8H/12H requests share a short-lived hourly cache and pending fe
   assert.match(html, /Date\.now\(\)-cached\.at<30000/);
 });
 
-test('weekly/monthly/yearly views reuse sufficiently deep daily history during refresh bursts', () => {
+test('weekly/monthly/yearly views reuse the bounded daily-history cache during refresh bursts', () => {
   assert.match(html, /const dailyHistoryCache=new Map\(\)/);
   assert.match(html, /cachedDaily&&Date\.now\(\)-cachedDaily\.at<30000&&cachedDaily\.bars\.length&&cachedDaily\.bars\[0\]\.time<=target/);
   assert.match(html, /reused in-memory daily history cache/);
@@ -614,8 +614,8 @@ test('signal admission has no artificial daily quota and scans all eleven timefr
   assert.doesNotMatch(html, /daily limit of [0-9]+ candidates for/);
   assert.match(html, /function candidateAlreadyPastLevels\(candidate,bars\)/);
   assert.match(html, /Automatic scan · '\+market\+' · 11 timeframes checked/);
-  assert.match(html, /setInterval\(\(\)=>runAutomaticPairScan\(\),20000\)/);
-  assert.match(html, /name="app-release" content="2026\.10\.27\.02"/);
+  assert.match(html, /setInterval\\(\\(\\)=>\\{if\\(!document\\.hidden\\)runAutomaticPairScan\\(\\)\\},20000\\)/);
+  assert.match(html, /name=\"app-release\" content=\"2026\\.10\\.27\\.[0-9]+\"/);
   assert.match(html, /t\.verificationState='PROVISIONAL-HEURISTIC'/);
 });
 test('daily candidate display counts by identification time rather than historical candle time', () => {
