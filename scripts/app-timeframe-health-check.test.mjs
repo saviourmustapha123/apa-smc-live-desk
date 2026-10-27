@@ -615,7 +615,7 @@ test('signal admission has no artificial daily quota and scans all eleven timefr
   assert.match(html, /function candidateAlreadyPastLevels\(candidate,bars\)/);
   assert.match(html, /Automatic scan · '\+market\+' · 11 timeframes checked/);
   assert.match(html, /setInterval\(\(\)=>runAutomaticPairScan\(\),20000\)/);
-  assert.match(html, /name="app-release" content="2026\.10\.27\.01"/);
+  assert.match(html, /name="app-release" content="2026\.10\.27\.02"/);
   assert.match(html, /t\.verificationState='PROVISIONAL-HEURISTIC'/);
 });
 test('daily candidate display counts by identification time rather than historical candle time', () => {
