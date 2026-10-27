@@ -127,8 +127,8 @@ test('weekly/monthly/yearly views reuse the bounded daily-history cache during r
   assert.match(html, /const dailyHistoryCache=new Map\(\)/);
   assert.match(html, /cachedDaily&&Date\.now\(\)-cachedDaily\.at<30000/);
   assert.match(html, /reused in-memory daily history cache/);
-  assert.match(html, /latestError&&!daily\.length\)\{const result=\{at:Date\.now\(\),bars:\[\],rounds,target,reason\};dailyHistoryCache\.set\(sym,result\);return result/);
-  assert.match(html, /dailyHistoryCache\.set\(sym,\{at:Date\.now\(\),bars:daily\}\)/);
+  assert.match(html, /latestError&&!daily\.length\)\{const result=\{at:Date\.now\(\),bars:\[\],rounds,target,reason\};dailyHistoryCache\.set\(cacheKey,result\);return result/);
+  assert.match(html, /const result=\{at:Date\.now\(\),bars:daily,rounds,target,reason\};\s*dailyHistoryCache\.set\(cacheKey,result\)/);
 });
 
 test('live chart loaders that await data are declared async', () => {
@@ -666,8 +666,8 @@ test('network requests time out and remote journal loading does not block first 
 
 test('weekly, monthly and yearly history requests share one pending daily backfill', () => {
   assert.match(html, /const dailyHistoryCache=new Map\(\),dailyHistoryPending=new Map\(\)/);
-  assert.match(html, /if\(dailyHistoryPending\.has\(sym\)\)return dailyHistoryPending\.get\(sym\)/);
-  assert.match(html, /dailyHistoryPending\.set\(sym,task\);try\{return await task\}finally\{dailyHistoryPending\.delete\(sym\)\}/);
+  assert.match(html, /if\(dailyHistoryPending\.has\(cacheKey\)\)return dailyHistoryPending\.get\(cacheKey\)/);
+  assert.match(html, /dailyHistoryPending\.set\(cacheKey,task\);try\{return await task\}finally\{dailyHistoryPending\.delete\(cacheKey\)\}/);
 });
 
 test('late network responses cannot overwrite the currently selected pair or timeframe', () => {
