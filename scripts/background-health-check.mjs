@@ -149,8 +149,8 @@ try {
   const html = await res.text();
   if (html.includes('APA · SMC Live Desk')) pass('GitHub Pages site responds', `HTTP ${res.status}, ${html.length} bytes`);
   else fail('GitHub Pages site content', 'HTTP success but expected app title not found');
-  const sourceRelease = source.match(/<meta\\s+name=["']app-release["']\\s+content=["']([^"']+)["']/i)?.[1];
-  const deployedRelease = html.match(/<meta\\s+name=["']app-release["']\\s+content=["']([^"']+)["']/i)?.[1];
+  const sourceRelease = source.match(/<meta\s+name=["']app-release["']\s+content=["']([^"']+)["']/i)?.[1];
+  const deployedRelease = html.match(/<meta\s+name=["']app-release["']\s+content=["']([^"']+)["']/i)?.[1];
   if (sourceRelease && deployedRelease && sourceRelease === deployedRelease) pass('Deployed app release matches audited source', deployedRelease);
   else fail('Deployed app release matches audited source', 'source=' + (sourceRelease || 'missing') + ', deployed=' + (deployedRelease || 'missing'));
 } catch (e) { fail('GitHub Pages site reachability', e.message); }
