@@ -54,6 +54,90 @@ function calcRR(){const e=Number(val('entry')),s=Number(val('stop')),t=Number(va
 function parseCSV(text){const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/).filter(x=>x.trim());if(lines.length<3)throw Error('CSV needs a header and at least two candles.');const split=line=>line.split(',').map(x=>x.trim().replace(/^"|"$/g,''));const head=split(lines[0]).map(x=>x.toLowerCase());const idx={time:head.findIndex(x=>['time','timestamp','date','datetime','open_time'].includes(x)),open:head.indexOf('open'),high:head.indexOf('high'),low:head.indexOf('low'),close:head.indexOf('close'),volume:head.indexOf('volume')};if(['open','high','low','close'].some(k=>idx[k]<0))throw Error('Could not find open, high, low, close columns.');const arr=[];for(let i=1;i<lines.length;i++){const row=split(lines[i]);const c={time:idx.time>=0?row[idx.time]:String(i),open:Number(row[idx.open]),high:Number(row[idx.high]),low:Number(row[idx.low]),close:Number(row[idx.close]),volume:idx.volume>=0?Number(row[idx.volume])||0:0};if([c.open,c.high,c.low,c.close].every(Number.isFinite)&&c.high>=Math.max(c.open,c.close,c.low)&&c.low<=Math.min(c.open,c.close,c.high))arr.push(c)}if(arr.length<2)throw Error('No valid OHLC candles found.');return arr}
 function draw(){const cv=$('chart'),ctx=cv.getContext('2d'),w=cv.clientWidth||900,h=cv.clientHeight||300,dpr=Math.max(1,window.devicePixelRatio||1);cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);ctx.scale(dpr,dpr);ctx.fillStyle='#0a121b';ctx.fillRect(0,0,w,h);const bars=state.candles.slice(Math.max(0,state.cursor-49),state.cursor+1);if(!bars.length){ctx.fillStyle='#91a2b5';ctx.font='14px system-ui';ctx.fillText('Import candles to start replay',18,30);return}const max=Math.max(...bars.map(c=>c.high)),min=Math.min(...bars.map(c=>c.low)),span=max-min||1,pad={t:18,b:22,l:12,r:58},cw=(w-pad.l-pad.r)/bars.length;const y=p=>pad.t+(max-p)/span*(h-pad.t-pad.b);ctx.strokeStyle='#233241';ctx.fillStyle='#91a2b5';ctx.font='10px system-ui';for(let j=0;j<5;j++){const yy=pad.t+j*(h-pad.t-pad.b)/4;ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(w-pad.r,yy);ctx.stroke();ctx.fillText((max-j*span/4).toPrecision(6),w-pad.r+4,yy+3)}bars.forEach((c,i)=>{const x=pad.l+i*cw+cw/2,up=c.close>=c.open;ctx.strokeStyle=up?'#35d39a':'#ff657a';ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.moveTo(x,y(c.high));ctx.lineTo(x,y(c.low));ctx.stroke();const top=y(Math.max(c.open,c.close)),bh=Math.max(1,Math.abs(y(c.open)-y(c.close)));ctx.fillRect(x-Math.max(1,cw*.28),top,Math.max(2,cw*.56),bh)});const c=current();$('replayStatus').textContent='Candle '+(state.cursor+1)+' / '+state.candles.length+' · '+c.time+' · chart displays only candles 1–'+(state.cursor+1)+'.';$('backStep').disabled=state.cursor<=0;$('nextStep').disabled=!state.candles.length||state.cursor>=state.candles.length-1}
 function step(n){if(!state.candles.length)return;state.cursor=Math.max(0,Math.min(state.candles.length-1,state.cursor+n));draw()}
+
+// Interactive SVG annotation layer: drawings are stored as structured records.
+const layer=$('annotLayer');
+const tools=['select','line','rect','brush','point','arrow','text','connect'];
+const toolNames={select:'Select / move',line:'Line',rect:'Rectangle',brush:'Paint',point:'Point',arrow:'Arrow',text:'Text box',connect:'Connect'};
+function pt(e){const r=layer.getBoundingClientRect();return {x:Math.max(0,Math.min(900,(e.clientX-r.left)*900/r.width)),y:Math.max(0,Math.min(330,(e.clientY-r.top)*330/r.height))}}
+function safeText(t){return esc(t).replace(/\n/g,'&#10;')}
+function nearestAnnotation(p,exclude){let best=null,dist=Infinity;for(const a of state.annotations){if(a.id===exclude)continue;const x=a.type==='text'?a.x+a.w/2:(a.x1??a.x??0),y=a.type==='text'?a.y+a.h/2:(a.y1??a.y??0),d=Math.hypot(p.x-x,p.y-y);if(d<dist&&d<48){dist=d;best=a}}return best}
+function renderAnnotations(){
+ if(!layer)return;
+ const out=[];
+ for(const a of state.annotations){
+  const selected=a.id===state.selectedAnnotation,cl='shape'+(selected?' selected':'');
+  const stroke=esc(a.color||'#70aaff'),sw=selected?3:2;
+  if(a.type==='line')out.push('<line class="'+cl+'" data-id="'+a.id+'" x1="'+a.x1+'" y1="'+a.y1+'" x2="'+a.x2+'" y2="'+a.y2+'" stroke="'+stroke+'" stroke-width="'+sw+'" />');
+  else if(a.type==='rect')out.push('<rect class="'+cl+'" data-id="'+a.id+'" x="'+Math.min(a.x1,a.x2)+'" y="'+Math.min(a.y1,a.y2)+'" width="'+Math.max(2,Math.abs(a.x2-a.x1))+'" height="'+Math.max(2,Math.abs(a.y2-a.y1))+'" fill="'+stroke+'" fill-opacity=".14" stroke="'+stroke+'" stroke-width="'+sw+'" />');
+  else if(a.type==='brush')out.push('<polyline class="'+cl+'" data-id="'+a.id+'" points="'+(a.points||[]).map(p=>p.x+','+p.y).join(' ')+'" fill="none" stroke="'+stroke+'" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round" />');
+  else if(a.type==='point')out.push('<g class="'+cl+'" data-id="'+a.id+'"><circle cx="'+a.x1+'" cy="'+a.y1+'" r="'+(selected?7:5)+'" fill="'+stroke+'" /><circle cx="'+a.x1+'" cy="'+a.y1+'" r="11" fill="none" stroke="'+stroke+'" stroke-width="1" stroke-dasharray="2 3"/></g>');
+  else if(a.type==='arrow'||a.type==='connector')out.push('<line class="'+cl+'" data-id="'+a.id+'" x1="'+a.x1+'" y1="'+a.y1+'" x2="'+a.x2+'" y2="'+a.y2+'" stroke="'+stroke+'" stroke-width="'+sw+'" stroke-linecap="round" marker-end="url(#annotArrow)" />');
+  else if(a.type==='text'){
+   const lines=String(a.text||'').split('\n'),fs=a.fontSize||15;
+   out.push('<g class="'+cl+'" data-id="'+a.id+'"><rect x="'+a.x+'" y="'+a.y+'" width="'+a.w+'" height="'+a.h+'" rx="5" fill="#111a24" fill-opacity=".94" stroke="'+stroke+'" stroke-width="'+sw+'"/>');
+   out.push('<text x="'+(a.x+7)+'" y="'+(a.y+fs+4)+'" fill="#ffffff" font-size="'+fs+'" stroke="none">'+lines.map((line,i)=>'<tspan x="'+(a.x+7)+'" dy="'+(i===0?0:fs+3)+'">'+safeText(line)+'</tspan>').join('')+'</text>');
+   if(selected)out.push('<rect data-resize="'+a.id+'" x="'+(a.x+a.w-9)+'" y="'+(a.y+a.h-9)+'" width="12" height="12" fill="#f4bd57" stroke="#0b1118" stroke-width="1" style="cursor:nwse-resize"/>');
+   out.push('</g>');
+  }
+ }
+ layer.innerHTML='<defs><marker id="annotArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="context-stroke"/></marker></defs>'+out.join('');
+}
+function setTool(tool){state.activeTool=tool;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===tool));$('annotationHelp').textContent=tool==='connect'?'Drag from one annotation to another. The connection remembers the linked objects and their explanation.':tool==='text'?'Tap the chart where the text should begin, then enter your explanation. Select the text and drag its lower-right handle to resize it.':'Choose a tool, then drag on the chart. Select / move lets you reposition drawings and text boxes.'}
+document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setTool(b.dataset.tool)));
+function uid(){return 'ann-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6)}
+function finishDrawing(p){
+ const d=state.drawing;if(!d)return;
+ if(d.type==='brush'&&d.points.length<2){state.drawing=null;renderAnnotations();return}
+ if(d.type!=='brush'&&Math.hypot(p.x-d.x1,p.y-d.y1)<4&&d.type!=='point'){state.drawing=null;renderAnnotations();return}
+ d.x2=p.x;d.y2=p.y;d.id=uid();d.color=$('annotColor').value;
+ if(d.type==='connect'){
+  const from=nearestAnnotation({x:d.x1,y:d.y1}),to=nearestAnnotation({x:d.x2,y:d.y2},from?.id);
+  if(from&&to){d.fromId=from.id;d.toId=to.id;d.type='connector';}
+  else {d.type='arrow';d.note='Unattached arrow; connect by starting/ending near annotations.'}
+ }
+ if(d.type==='text')d.type='text';
+ state.annotations.push(d);state.selectedAnnotation=d.id;state.drawing=null;renderAnnotations();
+}
+function addTextAt(p){
+ const txt=prompt('Write the explanation for this chart text box:');if(txt===null||!txt.trim())return;
+ const fs=Math.max(10,Math.min(32,Number($('annotTextSize').value)||15)),lines=txt.split('\n');
+ const a={id:uid(),type:'text',x:p.x,y:p.y,w:Math.max(130,Math.min(310,Math.max(...lines.map(x=>x.length),12)*fs*.58+18)),h:Math.max(48,lines.length*(fs+3)+18),text:txt,fontSize:fs,color:$('annotColor').value};
+ a.x=Math.min(a.x,900-a.w);a.y=Math.min(a.y,330-a.h);state.annotations.push(a);state.selectedAnnotation=a.id;renderAnnotations();
+}
+layer.addEventListener('pointerdown',e=>{
+ const p=pt(e),resize=e.target.closest('[data-resize]'),hit=e.target.closest('[data-id]');
+ if(state.activeTool==='text'){addTextAt(p);setTool('select');return}
+ if(state.activeTool==='select'&&resize){const a=state.annotations.find(x=>x.id===resize.dataset.resize);if(a){state.selectedAnnotation=a.id;state.drag={kind:'resize',id:a.id,start:p,orig:{w:a.w,h:a.h}};layer.setPointerCapture(e.pointerId);renderAnnotations()}e.preventDefault();return}
+ if(state.activeTool==='select'&&hit){const a=state.annotations.find(x=>x.id===hit.dataset.id);if(a){state.selectedAnnotation=a.id;state.drag={kind:'move',id:a.id,start:p,orig:JSON.parse(JSON.stringify(a))};layer.setPointerCapture(e.pointerId);renderAnnotations()}e.preventDefault();return}
+ if(state.activeTool==='select'){state.selectedAnnotation=null;renderAnnotations();return}
+ const d={id:uid(),type:state.activeTool,x1:p.x,y1:p.y,x2:p.x,y2:p.y,color:$('annotColor').value};
+ if(d.type==='point'){state.annotations.push(d);state.selectedAnnotation=d.id;renderAnnotations();return}
+ if(d.type==='brush')d.points=[p];
+ state.drawing=d;layer.setPointerCapture(e.pointerId);e.preventDefault();
+});
+layer.addEventListener('pointermove',e=>{
+ const p=pt(e);
+ if(state.drag){const a=state.annotations.find(x=>x.id===state.drag.id);if(!a)return;const dx=p.x-state.drag.start.x,dy=p.y-state.drag.start.y;if(state.drag.kind==='move'){const o=state.drag.orig;if(a.type==='text'){a.x=Math.max(0,Math.min(900-a.w,o.x+dx));a.y=Math.max(0,Math.min(330-a.h,o.y+dy))}else if(a.type==='brush'){a.points=o.points.map(q=>({x:q.x+dx,y:q.y+dy}))}else{if(o.x1!==undefined){a.x1=o.x1+dx;a.y1=o.y1+dy}if(o.x2!==undefined){a.x2=o.x2+dx;a.y2=o.y2+dy}if(o.x!==undefined){a.x=o.x+dx;a.y=o.y+dy}}}else{a.w=Math.max(90,Math.min(900-a.x,state.drag.orig.w+dx));a.h=Math.max(42,Math.min(330-a.y,state.drag.orig.h+dy))}renderAnnotations();return}
+ if(!state.drawing)return;state.drawing.x2=p.x;state.drawing.y2=p.y;if(state.drawing.type==='brush')state.drawing.points.push(p);
+ const d=state.drawing;const temp=state.annotations;state.annotations=temp.concat([{...d,id:'__preview',color:d.color}]);renderAnnotations();state.annotations=temp;
+});
+function endPointer(e){if(state.drag){state.drag=null;return}if(state.drawing)finishDrawing(pt(e))}
+layer.addEventListener('pointerup',endPointer);layer.addEventListener('pointercancel',endPointer);
+$('deleteAnnotation').onclick=()=>{if(!state.selectedAnnotation)return;state.annotations=state.annotations.filter(a=>a.id!==state.selectedAnnotation&&a.fromId!==state.selectedAnnotation&&a.toId!==state.selectedAnnotation);state.selectedAnnotation=null;renderAnnotations()};
+$('clearAnnotations').onclick=()=>{if(state.annotations.length&&confirm('Clear all drawings on this chart?')){state.annotations=[];state.selectedAnnotation=null;renderAnnotations()}};
+$('editAnnotationText').onclick=()=>{const a=state.annotations.find(x=>x.id===state.selectedAnnotation);if(!a||a.type!=='text'){alert('Select a text box first.');return}const t=prompt('Edit this explanation:',a.text);if(t!==null){a.text=t;const lines=t.split('\n');a.h=Math.max(a.h,lines.length*(a.fontSize+3)+18);renderAnnotations()}};
+$('annotTextSize').onchange=()=>{const a=state.annotations.find(x=>x.id===state.selectedAnnotation);if(a?.type==='text'){a.fontSize=Math.max(10,Math.min(32,Number($('annotTextSize').value)||15));a.h=Math.max(a.h,a.text.split('\n').length*(a.fontSize+3)+18);renderAnnotations()}};
+$('annotColor').onchange=()=>{const a=state.annotations.find(x=>x.id===state.selectedAnnotation);if(a){a.color=$('annotColor').value;renderAnnotations()}};
+$('annotationToInstruction').onclick=()=>{
+ const a=state.annotations.find(x=>x.id===state.selectedAnnotation);if(!a){alert('Select a drawing or text box first.');return}
+ const description=a.type==='text'?a.text:(a.type+' at chart coordinates '+JSON.stringify({x1:a.x1,y1:a.y1,x2:a.x2,y2:a.y2,points:a.points}));
+ const title=prompt('Instruction title:',a.type==='text'?(a.text.split('\n')[0].slice(0,80)):'Chart annotation lesson');if(title===null||!title.trim())return;
+ const rule=prompt('Explain the strategy rule represented by this drawing:',description);if(rule===null||!rule.trim())return;
+ const exceptions=prompt('When should this rule NOT be applied?','');if(exceptions===null)return;
+ state.instructions.unshift({id:uid(),title,category:val('model'),rule,exceptions,test:'Validate against positive and negative examples before applying to live strategy.',scope:'reusable',createdAt:new Date().toISOString(),source:'interactive chart annotation',annotation:{...a},market:meta()});
+ persist();renderLibrary();alert('Saved as a reusable instruction linked to this chart annotation. It is not automatically applied to live signals.');
+};
 $('csvFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{state.candles=parseCSV(await f.text());state.cursor=0;draw();$('replayStatus').textContent='Loaded '+state.candles.length+' valid candles from '+f.name+'. Future candles are hidden from the chart.'}catch(err){alert(err.message)}});
 $('backStep').onclick=()=>step(-Number($('replaySpeed').value));$('nextStep').onclick=()=>step(Number($('replaySpeed').value));$('resetReplay').onclick=()=>{state.cursor=0;draw()};window.addEventListener('resize',draw);
 $('saveMapping').onclick=()=>{const mapping=val('mapping');if(!mapping&&!val('evidence')){alert('Describe your mapping or its evidence first.');return}const rr=calcRR();addRecord('mapping',{model:val('model'),direction:val('direction'),mapping,entry:val('entry'),stop:val('stop'),target:val('target'),rr:rr??val('rr'),evidence:val('evidence'),attachment:state.attached});$('mapping').value='';$('evidence').value='';alert('Mapping saved to your local learning library.')};
