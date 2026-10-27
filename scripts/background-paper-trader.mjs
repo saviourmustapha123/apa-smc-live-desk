@@ -6,7 +6,8 @@ const STATE_URL = new URL('../data/background-paper-trading-state.json', import.
 const REPORT_URL = new URL('../artifacts/background-paper-trading-report.md', import.meta.url);
 const SYMBOLS = ['EURUSD', 'BTCUSD', 'QQQUSDT'];
 const TIMEFRAMES = ['1m', '5m', '15m', '1h'];
-const SECONDS = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600 };
+const CONTEXT_TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '8h', '12h'];
+const SECONDS = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '8h': 28800, '12h': 43200 };
 const MAX_FORWARD_BARS = 100;
 const MIN_RR = 3;
 const nowMs = Date.now();
@@ -197,12 +198,26 @@ log('- Transaction costs are not included. QQQUSDT is scanned only with a QQQUSD
 log('');
 
 for (const symbol of SYMBOLS) {
+  // Fetch execution and higher-timeframe context once per symbol before scanning.
+  // Paper results must use the same top-down admission rule as the live app.
+  const prepared = new Map();
+  for (const contextTf of CONTEXT_TIMEFRAMES) {
+    try {
+      const contextData = await fetchBars(symbol, contextTf);
+      const interval = SECONDS[contextTf];
+      const contextBars = contextData.bars.filter(bar => validOHLC(bar) && bar.time + interval <= nowSeconds).sort((a, b) => a.time - b.time);
+      if (contextBars.length < 20) throw new Error('Only ' + contextBars.length + ' closed candles remain for context');
+      prepared.set(contextTf, { data: contextData, bars: contextBars });
+    } catch (error) { prepared.set(contextTf, { error }); }
+  }
+  const alignmentSets = CONTEXT_TIMEFRAMES.map(tf => [tf, prepared.get(tf)?.bars || []]);
   for (const tf of TIMEFRAMES) {
     const key = symbol + '|' + tf;
     try {
-      const data = await fetchBars(symbol, tf);
+      const loaded = prepared.get(tf);
+      if (!loaded || loaded.error) throw loaded?.error || new Error('No prepared candle data');
+      const { data, bars } = loaded;
       const interval = SECONDS[tf];
-      const bars = data.bars.filter(bar => validOHLC(bar) && bar.time + interval <= nowSeconds).sort((a, b) => a.time - b.time);
       if (bars.length < 100) throw new Error('Only ' + bars.length + ' closed candles remain after filtering');
       const latest = bars.at(-1);
       const closedAt = latest.time + interval;
@@ -244,10 +259,13 @@ for (const symbol of SYMBOLS) {
           const result = engine.scan(symbol, tf, bars);
           const candidates = result.signals
             .filter(signal => signal.time === latest.time && validSignal(signal, latest))
-            .sort((a, b) => Number(a.rr) - Number(b.rr));
+            .map(signal => ({ signal, alignment: engine.align(signal, alignmentSets) }))
+            .filter(item => item.alignment.ok)
+            .sort((a, b) => Number(a.signal.rr) - Number(b.signal.rr));
           candidateCount = candidates.length;
           if (candidates.length) {
-            const signal = candidates[0];
+            const { signal, alignment } = candidates[0];
+            signal.reason = [...(Array.isArray(signal.reason) ? signal.reason : [signal.reason].filter(Boolean)), alignment.label];
             const trade = makeTrade(signal, data.provider, data.exact);
             if (!state.trades.some(item => item.id === trade.id)) {
               state.trades.push(trade);
