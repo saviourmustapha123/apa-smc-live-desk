@@ -71,7 +71,7 @@ test('live chart consumes background paper signals from the persistent remote jo
   assert.match(html, /paper-trade-state\/data\/background-paper-trading-state\.json/);
   assert.match(html, /async function syncBackgroundPaperTrades/);
   assert.match(html, /s\.backgroundLog=records\.filter/);
-  assert.match(html, /s\\.backgroundPaperSyncTimer=setInterval\\(\\(\\)=>\\{if\\(!document\\.hidden\\)syncBackgroundPaperTrades\\(true\\)\\},60000\\)/);
+  assert.match(html, /s\.backgroundPaperSyncTimer=setInterval\(\(\)=>\{if\(!document\.hidden\)syncBackgroundPaperTrades\(true\)\},60000\)/);
 });
 
 test('background chart overlays are explicitly labelled as simulated paper signals, never live broker executions', () => {
