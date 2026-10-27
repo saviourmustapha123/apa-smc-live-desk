@@ -18,7 +18,7 @@ test('offline shell pre-caches Learning Studio and its local module', () => {
 });
 
 test('offline Learning Studio navigation falls back to the Learning Studio document, not the main dashboard', () => {
-  assert.ok(sw.includes(String.raw\`const isLearningStudio = /\\/learning-studio\\.html$/.test(url.pathname);\`));
+  assert.ok(sw.includes("const isLearningStudio = /\\/learning-studio\\.html$/.test(url.pathname);"));
   assert.match(sw, /if \(isLearningStudio\) return \(await cache\.match\('\.\/learning-studio\.html'\)\) \|\| Response\.error\(\)/);
 });
 
