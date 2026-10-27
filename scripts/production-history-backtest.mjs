@@ -11,6 +11,7 @@ const CONTEXT_TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '8h', '12h'];
 const SYMBOLS = ['EURUSD', 'BTCUSD', 'QQQUSDT'];
 const MIN_RR = 3;
 const MAX_FORWARD_BARS = 100;
+const MAX_REPLAY_CLOSES = { '1m': 5000, '5m': 3000, '15m': 2000, '1h': 1000 };
 const INTERVAL_SECONDS = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '8h': 28800, '12h': 43200 };
 const report = [];
 const failures = [];
@@ -202,9 +203,9 @@ function runBacktest(symbol, tf, bars, provider, exact, contextBarsByTf) {
   // Replay the actual pending-OB detector at each historical candle close.
   // Do not treat retrospectively discovered HISTORICAL retests as orders that
   // existed before price touched their entry zones.
-  // Replay the most recent 500 candle closes per timeframe to keep the repeated
-  // production detector bounded; forward outcome evaluation still uses the full history.
-  const firstIndex = Math.max(34, bars.length - 500);
+  // Replay a larger, timeframe-specific recent window to collect meaningful outcomes
+  // without unbounded computation. Forward outcome evaluation uses the full available history.
+  const firstIndex = Math.max(34, bars.length - (MAX_REPLAY_CLOSES[tf] || 500));
   for (let i = firstIndex; i < bars.length - 1; i++) {
     const history = bars.slice(Math.max(0, i + 1 - 1000), i + 1);
     const signal = engine.pending(symbol, tf, history);
