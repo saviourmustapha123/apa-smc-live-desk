@@ -1,8 +1,8 @@
 /* APA SMC Live Desk service worker. Bump SHELL_VERSION whenever changing offline-shell behavior. */
 'use strict';
-const SHELL_VERSION = 'apa-smc-shell-2026-10-27-02';
+const SHELL_VERSION = 'apa-smc-shell-2026-10-27-05';
 const SHELL_CACHE = SHELL_VERSION;
-const SHELL_FILES = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
+const SHELL_FILES = ['./', './index.html', './learning-studio.html', './scripts/strategy-lab-ui.mjs', './manifest.webmanifest', './icon.svg'];
 const EXTERNAL_ASSETS = [
   'https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js',
   'https://cdn.jsdelivr.net/npm/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js'
@@ -55,17 +55,20 @@ self.addEventListener('fetch', event => {
 
   // Always try the network first for HTML. This keeps the app and its signal logic
   // current on each navigation; the cache is a fallback for temporary outages.
-  if (request.mode === 'navigate' || /\/index\.html$/.test(url.pathname)) {
+  if (request.mode === 'navigate' || /\/(?:index|learning-studio)\.html$/.test(url.pathname)) {
     event.respondWith((async () => {
       const cache = await caches.open(SHELL_CACHE);
+      const isLearningStudio = /\/learning-studio\.html$/.test(url.pathname);
+      const cacheKey = isLearningStudio ? './learning-studio.html' : './index.html';
       try {
         const response = await fetch(request, {cache: 'no-store'});
         if (response.ok && !url.searchParams.has('releaseCheck')) {
-          await cache.put('./index.html', response.clone());
-          await cache.put('./', response.clone());
+          await cache.put(cacheKey, response.clone());
+          if (!isLearningStudio) await cache.put('./', response.clone());
         }
         return response;
       } catch (_) {
+        if (isLearningStudio) return (await cache.match('./learning-studio.html')) || Response.error();
         return (await cache.match('./index.html')) || (await cache.match('./')) || Response.error();
       }
     })());
