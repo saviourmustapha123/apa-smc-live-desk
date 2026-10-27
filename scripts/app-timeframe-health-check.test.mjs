@@ -226,8 +226,10 @@ test('all-timeframe SMC zones are rebuilt into one symbol-wide overlay and mappe
   assert.match(html, /const completedTrades=mode==='clean'\?\[\]:s\.log\.filter/);
 });
 
-test('QQQUSDT uses the deployed Cloudflare Worker by default, including when a saved proxy setting is blank', () => {
+test('QQQUSDT uses the deployed Cloudflare Worker and Binance as the tested default venue', () => {
   assert.ok(html.includes("const DEFAULT_QQQ_PROXY='https://apa-smc-qqqusdt-proxy.saviourmustapha123.workers.dev';"));
+  assert.ok(html.includes("qqqProvider:'binance'"), 'new installs should use the Binance route confirmed by the user');
+  assert.match(html, /p\.qqqProvider==='bybit'\?'binance':p\.qqqProvider/, 'previous default Bybit settings must migrate to Binance so existing browsers use the verified route');
   assert.match(html, /s\.qqqProxy=safeQqqProxy\(p\.qqqProxy\|\|DEFAULT_QQQ_PROXY\)/);
   assert.match(html, /function safeQqqProxy\(value\)/);
   assert.match(html, /async function qqqJson\(path\)/);
