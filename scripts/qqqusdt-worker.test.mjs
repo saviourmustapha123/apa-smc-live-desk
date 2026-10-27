@@ -102,6 +102,34 @@ test('worker rejects other symbols and does not proxy them to either exchange', 
   assert.equal(called, false);
 });
 
+test('worker ignores browser-added UTM tracking parameters before query validation', async () => {
+  const calls = [];
+  const worker = makeWorker(async url => {
+    calls.push(String(url));
+    return jsonResponse({ symbol: 'QQQUSDT', price: '715.06', time: 1793064690656 });
+  });
+  const response = await worker.fetch(new Request('https://worker.test/fapi/v1/ticker/price?symbol=QQQUSDT&utm_source=test'));
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.symbol, 'QQQUSDT');
+  assert.equal(body.price, '715.06');
+  assert.ok(calls.every(url => !url.includes('utm_source')), 'tracking parameters must never be forwarded upstream');
+});
+
+test('worker retries the official Binance futures host rotation after a transient upstream failure', async () => {
+  const calls = [];
+  const worker = makeWorker(async url => {
+    calls.push(String(url));
+    if (calls.length <= 5) throw new Error('simulated transient upstream failure');
+    return jsonResponse({ symbol: 'QQQUSDT', price: '715.06' });
+  });
+  const response = await worker.fetch(new Request('https://worker.test/fapi/v1/ticker/price?symbol=QQQUSDT'));
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.price, '715.06');
+  assert.equal(calls.length, 6, 'the second host-rotation attempt should recover on its first host');
+});
+
 test('worker provides CORS headers for browser fetches', async () => {
   const worker = makeWorker(async () => jsonResponse({ symbol: 'QQQUSDT', price: '100' }));
   const response = await worker.fetch(new Request('https://worker.test/fapi/v1/ticker/price?symbol=QQQUSDT'));
