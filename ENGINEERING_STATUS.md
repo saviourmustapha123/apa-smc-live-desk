@@ -115,3 +115,12 @@ Append a dated entry for each material change. Include the commit, reason, check
 - Deployment workflow succeeds where deployment is affected.
 - Live behaviour is checked separately when possible.
 - Any failed check or unverified area remains visible in this record; it is not silently described as complete.
+
+### 2026-10-27 — Default QQQUSDT proxy wiring and health-check follow-up
+
+- Root cause found during the live-feed audit: the deployed Cloudflare Worker returned a valid QQQUSDT ticker when tested directly, but the app's `DEFAULT_QQQ_PROXY` was empty. Unless a user manually entered the Worker URL in Settings, the app attempted direct exchange requests first and could remain blocked by browser CORS or regional restrictions.
+- Change: the app now defaults to `https://apa-smc-qqqusdt-proxy.saviourmustapha123.workers.dev`. Existing saved blank proxy values also fall back to this default. The provider remains configurable and HTTP/data checks still determine whether the feed is usable.
+- Regression coverage: added assertions that the app uses the deployed Worker by default and that saved blank settings fall back to it. Updated the source-contract test to validate the intended configured default rather than the previous empty-default assumption.
+- Deployment status: Pages and Worker deployments had succeeded for the preceding revision. The user supplied a valid JSON ticker response (`QQQUSDT`, price `715.06`), confirming that exact ticker endpoint responded successfully at that time.
+- Outstanding verification: a GitHub Actions health run at 01:33 UTC still received HTTP 502 from both proxy ticker paths. That run preceded the user's later successful ticker response and does not yet prove the current app can load candles through the Worker. Recheck the newest post-change health run and production scanner report before calling the feed integration verified.
+- Strategy status remains provisional. Passing detector/lifecycle tests and a successful ticker response do not establish profitability or full reproduction of proprietary APA rules.
