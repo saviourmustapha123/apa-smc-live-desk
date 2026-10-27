@@ -68,7 +68,7 @@ function normalizeGate(rows) {
 }
 function configuredQqqProxy() {
   try {
-    const url = new URL(String(process.env.QQQ_PROXY_URL || ''));
+    const url = new URL(String(process.env.QQQ_PROXY_URL || 'https://apa-smc-qqqusdt-proxy.saviourmustapha123.workers.dev'));
     if (url.protocol !== 'https:' || !url.hostname.endsWith('.workers.dev') ||
         url.username || url.password || url.search || url.hash) return '';
     return url.origin + url.pathname.replace(/\/$/, '');
@@ -159,11 +159,11 @@ async function fetchBars(symbol, tf) {
     const proxyBase = configuredQqqProxy();
     const providers = [
       ...(proxyBase ? [['Configured Cloudflare Worker', async () => normalizeBinance(await getJson(proxyBase + '/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))]] : []),
-      ['Binance USD-M', async () => normalizeBinance(await getJson('https://fapi.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
-      ['Binance API alternate', async () => normalizeBinance(await getJson('https://api.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
-      ['Binance GCP alternate', async () => normalizeBinance(await getJson('https://api-gcp.binance.com/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))],
+      ...['fapi.binance.com','fapi1.binance.com','fapi2.binance.com','fapi3.binance.com','fapi4.binance.com'].map((host, index) =>
+        [index === 0 ? 'Binance USD-M' : 'Binance USD-M alternate ' + index,
+          async () => normalizeBinance(await getJson('https://' + host + '/fapi/v1/klines?symbol=QQQUSDT&interval=' + tf + '&limit=1000'))]),
       ['Bybit', async () => { const j = await getJson('https://api.bybit.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + ({'1m':'1','5m':'5','15m':'15','1h':'60'}[tf]) + '&limit=1000'); if (Number(j.retCode)!==0) throw new Error(j.retMsg || 'retCode ' + j.retCode); return normalizeBybit(j.result?.list || []); }],
-      ['Bytick', async () => { const j = await getJson('https://api.bytick.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + ({'5m':'5','15m':'15','1h':'60'}[tf]) + '&limit=1000'); if (Number(j.retCode)!==0) throw new Error(j.retMsg || 'retCode ' + j.retCode); return normalizeBybit(j.result?.list || []); }],
+      ['Bytick', async () => { const j = await getJson('https://api.bytick.com/v5/market/kline?category=linear&symbol=QQQUSDT&interval=' + ({'1m':'1','5m':'5','15m':'15','1h':'60'}[tf]) + '&limit=1000'); if (Number(j.retCode)!==0) throw new Error(j.retMsg || 'retCode ' + j.retCode); return normalizeBybit(j.result?.list || []); }],
       ['Gate USDT futures', async () => normalizeGate(await getJson('https://api.gateio.ws/api/v4/futures/usdt/candlesticks?contract=QQQ_USDT&interval=' + tf + '&limit=1000'))]
     ];
     for (const [provider, fetcher] of providers) {
@@ -177,7 +177,7 @@ async function fetchBars(symbol, tf) {
     // Retry with Binance's public historical archives for the exact perpetual
     // contract before considering any non-equivalent ETF proxy.
     try {
-      const archived = await fetchBinanceVisionDaily('QQQUSDT', tf, 8);
+      const archived = await fetchBinanceVisionDaily('QQQUSDT', tf, 30);
       if (archived.length >= 100) return { bars: archived, provider: 'Binance Vision historical archive QQQUSDT', exact: true };
       errors.push('Binance Vision archive returned only ' + archived.length + ' valid QQQUSDT bars');
     } catch (e) { errors.push('Binance Vision archive: ' + e.message); }
