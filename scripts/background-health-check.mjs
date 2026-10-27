@@ -137,7 +137,7 @@ try {
     ['selected candle feed refreshes separately from live quote polling', /async function refreshSelectedCandles\(force=false\)/.test(source) && /await tick\(\);await monitorBackgroundQuotes\(\);await refreshSelectedCandles\(false\)/.test(source)],
     ['all configured markets included in background scan', /async function scanBackgroundPair/.test(source) && /Object\.keys\(symbolConfig\)\.filter\(market=>market!==sym\)/.test(source) && /otherPairNew\+=await scanBackgroundPair\(other\)/.test(source)],
     ['signal journal uses IndexedDB', /createObjectStore\(SIGNALS/.test(source) && /function persistSignals/.test(source)],
-    ['continuous opportunity polling', /setInterval\(\(\)=>refreshTopDown\(\),60000\)/.test(source)],
+    ['continuous opportunity polling with background-tab throttling', /setInterval\(\(\)=>\{if\(!document\.hidden\)refreshTopDown\(\)\},60000\)/.test(source) && /setInterval\(\(\)=>\{if\(!document\.hidden\)runAutomaticPairScan\(\)\},20000\)/.test(source)],
     ['no artificial 500-signal cap', !/s\.log\s*=\s*s\.log\.slice\(0,\s*500\)/.test(source)],
     ['no brokerage execution integration', !/apiKeySecret|brokerPassword|placeOrder\s*\(/i.test(source)]
   ];
