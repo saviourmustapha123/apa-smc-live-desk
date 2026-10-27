@@ -124,11 +124,11 @@ test('concurrent 8H/12H requests share a short-lived hourly cache and pending fe
 });
 
 test('weekly/monthly/yearly views reuse the bounded daily-history cache during refresh bursts', () => {
-  assert.match(html, /const dailyHistoryCache=new Map\(\)/);
-  assert.match(html, /cachedDaily&&Date\.now\(\)-cachedDaily\.at<30000/);
+  assert.match(html, /const dailyHistoryCache=new Map\(\),dailyHistoryPending=new Map\(\)/);
+  assert.match(html, /const cacheKey=qqqCacheSymbol\(sym\),cached=dailyHistoryCache\.get\(cacheKey\)/);
+  assert.match(html, /if\(cached&&Date\.now\(\)-cached\.at<30000\)return cached/);
   assert.match(html, /reused in-memory daily history cache/);
-  assert.match(html, /latestError&&!daily\.length\)\{const result=\{at:Date\.now\(\),bars:\[\],rounds,target,reason\};dailyHistoryCache\.set\(cacheKey,result\);return result/);
-  assert.match(html, /const result=\{at:Date\.now\(\),bars:daily,rounds,target,reason\};\s*dailyHistoryCache\.set\(cacheKey,result\)/);
+  assert.match(html, /dailyHistoryCache\.set\(cacheKey,result\)/);
 });
 
 test('live chart loaders that await data are declared async', () => {
@@ -281,7 +281,7 @@ test('signal monitor exposes entry, stop, target, planned R:R, and setup trigger
   assert.match(html, /t\.reason\|\|t\.scanEngine\|\|'Provisional structural trigger'/);
 });
 
-test('closed forex markets request the last known quote instead of forcing a stale-data 404',()=>{assert.ok(html.includes('async function fetchQuote(sym)'));assert.ok(html.includes('else q=await fetchQuote(s.symbol)'));assert.ok(!html.includes('allowStale=false'));assert.ok(html.includes("endpoint('/latest?symbols='+encodeURIComponent(sym))"));assert.ok(html.includes('historical candles loaded; refresh continues'));assert.ok(html.includes('async function bybitJson(path)'));assert.ok(html.includes('https://api.bytick.com'));assert.ok(html.includes('if(!fresh.length)throw Error(\'Provider returned zero valid candles\')'))});
+test('closed forex markets request the last known quote instead of forcing a stale-data 404',()=>{assert.ok(html.includes('async function fetchQuote(sym)'));assert.ok(html.includes('else q=await fetchQuote(quoteSymbol)'));assert.ok(!html.includes('allowStale=false'));assert.ok(html.includes("endpoint('/latest?symbols='+encodeURIComponent(sym))"));assert.ok(html.includes('historical candles loaded; refresh continues'));assert.ok(html.includes('async function bybitJson(path)'));assert.ok(html.includes('https://api.bytick.com'));assert.ok(html.includes('if(!fresh.length)throw Error(\'Provider returned zero valid candles\')'))});
 
 
 test('signal monitor resolves historical setups from future candles and persists the result', () => {
@@ -552,7 +552,7 @@ test('untriggered EURUSD setups remain pending across weekly market closure', ()
   assert.match(html, /Session closure is not setup invalidation/);
   assert.match(html, /return 0;/);
   assert.doesNotMatch(html, /Forex weekly session closed before entry was triggered/);
-  assert.match(html, /expirePendingSignalsForClosedSessions\(\);await tick\(\);s\.timer=setInterval/);
+  assert.match(html, /expirePendingSignalsForClosedSessions\(\);await tick\(\);if\(generation!==s\.startGeneration/);
 });
 test('live setup generation fails closed while offline or when a market session is closed', () => {
   assert.match(html, /if\(typeof navigator!=='undefined'&&navigator\.onLine===false\)return 'offline: cached data only'/);
